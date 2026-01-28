@@ -1,16 +1,7 @@
-# Python
-backend/venv/
-__pycache__/
-*.pyc
-
-# Node / Next.js
-frontend/node_modules/
-frontend/.next/
-frontend/out/
-
-# Env files
 .env
-.env.local
-
-# OS
+__pycache__/
+venv/
+node_modules/
+.next/
+*.pyc
 .DS_Store
