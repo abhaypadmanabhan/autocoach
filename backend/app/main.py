@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import health, documents
+from app.api.routes import health, documents, quiz
 from app.config import get_settings
 
 settings = get_settings()
@@ -24,6 +24,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router, tags=["health"])
 app.include_router(documents.router, prefix="/documents", tags=["documents"])
+app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
 
 
 @app.get("/")
