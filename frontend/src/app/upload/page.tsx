@@ -4,16 +4,30 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
-import { School, LayoutDashboard, PlusCircle, CloudUpload, FolderOpen, FileText, Loader2, CheckCircle } from "lucide-react";
-import { useUploadDocument, usePollDocumentStatus } from "@/hooks/useDocuments";
+import { School, LayoutDashboard, PlusCircle, CloudUpload, FolderOpen, Loader2, CheckCircle } from "lucide-react";
+import { usePollDocumentStatus } from "@/hooks/useDocuments";
+import { useUploadDocument } from "@/hooks/useUploadDocument";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 export default function Upload() {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
-  const { upload, uploading, error: uploadError, progress } = useUploadDocument();
-  const { document, isPolling } = usePollDocumentStatus(documentId);
+  const { upload, error: uploadError } = useUploadDocument();
+  const { document } = usePollDocumentStatus(documentId);
+
+  // Check auth
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push("/login");
+      }
+    };
+    checkAuth();
+  }, [router]);
 
   useEffect(() => {
     if (document?.status === "ready") {
@@ -34,6 +48,16 @@ export default function Upload() {
     setIsDragging(false);
   }, []);
 
+  const handleUpload = useCallback(async (file: File) => {
+    setUploadedFile(file);
+    try {
+      const result = await upload(file);
+      setDocumentId(result.id);
+    } catch {
+      // Error handled by hook
+    }
+  }, [upload]);
+
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -41,24 +65,14 @@ export default function Upload() {
     if (files.length > 0) {
       await handleUpload(files[0]);
     }
-  }, []);
+  }, [handleUpload]);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       await handleUpload(files[0]);
     }
-  };
-
-  const handleUpload = async (file: File) => {
-    setUploadedFile(file);
-    try {
-      const result = await upload(file);
-      setDocumentId(result.id);
-    } catch (err) {
-      // Error handled by hook
-    }
-  };
+  }, [handleUpload]);
 
   const getStatusMessage = () => {
     if (!document) return "Uploading...";

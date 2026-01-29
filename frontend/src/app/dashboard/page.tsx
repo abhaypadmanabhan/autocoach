@@ -18,21 +18,29 @@ import {
 } from "lucide-react";
 import { useDocuments } from "@/hooks/useDocuments";
 import { createBrowserClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 export default function Dashboard() {
   const router = useRouter();
-  const { documents, loading, error, refetch } = useDocuments();
-  const [user, setUser] = useState<any>(null);
+  const { documents, loading, error } = useDocuments();
+  const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
 
-  // Get current user
+  // Get current user and check auth
   useEffect(() => {
-    const supabase = createBrowserClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    const checkAuth = async () => {
+      const supabase = createBrowserClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        router.push("/login");
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
       setUserLoading(false);
-    });
-  }, []);
+    };
+    checkAuth();
+  }, [router]);
 
   const handleLogout = async () => {
     const supabase = createBrowserClient();
@@ -43,7 +51,6 @@ export default function Dashboard() {
   // Calculate stats from real data
   const totalSessions = documents.length;
   const readyDocuments = documents.filter((d) => d.status === "ready").length;
-  const avgScore = documents.length > 0 ? 84 : 0; // Placeholder for now
 
   // Get most recent ready document for "Continue Learning"
   const recentDocument = documents.find((d) => d.status === "ready");
