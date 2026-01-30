@@ -106,10 +106,9 @@ export function useAnswerQuestion(sessionId: string | null) {
           `/quiz/sessions/${sessionId}/answer?question_id=${questionId}`,
           { method: "POST", body: { answer: normalizedAnswer, input_method: inputMethod } }
         );
-        await Promise.all([
-          globalMutate(`/quiz/sessions/${sessionId}`),
-          globalMutate(`/quiz/sessions/${sessionId}/current`),
-        ]);
+        // Only mutate session data, NOT current question
+        // Question will be refetched when user clicks "Next Question"
+        await globalMutate(`/quiz/sessions/${sessionId}`);
         return response;
       } catch (err: unknown) {
         const message = getErrorMessage(err);

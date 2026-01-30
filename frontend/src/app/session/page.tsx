@@ -30,6 +30,7 @@ function SessionContent() {
   const [answer, setAnswer] = useState<string>("");
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
+  const [isSessionComplete, setIsSessionComplete] = useState(false);
 
   // Timer state - initialized lazily via function to avoid effect
   const [timeRemaining, setTimeRemaining] = useState<number | null>(() => {
@@ -120,18 +121,8 @@ function SessionContent() {
     try {
       const result = await submitAnswer(question.question_id, answer, inputMethod);
       setLastResult(result.result);
+      setIsSessionComplete(result.session_complete);
       setShowFeedback(true);
-
-      if (result.session_complete) {
-        // Clear timer storage when session completes
-        if (sessionId) {
-          sessionStorage.removeItem(`quiz_timer_start_${sessionId}`);
-        }
-        setTimerActive(false);
-        setTimeout(() => {
-          router.push(`/results?session_id=${sessionId}`);
-        }, 2500);
-      }
     } catch {
       // Error handled by hook
     }
@@ -141,6 +132,8 @@ function SessionContent() {
     setShowFeedback(false);
     setAnswer("");
     setLastResult(null);
+    setIsSessionComplete(false);
+    // Refetch question only when user clicks Next (not immediately after submit)
     refetchQuestion();
     refetch();
   };
@@ -161,7 +154,8 @@ function SessionContent() {
     );
   }
 
-  if (!question) {
+  // Show session complete only when there's no question AND no feedback being shown
+  if (!question && !showFeedback) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#34344a]">
         <motion.div
@@ -251,6 +245,7 @@ function SessionContent() {
   };
 
   const getQuestionTypeLabel = () => {
+    if (!question) return "";
     switch (question.question_type) {
       case "mcq": return "Multiple Choice";
       case "true_false": return "True or False";
@@ -285,7 +280,7 @@ function SessionContent() {
             <div className="flex items-center gap-3 min-w-[140px]">
               <span className="text-[#c18c5d]"><FileText size={20} /></span>
               <span className="font-medium text-[#f2f5de]">
-                Question {question.question_number} of {question.total_questions}
+                {question ? `Question ${question.question_number} of ${question.total_questions}` : "Session Complete"}
               </span>
             </div>
             <div className="flex-1 w-full max-w-md mx-4">
@@ -320,15 +315,17 @@ function SessionContent() {
             <div className="bg-[#495867]/20 rounded-xl shadow-lg border border-[#495867] p-6 sm:p-10 relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#cd776a]/40 to-[#cd776a]" />
 
-              <div className="flex mb-6">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#34344a] border border-[#495867] px-3 py-1.5 text-sm font-medium text-[#c18c5d]">
-                  <CheckCircle size={16} />
-                  {getQuestionTypeLabel()}
-                </span>
-              </div>
+              {question && (
+                <div className="flex mb-6">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#34344a] border border-[#495867] px-3 py-1.5 text-sm font-medium text-[#c18c5d]">
+                    <CheckCircle size={16} />
+                    {getQuestionTypeLabel()}
+                  </span>
+                </div>
+              )}
 
               <h1 className="text-2xl sm:text-3xl font-bold text-[#f2f5de] leading-tight mb-10">
-                {question.question_text}
+                {question?.question_text}
               </h1>
 
               {showFeedback && lastResult ? (
@@ -369,14 +366,24 @@ function SessionContent() {
                   </motion.div>
 
                   <div className="flex justify-end">
-                    <button
-                      onClick={handleNext}
-                      disabled={timeUp}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3 text-base font-semibold bg-[#cd776a] text-[#34344a] hover:bg-[#cd776a]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                    >
-                      Next Question
-                      <ArrowRight size={20} />
-                    </button>
+                    {isSessionComplete ? (
+                      <button
+                        onClick={() => router.push(`/results?session_id=${sessionId}`)}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3 text-base font-semibold bg-green-500 text-white hover:bg-green-600 transition-all"
+                      >
+                        View Results
+                        <ArrowRight size={20} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleNext}
+                        disabled={timeUp}
+                        className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3 text-base font-semibold bg-[#cd776a] text-[#34344a] hover:bg-[#cd776a]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        Next Question
+                        <ArrowRight size={20} />
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
