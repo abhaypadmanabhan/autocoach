@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, AlertCircle } from "lucide-react";
 import { staggerContainer, slideUpItem, optionVariants } from "@/lib/motions";
+import { VoiceRecorder } from "./VoiceRecorder";
 import type { QuestionType } from "@/lib/types";
 
 interface QuestionCardProps {
@@ -68,12 +69,29 @@ export function QuestionCard({
 
       case "free_text":
         return (
-          <FreeTextInput
-            value={selectedAnswer || ""}
-            onChange={onAnswer}
-            disabled={showFeedback}
-            placeholder="Type your answer here..."
-          />
+          <div className="space-y-4">
+            <FreeTextInput
+              value={selectedAnswer || ""}
+              onChange={onAnswer}
+              disabled={showFeedback}
+              placeholder="Type your answer here..."
+            />
+            
+            {/* Voice input section */}
+            {!showFeedback && (
+              <div className="pt-4 border-t border-surface-border/50">
+                <VoiceRecorder
+                  onTranscription={(text) => {
+                    // Append transcription to existing text with a space
+                    const currentText = selectedAnswer || "";
+                    const separator = currentText && !currentText.endsWith(" ") ? " " : "";
+                    onAnswer(currentText + separator + text);
+                  }}
+                  disabled={showFeedback}
+                />
+              </div>
+            )}
+          </div>
         );
 
       default:
