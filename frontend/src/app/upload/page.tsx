@@ -1,13 +1,24 @@
 "use client";
 
-import { motion } from "framer-motion";
-import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect } from "react";
-import { School, LayoutDashboard, PlusCircle, CloudUpload, FolderOpen, Loader2, CheckCircle } from "lucide-react";
+import {
+  CloudUpload,
+  FolderOpen,
+  Loader2,
+  CheckCircle,
+  FileText,
+  X,
+  ArrowLeft,
+} from "lucide-react";
 import { usePollDocumentStatus } from "@/hooks/useDocuments";
 import { useUploadDocument } from "@/hooks/useUploadDocument";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { AppShell, PageContainer } from "@/components/layout/AppShell";
+import { DiamondSpinner } from "@/components/ui/DiamondButton";
+import { ProgressDots, ProgressBar } from "@/components/ui/StatusBadge";
+import { staggerContainer, slideUpItem, dropZoneVariants, circularRevealVariants } from "@/lib/motions";
 
 export default function Upload() {
   const router = useRouter();
@@ -29,6 +40,7 @@ export default function Upload() {
     checkAuth();
   }, [router]);
 
+  // Redirect when ready
   useEffect(() => {
     if (document?.status === "ready") {
       const timeout = setTimeout(() => {
@@ -77,109 +89,214 @@ export default function Upload() {
   const getStatusMessage = () => {
     if (!document) return "Uploading...";
     switch (document.status) {
-      case "pending": return "Waiting to process...";
-      case "processing": return "Processing document...";
-      case "ready": return "Ready! Redirecting...";
-      case "failed": return "Processing failed";
-      default: return "Processing...";
+      case "pending":
+        return "Waiting to process...";
+      case "processing":
+        return "Analyzing your document...";
+      case "ready":
+        return "Ready! Redirecting...";
+      case "failed":
+        return "Processing failed";
+      default:
+        return "Processing...";
     }
   };
 
   const getStatusColor = () => {
-    if (!document) return "text-primary";
+    if (!document) return "text-brand-primary";
     switch (document.status) {
-      case "ready": return "text-green-500";
-      case "failed": return "text-red-500";
-      default: return "text-primary";
+      case "ready":
+        return "text-semantic-success";
+      case "failed":
+        return "text-semantic-error";
+      default:
+        return "text-brand-primary";
     }
   };
 
   return (
-    <div className="bg-background-light dark:bg-background-dark text-indigo-space dark:text-gray-100 overflow-hidden h-screen flex font-sans">
-      <motion.aside 
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="w-64 h-full hidden md:flex flex-col border-r border-slate-border dark:border-gray-800 bg-white dark:bg-[#251a18]"
-      >
-        <div className="p-6 flex items-center gap-3 cursor-pointer" onClick={() => router.push("/dashboard")}>
-          <motion.div whileHover={{ scale: 1.1, rotate: 5 }} className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center text-white">
-            <School size={24} />
+    <AppShell showBack backHref="/dashboard" title="Upload Document">
+      <PageContainer size="md">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="py-8"
+        >
+          {/* Header */}
+          <motion.div variants={slideUpItem} className="text-center mb-12">
+            <h1 className="text-h1 font-serif text-text-primary mb-4">
+              What do you want to study?
+            </h1>
+            <p className="text-text-secondary text-lg">
+              Drop your PDF or PowerPoint and we&apos;ll create a custom quiz for you
+            </p>
           </motion.div>
-          <h1 className="text-xl font-bold tracking-tight">AutoCoach</h1>
-        </div>
-        <nav className="flex-1 px-4 space-y-2 mt-4">
-          <Link href="/dashboard" className="flex items-center gap-3 px-4 py-3 text-slate-text dark:text-gray-400 hover:bg-background-light rounded-lg transition-all">
-            <LayoutDashboard size={22} />
-            <span className="font-medium">Dashboard</span>
-          </Link>
-          <Link href="/upload" className="flex items-center gap-3 px-4 py-3 bg-primary/10 text-primary rounded-lg transition-all">
-            <PlusCircle size={22} className="fill-primary/20" />
-            <span className="font-medium">New Study</span>
-          </Link>
-        </nav>
-      </motion.aside>
 
-      <main className="flex-1 flex flex-col h-full relative overflow-y-auto">
-        <header className="h-16 border-b border-slate-border dark:border-gray-800 bg-white dark:bg-[#251a18] flex items-center justify-between px-8 sticky top-0 z-10">
-          <h2 className="text-lg font-medium text-slate-text dark:text-gray-400">Upload Documents</h2>
-        </header>
-        
-        <div className="flex-1 p-8 flex flex-col items-center justify-start">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="w-full max-w-4xl">
-            <div className="mb-8 text-center md:text-left">
-              <motion.h1 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }} className="text-3xl md:text-4xl font-black tracking-tight text-indigo-space dark:text-white mb-2">
-                What do you want to study?
-              </motion.h1>
-              <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="text-slate-text dark:text-gray-400 text-lg">
-                Supported formats: PDF, PPTX
-              </motion.p>
-            </div>
+          {/* Upload Area */}
+          <motion.div variants={slideUpItem}>
+            <motion.div
+              variants={dropZoneVariants}
+              initial="idle"
+              animate={isDragging ? "dragOver" : "idle"}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              onClick={() => !uploadedFile && window.document.getElementById("file-input")?.click()}
+              className={`
+                relative border-2 border-dashed rounded-3xl
+                p-12 md:p-16
+                flex flex-col items-center justify-center
+                cursor-pointer transition-all duration-300
+                ${isDragging
+                  ? "border-brand-primary bg-brand-primary/5 scale-[1.02]"
+                  : "border-surface-border bg-surface-card hover:border-brand-primary/50"
+                }
+                ${uploadedFile ? "pointer-events-none" : ""}
+              `}
+            >
+              <input
+                type="file"
+                id="file-input"
+                className="hidden"
+                accept=".pdf,.pptx"
+                onChange={handleFileSelect}
+              />
 
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5, delay: 0.3 }} className="bg-white dark:bg-[#251a18] rounded-xl shadow-sm border border-slate-border dark:border-gray-800 p-8 md:p-12 mb-10 transition-all duration-300 hover:shadow-md">
-              <motion.div 
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                animate={{ borderColor: isDragging ? "#cd776a" : "rgba(205, 119, 106, 0.3)", backgroundColor: isDragging ? "rgba(205, 119, 106, 0.05)" : "rgba(248, 246, 246, 0.5)" }}
-                className="border-2 border-dashed border-primary/30 dark:border-primary/20 bg-background-light/50 dark:bg-black/20 rounded-xl flex flex-col items-center justify-center py-16 px-4 text-center transition-all cursor-pointer min-h-[300px]"
-                onClick={() => !uploadedFile && window.document.getElementById("file-input")?.click()}
-              >
-                <input type="file" id="file-input" className="hidden" accept=".pdf,.pptx" onChange={handleFileSelect} />
-                
+              <AnimatePresence mode="wait">
                 {!uploadedFile ? (
-                  <>
-                    <motion.div animate={{ y: isDragging ? -5 : 0 }} transition={{ type: "spring", stiffness: 300 }} className="h-16 w-16 bg-white dark:bg-gray-800 rounded-full shadow-sm flex items-center justify-center mb-6 text-primary">
-                      <CloudUpload size={36} />
+                  <motion.div
+                    key="upload-prompt"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="text-center"
+                  >
+                    {/* Animated cloud icon */}
+                    <motion.div
+                      animate={{ y: isDragging ? -10 : [0, -5, 0] }}
+                      transition={{
+                        duration: isDragging ? 0.2 : 2,
+                        repeat: isDragging ? 0 : Infinity,
+                        ease: "easeInOut",
+                      }}
+                      className={`
+                        w-20 h-20 rounded-full mx-auto mb-6
+                        flex items-center justify-center
+                        ${isDragging ? "bg-brand-primary/20" : "bg-surface-dark"}
+                        transition-colors duration-300
+                      `}
+                    >
+                      <CloudUpload
+                        size={40}
+                        className={isDragging ? "text-brand-primary" : "text-brand-secondary"}
+                      />
                     </motion.div>
-                    <h3 className="text-xl font-bold text-indigo-space dark:text-white mb-2">{isDragging ? "Drop your file here" : "Drag & drop your PDF or PPTX"}</h3>
-                    <p className="text-slate-text dark:text-gray-400 mb-8 max-w-sm mx-auto">or click to browse files from your computer</p>
-                    <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-8 rounded-lg shadow-md transition-all flex items-center gap-2" onClick={(e) => { e.stopPropagation(); window.document.getElementById("file-input")?.click(); }}>
-                      <FolderOpen size={20} /> Browse Files
-                    </motion.button>
-                  </>
+
+                    <h3 className="text-xl font-semibold text-text-primary mb-2">
+                      {isDragging ? "Drop your file here" : "Drag & drop your file"}
+                    </h3>
+                    <p className="text-text-muted mb-8">
+                      or <span className="text-brand-primary">click to browse</span>
+                    </p>
+
+                    <div className="flex items-center gap-2 text-sm text-text-muted">
+                      <FileText size={16} />
+                      <span>Supports PDF, PPTX</span>
+                    </div>
+                  </motion.div>
                 ) : (
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center">
+                  <motion.div
+                    key="uploading"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center"
+                  >
                     {document?.status === "ready" ? (
-                      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 200 }} className="h-16 w-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mb-4 text-green-600">
-                        <CheckCircle size={32} />
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200 }}
+                        className="w-20 h-20 rounded-full bg-semantic-success/20 flex items-center justify-center mx-auto mb-6"
+                      >
+                        <CheckCircle size={40} className="text-semantic-success" />
                       </motion.div>
                     ) : (
-                      <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="h-16 w-16 text-primary mb-4">
-                        <Loader2 size={64} />
-                      </motion.div>
+                      <div className="mx-auto mb-6">
+                        <DiamondSpinner size="lg" />
+                      </div>
                     )}
-                    <h3 className="text-xl font-bold text-indigo-space dark:text-white mb-1">{uploadedFile.name}</h3>
-                    <p className="text-slate-text dark:text-gray-400 text-sm mb-2">{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                    <p className={`text-sm font-medium ${getStatusColor()}`}>{getStatusMessage()}</p>
-                    {uploadError && <p className="text-red-500 text-sm mt-2">{uploadError}</p>}
+
+                    <h3 className="text-xl font-semibold text-text-primary mb-2">
+                      {uploadedFile.name}
+                    </h3>
+                    <p className="text-text-muted text-sm mb-4">
+                      {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+
+                    <div className="flex items-center justify-center gap-3 mb-4">
+                      <p className={`font-medium ${getStatusColor()}`}>
+                        {getStatusMessage()}
+                      </p>
+                      {document?.status !== "ready" && (
+                        <ProgressDots />
+                      )}
+                    </div>
+
+                    {uploadError && (
+                      <p className="text-semantic-error text-sm mt-2">
+                        {uploadError}
+                      </p>
+                    )}
+
+                    {document?.status === "processing" && (
+                      <div className="w-64 mx-auto mt-4">
+                        <ProgressBar progress={60} size="sm" />
+                      </div>
+                    )}
                   </motion.div>
                 )}
-              </motion.div>
+              </AnimatePresence>
             </motion.div>
           </motion.div>
-        </div>
-      </main>
-    </div>
+
+          {/* Tips */}
+          <motion.div
+            variants={slideUpItem}
+            className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6"
+          >
+            {[
+              {
+                icon: "📄",
+                title: "Clear documents",
+                description: "PDFs with clear text work best",
+              },
+              {
+                icon: "📊",
+                title: "Presentations",
+                description: "PowerPoint files are supported too",
+              },
+              {
+                icon: "⚡",
+                title: "Fast processing",
+                description: "Usually takes less than a minute",
+              },
+            ].map((tip, index) => (
+              <motion.div
+                key={tip.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 + index * 0.1 }}
+                className="text-center p-4"
+              >
+                <div className="text-3xl mb-3">{tip.icon}</div>
+                <h4 className="font-semibold text-text-primary mb-1">{tip.title}</h4>
+                <p className="text-sm text-text-muted">{tip.description}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+        </motion.div>
+      </PageContainer>
+    </AppShell>
   );
 }

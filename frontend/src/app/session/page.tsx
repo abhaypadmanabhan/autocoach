@@ -3,11 +3,24 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { School, Timer, FileText, ArrowRight, Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  CheckCircle,
+  XCircle,
+  ArrowRight,
+  Timer,
+  AlertCircle,
+} from "lucide-react";
 import { useSession, useSubmitAnswer, useCurrentQuestion } from "@/hooks/useQuiz";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
-import type { AnswerResult, InputMethod } from "@/lib/types";
+import { AppShell, PageContainer } from "@/components/layout/AppShell";
+import { QuestionCard } from "@/components/quiz/QuestionCard";
+import { TimerBar } from "@/components/quiz/TimerBar";
+import { FeedbackPanel } from "@/components/quiz/FeedbackPanel";
+import { ProgressBar } from "@/components/ui/StatusBadge";
+import { staggerContainer, slideUpItem, pageVariants } from "@/lib/motions";
+import type { AnswerResult } from "@/lib/types";
 
 // Format seconds to mm:ss
 function formatTime(seconds: number): string {
@@ -32,9 +45,8 @@ function SessionContent() {
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
 
-  // Timer state - initialized lazily via function to avoid effect
+  // Timer state
   const [timeRemaining, setTimeRemaining] = useState<number | null>(() => {
-    // Lazy initialization from sessionStorage
     if (typeof window === "undefined" || !sessionId || !initialTimerSeconds) return initialTimerSeconds;
     const storageKey = `quiz_timer_start_${sessionId}`;
     let startTime = sessionStorage.getItem(storageKey);
@@ -45,7 +57,7 @@ function SessionContent() {
     const elapsed = Math.floor((Date.now() - parseInt(startTime, 10)) / 1000);
     return Math.max(0, initialTimerSeconds - elapsed);
   });
-  
+
   const [timerActive, setTimerActive] = useState(() => {
     if (typeof window === "undefined" || !sessionId || !initialTimerSeconds) return false;
     const storageKey = `quiz_timer_start_${sessionId}`;
@@ -56,7 +68,7 @@ function SessionContent() {
     const elapsed = Math.floor((Date.now() - parseInt(startTime, 10)) / 1000);
     return initialTimerSeconds - elapsed > 0;
   });
-  
+
   const [timeUp, setTimeUp] = useState(() => {
     if (typeof window === "undefined" || !sessionId || !initialTimerSeconds) return false;
     const storageKey = `quiz_timer_start_${sessionId}`;
@@ -84,12 +96,12 @@ function SessionContent() {
     }
   }, [sessionId, router]);
 
-  // Timer countdown effect
+  // Timer countdown
   useEffect(() => {
     if (!timerActive || timeRemaining === null || timeRemaining <= 0) return;
 
     const interval = setInterval(() => {
-      setTimeRemaining(prev => {
+      setTimeRemaining((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(interval);
           setTimerActive(false);
@@ -103,12 +115,12 @@ function SessionContent() {
     return () => clearInterval(interval);
   }, [timerActive, timeRemaining]);
 
-  // Auto-navigate to results when time is up
+  // Auto-navigate when time's up
   useEffect(() => {
     if (timeUp && sessionId) {
       const timeout = setTimeout(() => {
         router.push(`/results?session_id=${sessionId}`);
-      }, 1500);
+      }, 2000);
       return () => clearTimeout(timeout);
     }
   }, [timeUp, sessionId, router]);
@@ -116,10 +128,10 @@ function SessionContent() {
   const handleSubmit = async () => {
     if (!question || !answer.trim() || timeUp) return;
 
-    const inputMethod: InputMethod = "typed";
-
     try {
-      const result = await submitAnswer(question.question_id, answer, inputMethod);
+      // Always trim the answer before submitting
+      const trimmedAnswer = answer.trim();
+      const result = await submitAnswer(question.question_id, trimmedAnswer, "typed");
       setLastResult(result.result);
       setIsSessionComplete(result.session_complete);
       setShowFeedback(true);
@@ -133,313 +145,180 @@ function SessionContent() {
     setAnswer("");
     setLastResult(null);
     setIsSessionComplete(false);
-    // Refetch question only when user clicks Next (not immediately after submit)
     refetchQuestion();
     refetch();
   };
 
-  // Timer color based on remaining time
-  const getTimerColor = () => {
-    if (timeRemaining === null) return "text-[#f2f5de]";
-    if (timeRemaining <= 10) return "text-red-400 animate-pulse";
-    if (timeRemaining <= 30) return "text-[#c18c5d]";
-    return "text-[#f2f5de]";
+  const handleAnswer = (selectedAnswer: string) => {
+    setAnswer(selectedAnswer);
   };
+
+  const progress = session ? ((session.answered_questions / session.total_questions) * 100) : 0;
 
   if (sessionLoading || questionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#34344a]">
-        <Loader2 className="w-8 h-8 text-[#cd776a] animate-spin" />
+      <div className="h-[80vh] flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
       </div>
     );
   }
 
-  // Show session complete only when there's no question AND no feedback being shown
+  // Show session complete
   if (!question && !showFeedback) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#34344a]">
+      <div className="h-[80vh] flex flex-col items-center justify-center">
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: "spring", stiffness: 200 }}
+          className="w-20 h-20 rounded-full bg-semantic-success/20 flex items-center justify-center mb-6"
         >
-          <CheckCircle className="w-16 h-16 text-green-400 mb-4" />
+          <CheckCircle size={40} className="text-semantic-success" />
         </motion.div>
-        <h2 className="text-2xl font-bold text-[#f2f5de]">Session Complete!</h2>
-        <button 
-          onClick={() => router.push(`/results?session_id=${sessionId}`)} 
-          className="mt-4 px-6 py-3 bg-[#cd776a] text-[#34344a] rounded-lg font-semibold hover:bg-[#cd776a]/90 transition-colors"
+        <h2 className="text-h2 font-serif text-text-primary mb-4">Session Complete!</h2>
+        <motion.button
+          onClick={() => router.push(`/results?session_id=${sessionId}`)}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="
+            px-8 py-3 rounded-xl
+            bg-brand-primary text-surface-dark
+            font-semibold
+            hover:bg-brand-primary/90 transition-colors
+          "
         >
           View Results
-        </button>
+        </motion.button>
       </div>
     );
   }
 
-  const progress = session ? ((session.answered_questions / session.total_questions) * 100) : 0;
-
-  const renderQuestionInput = () => {
-    if (!question) return null;
-
-    switch (question.question_type) {
-      case "mcq":
-        return (
-          <div className="space-y-3">
-            {question.options?.map((opt, i) => (
-              <button
-                key={i}
-                onClick={() => setAnswer(opt)}
-                disabled={timeUp}
-                className={`w-full text-left group flex items-center p-4 rounded-xl border-2 transition-all duration-200 ${
-                  answer === opt
-                    ? "border-[#cd776a] bg-[#cd776a]/20"
-                    : "border-[#495867] bg-[#495867]/30 hover:border-[#cd776a]/50 hover:bg-[#495867]/50"
-                } ${timeUp ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-bold text-sm transition-colors ${
-                  answer === opt ? "bg-[#cd776a] text-[#34344a]" : "bg-[#34344a] text-[#f2f5de]/70 group-hover:bg-[#cd776a]/20 group-hover:text-[#cd776a]"
-                }`}>
-                  {String.fromCharCode(65 + i)}
-                </div>
-                <span className="ml-4 text-base text-[#f2f5de] font-medium">{opt}</span>
-              </button>
-            ))}
-          </div>
-        );
-
-      case "true_false":
-        return (
-          <div className="flex gap-4">
-            {["True", "False"].map((opt) => (
-              <button
-                key={opt}
-                onClick={() => setAnswer(opt)}
-                disabled={timeUp}
-                className={`flex-1 py-5 rounded-xl border-2 text-lg font-bold transition-all duration-200 ${
-                  answer === opt
-                    ? "border-[#cd776a] bg-[#cd776a] text-[#34344a] shadow-lg shadow-[#cd776a]/20"
-                    : "border-[#495867] bg-[#495867]/30 text-[#f2f5de] hover:border-[#cd776a]/50 hover:bg-[#495867]/50"
-                } ${timeUp ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        );
-
-      case "free_text":
-        return (
-          <textarea
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Type your answer here..."
-            rows={4}
-            disabled={timeUp}
-            className="w-full p-4 border-2 border-[#495867] bg-[#495867]/30 rounded-xl text-base text-[#f2f5de] placeholder-[#f2f5de]/40 focus:border-[#cd776a] focus:outline-none focus:bg-[#495867]/50 resize-none disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const getQuestionTypeLabel = () => {
-    if (!question) return "";
-    switch (question.question_type) {
-      case "mcq": return "Multiple Choice";
-      case "true_false": return "True or False";
-      case "free_text": return "Free Response";
-      default: return question.question_type;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#34344a] text-[#f2f5de] flex flex-col font-sans">
-      {/* Header */}
-      <header className="w-full bg-[#495867]/30 border-b border-[#495867] sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div 
-              className="flex items-center gap-3 cursor-pointer" 
-              onClick={() => router.push("/dashboard")}
-            >
-              <div className="flex items-center justify-center size-8 rounded-lg bg-[#cd776a]/20 text-[#cd776a]">
-                <School size={20} />
+    <div className="pb-32">
+      <PageContainer size="lg">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="py-8"
+        >
+          {/* Progress Header */}
+          <motion.div variants={slideUpItem} className="mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-h2 font-serif text-text-primary">
+                  Question {question?.question_number} of {question?.total_questions}
+                </h1>
+                <p className="text-text-muted mt-1">
+                  {session?.correct_answers || 0} correct so far
+                </p>
               </div>
-              <h2 className="text-xl font-bold tracking-tight text-[#f2f5de]">AutoCoach</h2>
-            </div>
-          </div>
-        </div>
-      </header>
 
-      {/* Progress Bar with Timer */}
-      <div className="w-full bg-[#495867]/20 border-b border-[#495867]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div className="flex items-center gap-3 min-w-[140px]">
-              <span className="text-[#c18c5d]"><FileText size={20} /></span>
-              <span className="font-medium text-[#f2f5de]">
-                {question ? `Question ${question.question_number} of ${question.total_questions}` : "Session Complete"}
-              </span>
-            </div>
-            <div className="flex-1 w-full max-w-md mx-4">
-              <div className="flex justify-between mb-1">
-                <span className="text-xs font-medium text-[#cd776a]">{Math.round(progress)}% Complete</span>
-              </div>
-              <div className="w-full bg-[#34344a] rounded-full h-2.5 border border-[#495867]">
-                <motion.div 
-                  className="bg-[#cd776a] h-2 rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progress}%` }}
-                  transition={{ duration: 0.5 }}
-                />
-              </div>
-            </div>
-            {initialTimerSeconds && (
-              <div className={`flex items-center gap-2 bg-[#34344a] px-4 py-2 rounded-lg border border-[#495867] ${getTimerColor()}`}>
-                <Timer size={18} />
-                <span className="font-mono font-bold text-lg">
-                  {timeRemaining !== null ? formatTime(timeRemaining) : "--:--"}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <main className="flex-grow w-full max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <div className="lg:col-span-8 flex flex-col gap-6">
-            <div className="bg-[#495867]/20 rounded-xl shadow-lg border border-[#495867] p-6 sm:p-10 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#cd776a]/40 to-[#cd776a]" />
-
-              {question && (
-                <div className="flex mb-6">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#34344a] border border-[#495867] px-3 py-1.5 text-sm font-medium text-[#c18c5d]">
-                    <CheckCircle size={16} />
-                    {getQuestionTypeLabel()}
+              {initialTimerSeconds && timeRemaining !== null && (
+                <div className="flex items-center gap-3 bg-surface-card px-4 py-2 rounded-xl border border-surface-border">
+                  <Timer size={20} className={timeRemaining <= 10 ? "text-semantic-error" : "text-brand-secondary"} />
+                  <span className={`font-mono text-xl font-bold ${timeRemaining <= 10 ? "text-semantic-error" : "text-text-primary"}`}>
+                    {formatTime(timeRemaining)}
                   </span>
                 </div>
               )}
+            </div>
 
-              <h1 className="text-2xl sm:text-3xl font-bold text-[#f2f5de] leading-tight mb-10">
-                {question?.question_text}
-              </h1>
+            {/* Progress bar */}
+            <div className="w-full bg-surface-border/30 rounded-full h-2 overflow-hidden">
+              <motion.div
+                className="h-full bg-brand-primary rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+          </motion.div>
 
-              {showFeedback && lastResult ? (
-                <div className="space-y-6">
-                  <motion.div 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`p-6 rounded-xl border ${
-                      lastResult.is_correct 
-                        ? "bg-green-500/10 border-green-500/30" 
-                        : "bg-red-500/10 border-red-500/30"
-                    }`}
+          {/* Question Card */}
+          <motion.div variants={slideUpItem}>
+            {question && (
+              <div className="bg-surface-card rounded-3xl p-8 md:p-12 border border-surface-border">
+                <QuestionCard
+                  number={question.question_number}
+                  question={question.question_text}
+                  type={question.question_type}
+                  options={question.options || undefined}
+                  onAnswer={handleAnswer}
+                  selectedAnswer={answer}
+                  showFeedback={showFeedback}
+                  correctAnswer={lastResult?.correct_answer}
+                />
+
+                {/* Submit button */}
+                {!showFeedback && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="mt-8 flex justify-end"
                   >
-                    <div className="flex items-center gap-3 mb-3">
-                      {lastResult.is_correct ? (
-                        <CheckCircle className="text-green-400" size={28} />
-                      ) : (
-                        <XCircle className="text-red-400" size={28} />
-                      )}
-                      <h3 className={`text-xl font-bold ${
-                        lastResult.is_correct ? "text-green-400" : "text-red-400"
-                      }`}>
-                        {lastResult.is_correct ? "Correct!" : "Incorrect"}
-                      </h3>
-                    </div>
-                    {lastResult.feedback && (
-                      <p className="text-[#f2f5de]/90 mb-3">{lastResult.feedback}</p>
-                    )}
-                    {!lastResult.is_correct && (
-                      <p className="text-sm text-[#f2f5de]/70">
-                        <span className="font-medium text-[#f2f5de]">Correct answer:</span>{" "}
-                        <span className="text-green-400">{lastResult.correct_answer}</span>
-                      </p>
-                    )}
-                    {lastResult.explanation && (
-                      <p className="text-sm text-[#f2f5de]/60 mt-3 italic">{lastResult.explanation}</p>
-                    )}
-                  </motion.div>
-
-                  <div className="flex justify-end">
-                    {isSessionComplete ? (
-                      <button
-                        onClick={() => router.push(`/results?session_id=${sessionId}`)}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3 text-base font-semibold bg-green-500 text-white hover:bg-green-600 transition-all"
-                      >
-                        View Results
-                        <ArrowRight size={20} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleNext}
-                        disabled={timeUp}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-3 text-base font-semibold bg-[#cd776a] text-[#34344a] hover:bg-[#cd776a]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                      >
-                        Next Question
-                        <ArrowRight size={20} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {renderQuestionInput()}
-
-                  <div className="mt-10 flex justify-end">
-                    <button
+                    <motion.button
                       onClick={handleSubmit}
                       disabled={!answer.trim() || submitting || timeUp}
-                      className={`inline-flex items-center justify-center rounded-lg px-8 py-3 text-base font-semibold shadow-sm transition-all w-full sm:w-auto ${
-                        answer.trim() && !submitting && !timeUp
-                          ? "bg-[#cd776a] text-[#34344a] hover:bg-[#cd776a]/90"
-                          : "bg-[#495867]/50 text-[#f2f5de]/40 cursor-not-allowed"
-                      }`}
+                      whileHover={!answer.trim() || submitting || timeUp ? {} : { scale: 1.02 }}
+                      whileTap={!answer.trim() || submitting || timeUp ? {} : { scale: 0.98 }}
+                      className="
+                        flex items-center gap-2 px-8 py-4 rounded-xl
+                        font-semibold text-lg
+                        transition-all
+                        disabled:opacity-50 disabled:cursor-not-allowed
+                        bg-brand-primary text-surface-dark
+                        hover:bg-brand-primary/90
+                      "
                     >
-                      {submitting ? <Loader2 className="animate-spin mr-2" size={20} /> : null}
-                      {submitting ? "Submitting..." : timeUp ? "Time's Up" : "Submit Answer"}
-                      {!submitting && !timeUp && <ArrowRight className="ml-2" size={20} />}
-                    </button>
-                  </div>
-                  {submitError && (
-                    <div className="mt-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm text-right">
-                      <span className="flex items-center justify-end gap-2">
-                        <AlertCircle size={16} />
-                        {getErrorMessage(submitError)}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
+                      {submitting ? (
+                        <>
+                          <Loader2 size={20} className="animate-spin" />
+                          Submitting...
+                        </>
+                      ) : timeUp ? (
+                        "Time's Up"
+                      ) : (
+                        <>
+                          Submit Answer
+                          <ArrowRight size={20} />
+                        </>
+                      )}
+                    </motion.button>
+                  </motion.div>
+                )}
 
-          {/* Sidebar Stats */}
-          <div className="lg:col-span-4 space-y-6">
-            <div className="bg-[#495867]/20 rounded-xl p-5 border border-[#495867]">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-[#f2f5de]/60 mb-3">Progress</h3>
-              <p className="text-3xl font-bold text-[#cd776a]">{session?.correct_answers || 0} <span className="text-[#f2f5de]/40">/</span> {session?.answered_questions || 0}</p>
-              <p className="text-sm text-[#f2f5de]/60 mt-1">Correct answers</p>
-            </div>
-
-            {initialTimerSeconds && (
-              <div className="bg-[#495867]/20 rounded-xl p-5 border border-[#495867]">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-[#f2f5de]/60 mb-3">Time Remaining</h3>
-                <div className={`text-3xl font-bold font-mono ${getTimerColor()}`}>
-                  {timeRemaining !== null ? formatTime(timeRemaining) : "--:--"}
-                </div>
-                <p className="text-sm text-[#f2f5de]/60 mt-1">
-                  {timeRemaining && timeRemaining <= 30 ? "Hurry up!" : "Keep going!"}
-                </p>
+                {/* Error message */}
+                {submitError && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 p-4 rounded-xl bg-semantic-error/10 border border-semantic-error/30 text-semantic-error flex items-center gap-2"
+                  >
+                    <AlertCircle size={18} />
+                    {getErrorMessage(submitError)}
+                  </motion.div>
+                )}
               </div>
             )}
-          </div>
-        </div>
-      </main>
+          </motion.div>
+        </motion.div>
+      </PageContainer>
+
+      {/* Feedback Panel */}
+      <AnimatePresence>
+        {showFeedback && lastResult && (
+          <FeedbackPanel
+            isCorrect={lastResult.is_correct}
+            explanation={lastResult.explanation || undefined}
+            correctAnswer={lastResult.correct_answer}
+            userAnswer={answer}
+            onNext={isSessionComplete ? () => router.push(`/results?session_id=${sessionId}`) : handleNext}
+            isLastQuestion={isSessionComplete}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Time's Up Overlay */}
       <AnimatePresence>
@@ -448,7 +327,7 @@ function SessionContent() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-[#34344a]/95 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-surface-dark/95 backdrop-blur-sm"
           >
             <motion.div
               initial={{ scale: 0.5, opacity: 0 }}
@@ -457,24 +336,22 @@ function SessionContent() {
               className="text-center"
             >
               <motion.div
-                animate={{ 
+                animate={{
                   rotate: [0, -10, 10, -10, 10, 0],
-                  scale: [1, 1.1, 1]
+                  scale: [1, 1.1, 1],
                 }}
                 transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
               >
-                <Timer size={80} className="text-red-400 mx-auto mb-6" />
+                <Timer size={80} className="text-semantic-error mx-auto mb-6" />
               </motion.div>
-              <h2 className="text-4xl font-bold text-[#f2f5de] mb-2">Time&apos;s Up!</h2>
-              <p className="text-[#f2f5de]/60 mb-6">Redirecting to results...</p>
-              <motion.div
-                className="w-48 h-1 bg-[#495867] rounded-full mx-auto overflow-hidden"
-              >
+              <h2 className="text-4xl font-bold text-text-primary mb-2">Time&apos;s Up!</h2>
+              <p className="text-text-muted mb-6">Redirecting to results...</p>
+              <motion.div className="w-48 h-1 bg-surface-border rounded-full mx-auto overflow-hidden">
                 <motion.div
-                  className="h-full bg-[#cd776a]"
+                  className="h-full bg-brand-primary"
                   initial={{ width: "0%" }}
                   animate={{ width: "100%" }}
-                  transition={{ duration: 1.5, ease: "linear" }}
+                  transition={{ duration: 2, ease: "linear" }}
                 />
               </motion.div>
             </motion.div>
@@ -487,12 +364,16 @@ function SessionContent() {
 
 export default function Session() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#34344a]">
-        <Loader2 className="w-8 h-8 text-[#cd776a] animate-spin" />
-      </div>
-    }>
-      <SessionContent />
-    </Suspense>
+    <AppShell>
+      <Suspense
+        fallback={
+          <div className="h-[80vh] flex items-center justify-center">
+            <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+          </div>
+        }
+      >
+        <SessionContent />
+      </Suspense>
+    </AppShell>
   );
 }

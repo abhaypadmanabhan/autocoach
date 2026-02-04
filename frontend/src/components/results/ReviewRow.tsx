@@ -1,0 +1,249 @@
+"use client";
+
+import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
+import { CheckCircle, XCircle, ChevronDown, Clock, Target, HelpCircle } from "lucide-react";
+import { accordionVariants, listItemVariants } from "@/lib/motions";
+import type { QuestionType } from "@/lib/types";
+
+interface ReviewRowProps {
+  questionNumber: number;
+  questionText: string;
+  questionType: QuestionType;
+  userAnswer: string;
+  correctAnswer: string;
+  isCorrect: boolean;
+  explanation?: string;
+  className?: string;
+}
+
+export function ReviewRow({
+  questionNumber,
+  questionText,
+  questionType,
+  userAnswer,
+  correctAnswer,
+  isCorrect,
+  explanation,
+  className = "",
+}: ReviewRowProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const getQuestionTypeLabel = (type: QuestionType) => {
+    switch (type) {
+      case "mcq":
+        return "Multiple Choice";
+      case "true_false":
+        return "True/False";
+      case "free_text":
+        return "Free Response";
+      default:
+        return type;
+    }
+  };
+
+  const getQuestionTypeIcon = (type: QuestionType) => {
+    switch (type) {
+      case "mcq":
+        return "🔘";
+      case "true_false":
+        return "✓";
+      case "free_text":
+        return "✏️";
+      default:
+        return "❓";
+    }
+  };
+
+  return (
+    <motion.div
+      variants={listItemVariants}
+      custom={questionNumber - 1}
+      initial="hidden"
+      animate="visible"
+      className={`
+        border-b border-surface-border/50 last:border-0
+        ${className}
+      `}
+    >
+      {/* Collapsed row */}
+      <motion.button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full p-4 flex items-start gap-4 hover:bg-surface-card/50 transition-colors text-left"
+      >
+        {/* Status indicator */}
+        <div
+          className={`
+            w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+            ${isCorrect
+              ? "bg-semantic-success/10 text-semantic-success"
+              : "bg-semantic-error/10 text-semantic-error"
+            }
+          `}
+        >
+          {isCorrect ? <CheckCircle size={20} /> : <XCircle size={20} />}
+        </div>
+
+        {/* Question content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-bold text-text-muted uppercase">
+              Q{questionNumber}
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded-lg bg-surface-card text-text-secondary border border-surface-border/50">
+              {getQuestionTypeIcon(questionType)} {getQuestionTypeLabel(questionType)}
+            </span>
+          </div>
+          <p className="text-text-primary font-medium line-clamp-2">
+            {questionText}
+          </p>
+        </div>
+
+        {/* Expand icon */}
+        <motion.div
+          animate={{ rotate: isExpanded ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-text-muted"
+        >
+          <ChevronDown size={20} />
+        </motion.div>
+      </motion.button>
+
+      {/* Expanded content */}
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial="collapsed"
+            animate="expanded"
+            exit="collapsed"
+            variants={accordionVariants}
+            className="overflow-hidden"
+          >
+            <div className="px-4 pb-4 pl-[72px]">
+              <div className="space-y-3 p-4 rounded-xl bg-surface-card border border-surface-border/50">
+                {/* User's answer */}
+                <div>
+                  <span className="text-xs text-text-muted uppercase tracking-wider block mb-1">
+                    Your Answer
+                  </span>
+                  <span
+                    className={`font-medium ${
+                      isCorrect ? "text-semantic-success" : "text-semantic-error"
+                    }`}
+                  >
+                    {userAnswer || "Not answered"}
+                  </span>
+                </div>
+
+                {/* Correct answer (if wrong) */}
+                {!isCorrect && (
+                  <div>
+                    <span className="text-xs text-text-muted uppercase tracking-wider block mb-1">
+                      Correct Answer
+                    </span>
+                    <span className="font-medium text-semantic-success">
+                      {correctAnswer}
+                    </span>
+                  </div>
+                )}
+
+                {/* Explanation */}
+                {explanation && (
+                  <div className="pt-2 border-t border-surface-border/30">
+                    <span className="text-xs text-brand-secondary uppercase tracking-wider block mb-1">
+                      Explanation
+                    </span>
+                    <p className="text-sm text-text-secondary">{explanation}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+interface ReviewListProps {
+  items: Array<{
+    question_id: string;
+    question_number: number;
+    question_text: string;
+    question_type: QuestionType;
+    user_answer: string;
+    correct_answer: string;
+    is_correct: boolean;
+    explanation?: string;
+  }>;
+  className?: string;
+}
+
+export function ReviewList({ items, className = "" }: ReviewListProps) {
+  return (
+    <div className={`bg-surface-card rounded-2xl border border-surface-border overflow-hidden ${className}`}>
+      {items.map((item, index) => (
+        <ReviewRow
+          key={item.question_id}
+          questionNumber={item.question_number}
+          questionText={item.question_text}
+          questionType={item.question_type}
+          userAnswer={item.user_answer}
+          correctAnswer={item.correct_answer}
+          isCorrect={item.is_correct}
+          explanation={item.explanation}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface ReviewSummaryProps {
+  total: number;
+  correct: number;
+  incorrect: number;
+  skipped?: number;
+  className?: string;
+}
+
+export function ReviewSummary({
+  total,
+  correct,
+  incorrect,
+  skipped = 0,
+  className = "",
+}: ReviewSummaryProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`grid grid-cols-2 md:grid-cols-4 gap-4 ${className}`}
+    >
+      <div className="p-4 rounded-xl bg-surface-card border border-surface-border text-center">
+        <HelpCircle size={24} className="mx-auto mb-2 text-text-muted" />
+        <p className="text-2xl font-bold text-text-primary">{total}</p>
+        <p className="text-xs text-text-muted uppercase tracking-wider">Total</p>
+      </div>
+
+      <div className="p-4 rounded-xl bg-surface-card border border-surface-border text-center">
+        <CheckCircle size={24} className="mx-auto mb-2 text-semantic-success" />
+        <p className="text-2xl font-bold text-semantic-success">{correct}</p>
+        <p className="text-xs text-text-muted uppercase tracking-wider">Correct</p>
+      </div>
+
+      <div className="p-4 rounded-xl bg-surface-card border border-surface-border text-center">
+        <XCircle size={24} className="mx-auto mb-2 text-semantic-error" />
+        <p className="text-2xl font-bold text-semantic-error">{incorrect}</p>
+        <p className="text-xs text-text-muted uppercase tracking-wider">Wrong</p>
+      </div>
+
+      {skipped > 0 && (
+        <div className="p-4 rounded-xl bg-surface-card border border-surface-border text-center">
+          <Clock size={24} className="mx-auto mb-2 text-semantic-warning" />
+          <p className="text-2xl font-bold text-semantic-warning">{skipped}</p>
+          <p className="text-xs text-text-muted uppercase tracking-wider">Skipped</p>
+        </div>
+      )}
+    </motion.div>
+  );
+}
