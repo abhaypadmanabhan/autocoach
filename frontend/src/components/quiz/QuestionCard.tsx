@@ -215,8 +215,56 @@ function MCQOptions({
     >
       {options.map((option, index) => {
         const isSelected = selectedAnswer === option;
-        const isCorrect = showFeedback && correctAnswer === option;
-        const isWrong = showFeedback && isSelected && correctAnswer !== option;
+        const isCorrectOption = showFeedback && correctAnswer === option;
+        const isWrongSelection = showFeedback && isSelected && correctAnswer !== option;
+
+        // Determine visual state (priority: correct > wrong > selected > idle)
+        const visualState = isCorrectOption
+          ? "correct"
+          : isWrongSelection
+            ? "wrong"
+            : isSelected
+              ? "selected"
+              : "idle";
+
+        // Get border/bg styles based on state
+        const getContainerStyles = () => {
+          if (isCorrectOption) {
+            return "border-semantic-success bg-semantic-success/10";
+          }
+          if (isWrongSelection) {
+            return "border-semantic-error bg-semantic-error/10";
+          }
+          if (isSelected) {
+            return "border-brand-primary bg-brand-primary/10";
+          }
+          return "border-surface-border bg-surface-card hover:border-brand-primary/50";
+        };
+
+        // Get indicator styles based on state
+        const getIndicatorStyles = () => {
+          if (isCorrectOption) {
+            return "bg-semantic-success text-white";
+          }
+          if (isWrongSelection) {
+            return "bg-semantic-error text-white";
+          }
+          if (isSelected) {
+            return "bg-brand-primary text-surface-dark";
+          }
+          return "bg-surface-dark text-text-secondary";
+        };
+
+        // Get text styles based on state
+        const getTextStyles = () => {
+          if (isCorrectOption) {
+            return "text-semantic-success font-semibold";
+          }
+          if (isWrongSelection) {
+            return "text-semantic-error";
+          }
+          return "text-text-primary";
+        };
 
         return (
           <motion.button
@@ -227,26 +275,13 @@ function MCQOptions({
             initial="idle"
             whileHover={showFeedback ? undefined : "hover"}
             whileTap={showFeedback ? undefined : "tap"}
-            animate={
-              isCorrect
-                ? "correct"
-                : isWrong
-                  ? "wrong"
-                  : isSelected
-                    ? "selected"
-                    : "idle"
-            }
+            animate={visualState}
             className={`
               w-full text-left p-4 rounded-xl border-2
               flex items-center gap-4
               transition-all duration-200
               disabled:cursor-default
-              ${isSelected
-                ? "border-brand-primary bg-brand-primary/10"
-                : "border-surface-border bg-surface-card hover:border-brand-primary/50"
-              }
-              ${isCorrect ? "border-semantic-success bg-semantic-success/10" : ""}
-              ${isWrong ? "border-semantic-error bg-semantic-error/10" : ""}
+              ${getContainerStyles()}
             `}
           >
             {/* Option letter (A, B, C, D...) */}
@@ -255,32 +290,45 @@ function MCQOptions({
                 w-10 h-10 rounded-lg flex items-center justify-center
                 font-bold text-sm flex-shrink-0
                 transition-all duration-200
-                ${isSelected
-                  ? "bg-brand-primary text-surface-dark"
-                  : isCorrect
-                    ? "bg-semantic-success text-white"
-                    : isWrong
-                      ? "bg-semantic-error text-white"
-                      : "bg-surface-dark text-text-secondary"
-                }
+                ${getIndicatorStyles()}
               `}
             >
               {String.fromCharCode(65 + index)}
             </div>
 
             {/* Option text */}
-            <span className="text-base font-medium flex-1 text-text-primary">
+            <span className={`text-base font-medium flex-1 ${getTextStyles()}`}>
               {option}
             </span>
 
-            {/* Selection indicator */}
-            {isSelected && !showFeedback && (
+            {/* Selection indicator - only show when not in feedback mode */}
+            {!showFeedback && isSelected && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 className="w-6 h-6 rounded-full bg-brand-primary flex items-center justify-center"
               >
                 <Check size={14} className="text-surface-dark" />
+              </motion.div>
+            )}
+
+            {/* Feedback indicators */}
+            {showFeedback && isCorrectOption && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="w-6 h-6 rounded-full bg-semantic-success flex items-center justify-center"
+              >
+                <Check size={14} className="text-white" />
+              </motion.div>
+            )}
+            {showFeedback && isWrongSelection && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="w-6 h-6 rounded-full bg-semantic-error flex items-center justify-center"
+              >
+                <span className="text-white text-xs font-bold">✕</span>
               </motion.div>
             )}
           </motion.button>
@@ -319,8 +367,64 @@ function TrueFalseOptions({
     >
       {booleanOptions.map((option) => {
         const isSelected = selectedAnswer === option.value;
-        const isCorrect = showFeedback && correctAnswer === option.value;
-        const isWrong = showFeedback && isSelected && correctAnswer !== option.value;
+        const isCorrectOption = showFeedback && correctAnswer === option.value;
+        const isWrongSelection = showFeedback && isSelected && correctAnswer !== option.value;
+
+        // Determine visual state (priority: correct > wrong > selected > idle)
+        const visualState = isCorrectOption
+          ? "correct"
+          : isWrongSelection
+            ? "wrong"
+            : isSelected
+              ? "selected"
+              : "idle";
+
+        // Get border/bg styles based on state
+        const getContainerStyles = () => {
+          if (isCorrectOption) {
+            return "border-semantic-success bg-semantic-success/10";
+          }
+          if (isWrongSelection) {
+            return "border-semantic-error bg-semantic-error/10";
+          }
+          if (isSelected) {
+            return "border-brand-primary bg-brand-primary/10";
+          }
+          return "border-surface-border bg-surface-card hover:border-brand-primary/50";
+        };
+
+        // Get indicator styles based on state
+        const getIndicatorStyles = () => {
+          if (isCorrectOption) {
+            return "bg-semantic-success text-white";
+          }
+          if (isWrongSelection) {
+            return "bg-semantic-error text-white";
+          }
+          if (isSelected) {
+            return "bg-brand-primary text-surface-dark";
+          }
+          return "bg-surface-dark text-text-secondary";
+        };
+
+        // Get indicator content based on state
+        const getIndicatorContent = () => {
+          if (isCorrectOption || isSelected) {
+            return <Check size={18} />;
+          }
+          return <span className="w-2 h-2 rounded-full bg-current" />;
+        };
+
+        // Get text styles based on state
+        const getTextStyles = () => {
+          if (isCorrectOption) {
+            return "text-semantic-success font-semibold";
+          }
+          if (isWrongSelection) {
+            return "text-semantic-error";
+          }
+          return "text-text-primary";
+        };
 
         return (
           <motion.button
@@ -331,26 +435,13 @@ function TrueFalseOptions({
             initial="idle"
             whileHover={showFeedback ? undefined : "hover"}
             whileTap={showFeedback ? undefined : "tap"}
-            animate={
-              isCorrect
-                ? "correct"
-                : isWrong
-                  ? "wrong"
-                  : isSelected
-                    ? "selected"
-                    : "idle"
-            }
+            animate={visualState}
             className={`
               w-full text-left p-4 rounded-xl border-2
               flex items-center gap-4
               transition-all duration-200
               disabled:cursor-default
-              ${isSelected
-                ? "border-brand-primary bg-brand-primary/10"
-                : "border-surface-border bg-surface-card hover:border-brand-primary/50"
-              }
-              ${isCorrect ? "border-semantic-success bg-semantic-success/10" : ""}
-              ${isWrong ? "border-semantic-error bg-semantic-error/10" : ""}
+              ${getContainerStyles()}
             `}
           >
             {/* Option indicator */}
@@ -359,36 +450,45 @@ function TrueFalseOptions({
                 w-10 h-10 rounded-lg flex items-center justify-center
                 font-bold text-sm flex-shrink-0
                 transition-all duration-200
-                ${isSelected
-                  ? "bg-brand-primary text-surface-dark"
-                  : isCorrect
-                    ? "bg-semantic-success text-white"
-                    : isWrong
-                      ? "bg-semantic-error text-white"
-                      : "bg-surface-dark text-text-secondary"
-                }
+                ${getIndicatorStyles()}
               `}
             >
-              {isSelected || isCorrect ? (
-                <Check size={18} />
-              ) : (
-                <span className="w-2 h-2 rounded-full bg-current" />
-              )}
+              {getIndicatorContent()}
             </div>
 
             {/* Option text */}
-            <span className="text-base font-medium flex-1 text-text-primary">
+            <span className={`text-base font-medium flex-1 ${getTextStyles()}`}>
               {option.label}
             </span>
 
-            {/* Selection indicator */}
-            {isSelected && !showFeedback && (
+            {/* Selection indicator - only show when not in feedback mode */}
+            {!showFeedback && isSelected && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 className="w-6 h-6 rounded-full bg-brand-primary flex items-center justify-center"
               >
                 <Check size={14} className="text-surface-dark" />
+              </motion.div>
+            )}
+
+            {/* Feedback indicators */}
+            {showFeedback && isCorrectOption && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="w-6 h-6 rounded-full bg-semantic-success flex items-center justify-center"
+              >
+                <Check size={14} className="text-white" />
+              </motion.div>
+            )}
+            {showFeedback && isWrongSelection && (
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="w-6 h-6 rounded-full bg-semantic-error flex items-center justify-center"
+              >
+                <span className="text-white text-xs font-bold">✕</span>
               </motion.div>
             )}
           </motion.button>
