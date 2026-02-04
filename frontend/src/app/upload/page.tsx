@@ -26,7 +26,7 @@ export default function Upload() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
-  const { upload, error: uploadError, uploading } = useUploadDocument();
+  const { upload, error: uploadError, uploading, stage, progress } = useUploadDocument();
   const { document } = usePollDocumentStatus(documentId);
 
   const handleReset = useCallback(() => {
@@ -93,10 +93,24 @@ export default function Upload() {
   }, [handleUpload]);
 
   const getStatusMessage = () => {
-    if (!document) return "Uploading...";
+    // Show upload stages first (before document is registered)
+    if (!documentId) {
+      switch (stage) {
+        case "uploading":
+          return "Uploading to storage...";
+        case "registering":
+          return "Registering document...";
+        case "error":
+          return "Upload failed";
+        default:
+          return "Preparing...";
+      }
+    }
+    // Then show document processing status
+    if (!document) return "Waiting to process...";
     switch (document.status) {
       case "pending":
-        return "Waiting to process...";
+        return "Queued for processing...";
       case "processing":
         return "Analyzing your document...";
       case "ready":
@@ -264,9 +278,13 @@ export default function Upload() {
                       </p>
                     )}
 
-                    {document?.status === "processing" && (
+                    {/* Progress bar during upload or processing */}
+                    {(uploading || document?.status === "processing") && (
                       <div className="w-64 mx-auto mt-4">
-                        <ProgressBar progress={60} size="sm" />
+                        <ProgressBar
+                          progress={uploading ? progress : 60}
+                          size="sm"
+                        />
                       </div>
                     )}
 

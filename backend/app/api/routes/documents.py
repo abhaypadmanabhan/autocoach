@@ -15,6 +15,7 @@ from app.core.supabase import supabase_admin
 from app.models.documents import (
     DocumentResponse,
     DocumentListResponse,
+    RegisterDocumentRequest,
     SearchRequest,
     SearchResponse,
     ChunkResult,
@@ -179,6 +180,127 @@ async def upload_document(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to create document record: {str(e)}"
+        )
+
+
+@router.post("/register", response_model=DocumentResponse)
+async def register_document(
+    request: RegisterDocumentRequest,
+    background_tasks: BackgroundTasks,
+    user_id: UUID = Depends(get_user_id_from_token),
+):
+    """
+    Register a document that was uploaded directly to Supabase Storage.
+
+    This endpoint is used when the frontend uploads files directly to storage
+    (bypassing the backend), then registers the document for processing.
+
+    Args:
+        request: The registration request with file details.
+        background_tasks: FastAPI background tasks for async processing.
+        user_id: The authenticated user's ID (from token).
+
+    Returns:
+        DocumentResponse with the registered document's details.
+
+    Raises:
+        HTTPException: 400 if file path is invalid or file doesn't exist.
+        HTTPException: 403 if file path doesn't belong to user.
+        HTTPException: 500 if registration fails.
+    """
+    # Validate file extension
+    file_ext = get_file_extension(request.filename)
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Only {', '.join(ALLOWED_EXTENSIONS)} files are allowed.",
+        )
+
+    # Validate file path ownership - must start with user's ID
+    if not request.file_path.startswith(f"{user_id}/"):
+        raise HTTPException(
+            status_code=403,
+            detail="File path does not belong to authenticated user.",
+        )
+
+    # Validate file type matches extension
+    expected_type = "pdf" if file_ext == ".pdf" else "pptx"
+    if request.file_type != expected_type:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type mismatch. Expected '{expected_type}' for {file_ext} file.",
+        )
+
+    # Validate file size
+    if request.file_size > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit.",
+        )
+
+    # Enforce document quota
+    enforce_max_documents(user_id, settings.max_documents_per_user)
+
+    # Verify file exists in storage
+    try:
+        # Try to get file metadata by listing the path
+        storage_list = supabase_admin.storage.from_("documents").list(
+            path="/".join(request.file_path.split("/")[:-1])  # Get parent folder
+        )
+        filename = request.file_path.split("/")[-1]
+        file_exists = any(f.get("name") == filename for f in storage_list)
+
+        if not file_exists:
+            raise HTTPException(
+                status_code=400,
+                detail="File not found in storage. Please upload the file first.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        # If we can't verify, proceed anyway - ingestion will fail if file doesn't exist
+        pass
+
+    # Generate document ID
+    document_id = uuid4()
+
+    try:
+        # Insert record into documents table
+        document_data = {
+            "id": str(document_id),
+            "user_id": str(user_id),
+            "filename": request.filename,
+            "file_path": request.file_path,
+            "file_type": request.file_type,
+            "file_size": request.file_size,
+            "status": "pending",
+        }
+
+        db_response = supabase_admin.table("documents").insert(document_data).execute()
+
+        if not db_response.data:
+            raise HTTPException(
+                status_code=500, detail="Failed to create document record in database"
+            )
+
+        created_document = db_response.data[0]
+
+        # Trigger async document processing
+        background_tasks.add_task(process_document, str(document_id))
+
+        return DocumentResponse(
+            id=UUID(created_document["id"]),
+            filename=created_document["filename"],
+            file_type=created_document["file_type"],
+            file_size=created_document["file_size"],
+            status=created_document["status"],
+            created_at=created_document["created_at"],
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to register document: {str(e)}"
         )
 
 

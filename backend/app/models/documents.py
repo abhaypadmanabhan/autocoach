@@ -21,6 +21,15 @@ class DocumentListResponse(BaseModel):
     documents: list[DocumentResponse]
 
 
+class RegisterDocumentRequest(BaseModel):
+    """Request model for registering a document uploaded directly to storage."""
+
+    filename: str
+    file_path: str
+    file_type: str
+    file_size: int
+
+
 class SearchRequest(BaseModel):
     """Request model for searching within a document."""
 
