@@ -54,8 +54,8 @@ export function FeedbackPanel({
                 className={`
                   w-14 h-14 rounded-2xl flex items-center justify-center
                   ${isCorrect
-                    ? "bg-semantic-success/20 text-semantic-success"
-                    : "bg-semantic-error/20 text-semantic-error"
+                    ? "bg-[var(--semantic-success)] bg-opacity-20 text-[var(--semantic-success)]"
+                    : "bg-[var(--semantic-error)] bg-opacity-20 text-[var(--semantic-error)]"
                   }
                 `}
               >
@@ -69,12 +69,12 @@ export function FeedbackPanel({
                 <h3
                   className={`
                     text-xl font-bold
-                    ${isCorrect ? "text-semantic-success" : "text-semantic-error"}
+                    ${isCorrect ? "text-[var(--semantic-success)]" : "text-[var(--semantic-error)]"}
                   `}
                 >
                   {isCorrect ? "Correct!" : "Not quite"}
                 </h3>
-                <p className="text-text-muted text-sm">
+                <p className="text-[var(--text-muted)] text-sm">
                   {isCorrect
                     ? "Great job! You got it right."
                     : "Let's review the correct answer."}
@@ -89,14 +89,14 @@ export function FeedbackPanel({
             >
               {!isCorrect && correctAnswer && (
                 <div className="text-sm">
-                  <span className="text-text-muted">Correct answer: </span>
-                  <span className="text-semantic-success font-medium">{correctAnswer}</span>
+                  <span className="text-[var(--text-muted)]">Correct answer: </span>
+                  <span className="text-[var(--semantic-success)] font-medium">{correctAnswer}</span>
                 </div>
               )}
               {!isCorrect && userAnswer && (
                 <div className="text-sm">
-                  <span className="text-text-muted">Your answer: </span>
-                  <span className="text-semantic-error font-medium">{userAnswer}</span>
+                  <span className="text-[var(--text-muted)]">Your answer: </span>
+                  <span className="text-[var(--semantic-error)] font-medium">{userAnswer}</span>
                 </div>
               )}
               {explanation && (
@@ -104,10 +104,10 @@ export function FeedbackPanel({
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="p-3 rounded-lg bg-surface-dark border border-surface-border/50"
+                  className="p-3 rounded-lg bg-[var(--surface-dark)] border border-[var(--surface-border)]/50"
                 >
-                  <p className="text-sm text-text-secondary">
-                    <span className="font-medium text-brand-secondary">Note: </span>
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    <span className="font-medium text-[var(--brand-secondary)]">Note: </span>
                     {explanation}
                   </p>
                 </motion.div>
@@ -122,10 +122,11 @@ export function FeedbackPanel({
                 whileTap={{ scale: 0.98 }}
                 className="
                   flex items-center gap-2 px-6 py-3
-                  bg-brand-primary text-surface-dark
+                  bg-[var(--brand-primary)] text-[var(--surface-dark)]
                   rounded-xl font-semibold
-                  hover:bg-brand-primary/90
+                  hover:bg-opacity-90
                   transition-colors
+                  shadow-lg shadow-[var(--brand-primary)]/20
                 "
               >
                 {isLastQuestion ? "Finish" : "Next Question"}

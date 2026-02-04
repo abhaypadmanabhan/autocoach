@@ -26,7 +26,7 @@ export function VoiceRecorder({
   const [state, setState] = useState<RecordingState>("idle");
   const [error, setError] = useState<VoiceRecorderError | null>(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
-  
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -34,7 +34,7 @@ export function VoiceRecorder({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
-  
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getByteFrequencyData = (analyser: AnalyserNode, dataArray: Uint8Array | any) => {
     analyser.getByteFrequencyData(dataArray);
@@ -62,7 +62,7 @@ export function VoiceRecorder({
   const updateWaveform = useCallback(() => {
     if (!analyserRef.current || !dataArrayRef.current) {
       // Fallback: animate bars with sine wave pattern
-      setAudioLevels(prev => 
+      setAudioLevels(prev =>
         prev.map((_, i) => {
           const time = Date.now() / 200;
           const base = Math.sin(time + i * 0.8) * 0.3 + 0.4;
@@ -75,7 +75,7 @@ export function VoiceRecorder({
     }
 
     getByteFrequencyData(analyserRef.current, dataArrayRef.current);
-    
+
     // Sample 5 frequency bands
     const levels = [0, 1, 2, 3, 4].map(i => {
       const start = Math.floor((dataArrayRef.current!.length / 5) * i);
@@ -87,7 +87,7 @@ export function VoiceRecorder({
       const average = sum / (end - start);
       return Math.min(1, Math.max(0.1, average / 128));
     });
-    
+
     setAudioLevels(levels);
     animationFrameRef.current = requestAnimationFrame(updateWaveform);
   }, []);
@@ -95,7 +95,7 @@ export function VoiceRecorder({
   const startRecording = async () => {
     setError(null);
     setState("requesting");
-    
+
     try {
       // Check browser support
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -103,28 +103,28 @@ export function VoiceRecorder({
       }
 
       // Request microphone permission
-      const stream = await navigator.mediaDevices.getUserMedia({ 
+      const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
         }
       });
-      
+
       streamRef.current = stream;
 
       // Set up audio analysis for waveform
       try {
         const audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         audioContextRef.current = audioContext;
-        
+
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         analyserRef.current = analyser;
-        
+
         const source = audioContext.createMediaStreamSource(stream);
         source.connect(analyser);
-        
+
         const bufferLength = analyser.frequencyBinCount;
         dataArrayRef.current = new Uint8Array(bufferLength);
       } catch (audioErr) {
@@ -134,11 +134,11 @@ export function VoiceRecorder({
 
       // Create MediaRecorder
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("audio/webm") 
-          ? "audio/webm" 
+        mimeType: MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
           : "audio/mp4"
       });
-      
+
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -154,7 +154,7 @@ export function VoiceRecorder({
           clearInterval(durationIntervalRef.current);
           durationIntervalRef.current = null;
         }
-        
+
         // Stop waveform animation
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current);
@@ -162,10 +162,10 @@ export function VoiceRecorder({
         }
 
         // Create audio blob
-        const audioBlob = new Blob(audioChunksRef.current, { 
-          type: mediaRecorder.mimeType 
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType
         });
-        
+
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
         streamRef.current = null;
@@ -187,7 +187,7 @@ export function VoiceRecorder({
       mediaRecorder.start(100); // Collect data every 100ms
       setState("recording");
       setRecordingDuration(0);
-      
+
       // Start duration timer
       durationIntervalRef.current = setInterval(() => {
         setRecordingDuration(prev => prev + 1);
@@ -198,7 +198,7 @@ export function VoiceRecorder({
 
     } catch (err) {
       const errMsg = getErrorMessage(err);
-      
+
       if (err instanceof Error) {
         if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
           setError({
@@ -222,7 +222,7 @@ export function VoiceRecorder({
           type: "unknown"
         });
       }
-      
+
       setState("error");
     }
   };
@@ -231,22 +231,22 @@ export function VoiceRecorder({
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop();
     }
-    
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
-    
+
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
       durationIntervalRef.current = null;
     }
-    
+
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
-    
+
     if (state === "recording") {
       setState("transcribing");
     }
@@ -254,13 +254,13 @@ export function VoiceRecorder({
 
   const transcribeAudio = async (audioBlob: Blob) => {
     setState("transcribing");
-    
+
     try {
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
-      
+
       const response = await apiClient.postFormData("/voice/transcribe", formData);
-      
+
       if (response.text) {
         onTranscription(response.text);
         setState("idle");
@@ -326,11 +326,11 @@ export function VoiceRecorder({
           className={`
             relative flex items-center justify-center
             w-12 h-12 rounded-full
-            transition-colors duration-200
+            transition-all duration-200
             disabled:opacity-50 disabled:cursor-not-allowed
-            ${isRecording 
-              ? "bg-semantic-error text-white animate-pulse" 
-              : "bg-brand-primary text-surface-dark hover:bg-brand-primary/90"
+            ${isRecording
+              ? "bg-[var(--semantic-error)] text-white shadow-[0_0_15px_rgba(239,68,68,0.4)]"
+              : "bg-[var(--brand-primary)] text-[var(--surface-dark)] hover:bg-opacity-90 shadow-[0_0_15px_rgba(205,119,106,0.25)]"
             }
           `}
         >
@@ -341,12 +341,12 @@ export function VoiceRecorder({
           ) : (
             <Mic size={20} />
           )}
-          
+
           {/* Recording indicator ring */}
           {isRecording && (
             <motion.span
-              className="absolute inset-0 rounded-full border-2 border-semantic-error"
-              animate={{ scale: [1, 1.2, 1], opacity: [1, 0.5, 1] }}
+              className="absolute inset-0 rounded-full border-2 border-[var(--semantic-error)]"
+              animate={{ scale: [1, 1.5, 1], opacity: [1, 0, 1] }}
               transition={{ duration: 1.5, repeat: Infinity }}
             />
           )}

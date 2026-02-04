@@ -80,7 +80,7 @@ export function QuestionCard({
               disabled={showFeedback}
               placeholder="Type your answer here..."
             />
-            
+
             {/* Voice input section */}
             {!showFeedback && (
               <div className="pt-4 border-t border-surface-border/50">
@@ -238,41 +238,45 @@ function MCQOptions({
         // Get border/bg styles based on state
         const getContainerStyles = () => {
           if (isCorrectOption || isSelectedCorrect) {
-            return "border-semantic-success bg-semantic-success/10";
+            return "border-[var(--semantic-success)] bg-[var(--semantic-success)] bg-opacity-10";
           }
           if (isWrongSelection) {
-            return "border-semantic-error bg-semantic-error/10";
+            return "border-[var(--semantic-error)] bg-[var(--semantic-error)] bg-opacity-10";
           }
           if (isSelected) {
-            return "border-brand-primary bg-brand-primary/10";
+            return "border-[var(--brand-primary)] bg-[var(--brand-primary)] bg-opacity-10 shadow-[0_0_15px_rgba(205,119,106,0.15)]";
           }
-          return "border-surface-border bg-surface-card hover:border-brand-primary/50";
+          return "border-[var(--surface-border)] bg-[var(--surface-card)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:bg-opacity-5";
         };
 
         // Get indicator styles based on state
         const getIndicatorStyles = () => {
           if (isCorrectOption || isSelectedCorrect) {
-            return "bg-semantic-success text-white";
+            return "bg-[var(--semantic-success)] text-white shadow-lg shadow-[var(--semantic-success)]/20";
           }
           if (isWrongSelection) {
-            return "bg-semantic-error text-white";
+            return "bg-[var(--semantic-error)] text-white shadow-lg shadow-[var(--semantic-error)]/20";
           }
           if (isSelected) {
-            return "bg-brand-primary text-surface-dark";
+            return "bg-[var(--brand-primary)] text-[var(--surface-dark)] shadow-lg shadow-[var(--brand-primary)]/20";
           }
-          return "bg-surface-dark text-text-secondary";
+          return "bg-[var(--surface-dark)] text-[var(--text-muted)] border border-[var(--surface-border)]";
         };
 
         // Get text styles based on state
         const getTextStyles = () => {
           if (isCorrectOption || isSelectedCorrect) {
-            return "text-semantic-success font-semibold";
+            return "text-[var(--semantic-success)] font-semibold";
           }
           if (isWrongSelection) {
-            return "text-semantic-error";
+            return "text-[var(--semantic-error)]";
           }
-          return "text-text-primary";
+          if (isSelected) {
+            return "text-[var(--text-primary)] font-semibold";
+          }
+          return "text-[var(--text-primary)]";
         };
+
 
         return (
           <motion.button
@@ -394,29 +398,29 @@ function TrueFalseOptions({
         // Get border/bg styles based on state
         const getContainerStyles = () => {
           if (isCorrectOption || isSelectedCorrect) {
-            return "border-semantic-success bg-semantic-success/10";
+            return "border-[var(--semantic-success)] bg-[var(--semantic-success)] bg-opacity-10";
           }
           if (isWrongSelection) {
-            return "border-semantic-error bg-semantic-error/10";
+            return "border-[var(--semantic-error)] bg-[var(--semantic-error)] bg-opacity-10";
           }
           if (isSelected) {
-            return "border-brand-primary bg-brand-primary/10";
+            return "border-[var(--brand-primary)] bg-[var(--brand-primary)] bg-opacity-10 shadow-[0_0_15px_rgba(205,119,106,0.15)]";
           }
-          return "border-surface-border bg-surface-card hover:border-brand-primary/50";
+          return "border-[var(--surface-border)] bg-[var(--surface-card)] hover:border-[var(--brand-primary)] hover:bg-[var(--brand-primary)] hover:bg-opacity-5";
         };
 
         // Get indicator styles based on state
         const getIndicatorStyles = () => {
           if (isCorrectOption || isSelectedCorrect) {
-            return "bg-semantic-success text-white";
+            return "bg-[var(--semantic-success)] text-white shadow-lg shadow-[var(--semantic-success)]/20";
           }
           if (isWrongSelection) {
-            return "bg-semantic-error text-white";
+            return "bg-[var(--semantic-error)] text-white shadow-lg shadow-[var(--semantic-error)]/20";
           }
           if (isSelected) {
-            return "bg-brand-primary text-surface-dark";
+            return "bg-[var(--brand-primary)] text-[var(--surface-dark)] shadow-lg shadow-[var(--brand-primary)]/20";
           }
-          return "bg-surface-dark text-text-secondary";
+          return "bg-[var(--surface-dark)] text-[var(--text-muted)] border border-[var(--surface-border)]";
         };
 
         // Get indicator content based on state
@@ -430,12 +434,15 @@ function TrueFalseOptions({
         // Get text styles based on state
         const getTextStyles = () => {
           if (isCorrectOption || isSelectedCorrect) {
-            return "text-semantic-success font-semibold";
+            return "text-[var(--semantic-success)] font-semibold";
           }
           if (isWrongSelection) {
-            return "text-semantic-error";
+            return "text-[var(--semantic-error)]";
           }
-          return "text-text-primary";
+          if (isSelected) {
+            return "text-[var(--text-primary)] font-semibold";
+          }
+          return "text-[var(--text-primary)]";
         };
 
         return (
@@ -530,7 +537,7 @@ export function FreeTextInput({
 }: FreeTextInputProps) {
   // Ensure value is always a string and trimmed
   const sanitizedValue = typeof value === "string" ? value : "";
-  
+
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     // Pass the value (parent component should trim when submitting)
