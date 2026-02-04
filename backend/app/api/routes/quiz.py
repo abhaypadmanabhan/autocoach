@@ -4,20 +4,31 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends
 
+from app.config import get_settings
 from app.models.quiz import QuizGenerateRequest, QuizGenerateResponse, QuestionSchema
 from app.services.quiz_generator import generate_quiz_questions
 from app.api.routes.documents import get_user_id_from_token
 from app.core.supabase import supabase_admin
+from app.core.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+settings = get_settings()
+
+
+def enforce_quiz_rate_limit(user_id=Depends(get_user_id_from_token)):
+    rate_limiter.check(
+        key=f"quiz:{user_id}",
+        requests_per_window=settings.quiz_requests_per_minute,
+        window_seconds=60,
+    )
+    return user_id
 
 
 @router.post("/generate", response_model=QuizGenerateResponse)
 async def generate_quiz(
-    request: QuizGenerateRequest,
-    user_id=Depends(get_user_id_from_token)
+    request: QuizGenerateRequest, user_id=Depends(enforce_quiz_rate_limit)
 ):
     """
     Generate a quiz from a document.
@@ -46,10 +57,7 @@ async def generate_quiz(
         )
 
         if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=404,
-                detail="Document not found"
-            )
+            raise HTTPException(status_code=404, detail="Document not found")
 
         doc = response.data[0]
 
@@ -57,24 +65,26 @@ async def generate_quiz(
         if doc["status"] != "ready":
             raise HTTPException(
                 status_code=400,
-                detail=f"Document is not ready for quiz generation. Current status: {doc['status']}"
+                detail=f"Document is not ready for quiz generation. Current status: {doc['status']}",
             )
 
-        logger.info(f"Generating quiz for document {request.document_id} "
-                   f"({request.num_questions} questions, {request.difficulty} difficulty)")
+        logger.info(
+            f"Generating quiz for document {request.document_id} "
+            f"({request.num_questions} questions, {request.difficulty} difficulty)"
+        )
 
         # Generate quiz questions
         questions_data = generate_quiz_questions(
             document_id=request.document_id,
             num_questions=request.num_questions,
             difficulty=request.difficulty,
-            question_types=request.question_types
+            question_types=request.question_types,
         )
 
         if not questions_data:
             raise HTTPException(
                 status_code=500,
-                detail="Failed to generate quiz questions. Please try again."
+                detail="Failed to generate quiz questions. Please try again.",
             )
 
         # Convert to QuestionSchema models
@@ -84,7 +94,7 @@ async def generate_quiz(
                 question_text=q.get("question_text", ""),
                 options=q.get("options"),
                 correct_answer=q.get("correct_answer", ""),
-                explanation=q.get("explanation")
+                explanation=q.get("explanation"),
             )
             for q in questions_data
         ]
@@ -94,7 +104,7 @@ async def generate_quiz(
         return QuizGenerateResponse(
             document_id=request.document_id,
             difficulty=request.difficulty,
-            questions=questions
+            questions=questions,
         )
 
     except HTTPException:
@@ -102,6 +112,5 @@ async def generate_quiz(
     except Exception as e:
         logger.error(f"Unexpected error generating quiz: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate quiz: {str(e)}"
+            status_code=500, detail=f"Failed to generate quiz: {str(e)}"
         )

@@ -16,7 +16,7 @@ def create_session(
     document_id: str,
     num_questions: int,
     difficulty: str,
-    question_types: list[str]
+    question_types: list[str],
 ) -> dict:
     """
     Create a new quiz session.
@@ -37,7 +37,7 @@ def create_session(
             document_id=document_id,
             num_questions=num_questions,
             difficulty=difficulty,
-            question_types=question_types
+            question_types=question_types,
         )
 
         if not questions:
@@ -58,7 +58,7 @@ def create_session(
             "answered_questions": 0,
             "correct_answers": 0,
             "started_at": now,
-            "completed_at": None
+            "completed_at": None,
         }
 
         supabase_admin.table("quiz_sessions").insert(session_data).execute()
@@ -78,13 +78,13 @@ def create_session(
                 "user_answer": None,
                 "is_correct": None,
                 "input_method": None,
-                "answered_at": None
+                "answered_at": None,
             }
             question_records.append(question_record)
 
         # Insert questions in batches
         for i in range(0, len(question_records), 100):
-            batch = question_records[i:i + 100]
+            batch = question_records[i : i + 100]
             supabase_admin.table("questions").insert(batch).execute()
 
         # Get first question
@@ -104,8 +104,10 @@ def create_session(
                 "question_type": first_question["question_type"],
                 "question_text": first_question["question_text"],
                 "options": first_question["options"],
-                "difficulty": difficulty
-            } if first_question else None
+                "difficulty": difficulty,
+            }
+            if first_question
+            else None,
         }
 
     except Exception as e:
@@ -168,7 +170,7 @@ def get_session(session_id: str, user_id: str) -> dict | None:
                 "user_answer": q["user_answer"],
                 "is_correct": q["is_correct"],
                 "correct_answer": q["correct_answer"],
-                "explanation": q["explanation"]
+                "explanation": q["explanation"],
             }
             for q in questions
         ]
@@ -184,7 +186,7 @@ def get_session(session_id: str, user_id: str) -> dict | None:
             "score_percentage": score_percentage,
             "questions": question_details,
             "started_at": session["started_at"],
-            "completed_at": session["completed_at"]
+            "completed_at": session["completed_at"],
         }
 
     except Exception as e:
@@ -220,7 +222,9 @@ def get_current_question(session_id: str, user_id: str) -> dict | None:
         session = session_response.data[0]
 
         if session["status"] != "active":
-            logger.info(f"Session {session_id} is not active (status: {session['status']})")
+            logger.info(
+                f"Session {session_id} is not active (status: {session['status']})"
+            )
             return None
 
         # Get first unanswered question
@@ -246,7 +250,7 @@ def get_current_question(session_id: str, user_id: str) -> dict | None:
             "question_type": question["question_type"],
             "question_text": question["question_text"],
             "options": question["options"],
-            "difficulty": session["difficulty"]
+            "difficulty": session["difficulty"],
         }
 
     except Exception as e:
@@ -255,11 +259,7 @@ def get_current_question(session_id: str, user_id: str) -> dict | None:
 
 
 def submit_answer(
-    session_id: str,
-    user_id: str,
-    question_id: str,
-    answer: str,
-    input_method: str
+    session_id: str, user_id: str, question_id: str, answer: str, input_method: str
 ) -> dict:
     """
     Submit an answer for a question in a session.
@@ -269,7 +269,7 @@ def submit_answer(
         user_id: The user's ID (for verification).
         question_id: The question ID.
         answer: The user's answer.
-        input_method: How the answer was input (typed/voice).
+        input_method: How the answer was input (click/text).
 
     Returns:
         Dictionary with result and next question (if any).
@@ -315,7 +315,7 @@ def submit_answer(
             question_type=question["question_type"],
             user_answer=answer,
             correct_answer=question["correct_answer"],
-            question_text=question["question_text"]
+            question_text=question["question_text"],
         )
 
         is_correct = eval_result["is_correct"]
@@ -323,12 +323,14 @@ def submit_answer(
 
         # Update question record
         now = datetime.now(timezone.utc).isoformat()
-        supabase_admin.table("questions").update({
-            "user_answer": answer,
-            "is_correct": is_correct,
-            "input_method": input_method,
-            "answered_at": now
-        }).eq("id", question_id).execute()
+        supabase_admin.table("questions").update(
+            {
+                "user_answer": answer,
+                "is_correct": is_correct,
+                "input_method": input_method,
+                "answered_at": now,
+            }
+        ).eq("id", question_id).execute()
 
         # Update session counts
         new_answered = session["answered_questions"] + 1
@@ -336,7 +338,7 @@ def submit_answer(
 
         session_update = {
             "answered_questions": new_answered,
-            "correct_answers": new_correct
+            "correct_answers": new_correct,
         }
 
         # Check if all questions answered
@@ -371,7 +373,7 @@ def submit_answer(
                     "question_type": next_q["question_type"],
                     "question_text": next_q["question_text"],
                     "options": next_q["options"],
-                    "difficulty": session["difficulty"]
+                    "difficulty": session["difficulty"],
                 }
 
         return {
@@ -381,10 +383,10 @@ def submit_answer(
                 "explanation": question["explanation"],
                 "score_so_far": new_correct,
                 "total_answered": new_answered,
-                "feedback": feedback
+                "feedback": feedback,
             },
             "next_question": next_question,
-            "session_complete": is_complete
+            "session_complete": is_complete,
         }
 
     except Exception as e:

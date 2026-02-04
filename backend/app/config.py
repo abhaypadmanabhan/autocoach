@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     backend_url: str = "http://localhost:8000"
     frontend_url: str = "http://localhost:3000"
 
+    # Abuse controls
+    max_document_mb: int = 20
+    max_documents_per_user: int = 2
+    max_quiz_sessions_per_day: int = 5
+    quiz_requests_per_minute: int = 60
+
     class Config:
         env_file = ".env"
 

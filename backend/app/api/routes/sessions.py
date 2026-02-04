@@ -4,6 +4,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends
 
+from app.config import get_settings
 from app.models.quiz import (
     QuizSessionCreate,
     QuestionResponse,
@@ -11,26 +12,37 @@ from app.models.quiz import (
     AnswerResponse,
     AnswerResult,
     SessionStatus,
-    SessionQuestionDetail
+    SessionQuestionDetail,
 )
 from app.services.session_manager import (
     create_session,
     get_session,
     submit_answer,
-    get_current_question
+    get_current_question,
 )
+from app.services.abuse_controls import enforce_daily_quiz_sessions
 from app.api.routes.documents import get_user_id_from_token
 from app.core.supabase import supabase_admin
+from app.core.rate_limit import rate_limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+settings = get_settings()
+
+
+def enforce_quiz_rate_limit(user_id=Depends(get_user_id_from_token)):
+    rate_limiter.check(
+        key=f"quiz:{user_id}",
+        requests_per_window=settings.quiz_requests_per_minute,
+        window_seconds=60,
+    )
+    return user_id
 
 
 @router.post("/", response_model=dict)
 async def create_quiz_session(
-    request: QuizSessionCreate,
-    user_id=Depends(get_user_id_from_token)
+    request: QuizSessionCreate, user_id=Depends(enforce_quiz_rate_limit)
 ):
     """
     Create a new interactive quiz session.
@@ -46,6 +58,9 @@ async def create_quiz_session(
         HTTPException: 404 if document not found, 400 if not ready, 500 on error.
     """
     try:
+        # Enforce daily session quota
+        enforce_daily_quiz_sessions(user_id, settings.max_quiz_sessions_per_day)
+
         # Verify document exists and belongs to user
         doc_response = (
             supabase_admin.table("documents")
@@ -56,10 +71,7 @@ async def create_quiz_session(
         )
 
         if not doc_response.data or len(doc_response.data) == 0:
-            raise HTTPException(
-                status_code=404,
-                detail="Document not found"
-            )
+            raise HTTPException(status_code=404, detail="Document not found")
 
         doc = doc_response.data[0]
 
@@ -67,7 +79,7 @@ async def create_quiz_session(
         if doc["status"] != "ready":
             raise HTTPException(
                 status_code=400,
-                detail=f"Document is not ready for quiz. Current status: {doc['status']}"
+                detail=f"Document is not ready for quiz. Current status: {doc['status']}",
             )
 
         # Create session
@@ -76,7 +88,7 @@ async def create_quiz_session(
             document_id=request.document_id,
             num_questions=request.num_questions,
             difficulty=request.difficulty,
-            question_types=request.question_types
+            question_types=request.question_types,
         )
 
         return session_data
@@ -86,16 +98,12 @@ async def create_quiz_session(
     except Exception as e:
         logger.error(f"Failed to create quiz session: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create quiz session: {str(e)}"
+            status_code=500, detail=f"Failed to create quiz session: {str(e)}"
         )
 
 
 @router.get("/{session_id}", response_model=SessionStatus)
-async def get_session_status(
-    session_id: str,
-    user_id=Depends(get_user_id_from_token)
-):
+async def get_session_status(session_id: str, user_id=Depends(enforce_quiz_rate_limit)):
     """
     Get the status of a quiz session.
 
@@ -113,10 +121,7 @@ async def get_session_status(
         session = get_session(session_id, str(user_id))
 
         if not session:
-            raise HTTPException(
-                status_code=404,
-                detail="Session not found"
-            )
+            raise HTTPException(status_code=404, detail="Session not found")
 
         return SessionStatus(
             session_id=session["session_id"],
@@ -127,11 +132,9 @@ async def get_session_status(
             answered_questions=session["answered_questions"],
             correct_answers=session["correct_answers"],
             score_percentage=session["score_percentage"],
-            questions=[
-                SessionQuestionDetail(**q) for q in session["questions"]
-            ],
+            questions=[SessionQuestionDetail(**q) for q in session["questions"]],
             started_at=session["started_at"],
-            completed_at=session["completed_at"]
+            completed_at=session["completed_at"],
         )
 
     except HTTPException:
@@ -139,15 +142,13 @@ async def get_session_status(
     except Exception as e:
         logger.error(f"Failed to get session status: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get session status: {str(e)}"
+            status_code=500, detail=f"Failed to get session status: {str(e)}"
         )
 
 
 @router.get("/{session_id}/current", response_model=QuestionResponse)
 async def get_current_quiz_question(
-    session_id: str,
-    user_id=Depends(get_user_id_from_token)
+    session_id: str, user_id=Depends(enforce_quiz_rate_limit)
 ):
     """
     Get the current (next unanswered) question in a session.
@@ -173,25 +174,21 @@ async def get_current_quiz_question(
         )
 
         if not session_response.data:
-            raise HTTPException(
-                status_code=404,
-                detail="Session not found"
-            )
+            raise HTTPException(status_code=404, detail="Session not found")
 
         session = session_response.data[0]
 
         if session["status"] != "active":
             raise HTTPException(
                 status_code=410,
-                detail=f"Session is not active (status: {session['status']})"
+                detail=f"Session is not active (status: {session['status']})",
             )
 
         question = get_current_question(session_id, str(user_id))
 
         if not question:
             raise HTTPException(
-                status_code=404,
-                detail="No more questions - quiz is complete"
+                status_code=404, detail="No more questions - quiz is complete"
             )
 
         return QuestionResponse(
@@ -201,7 +198,7 @@ async def get_current_quiz_question(
             question_type=question["question_type"],
             question_text=question["question_text"],
             options=question["options"],
-            difficulty=question["difficulty"]
+            difficulty=question["difficulty"],
         )
 
     except HTTPException:
@@ -209,8 +206,7 @@ async def get_current_quiz_question(
     except Exception as e:
         logger.error(f"Failed to get current question: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get current question: {str(e)}"
+            status_code=500, detail=f"Failed to get current question: {str(e)}"
         )
 
 
@@ -219,7 +215,7 @@ async def submit_quiz_answer(
     session_id: str,
     question_id: str,
     answer_data: AnswerSubmit,
-    user_id=Depends(get_user_id_from_token)
+    user_id=Depends(enforce_quiz_rate_limit),
 ):
     """
     Submit an answer for a question in a session.
@@ -242,7 +238,7 @@ async def submit_quiz_answer(
             user_id=str(user_id),
             question_id=question_id,
             answer=answer_data.answer,
-            input_method=answer_data.input_method
+            input_method=answer_data.input_method,
         )
 
         # Format next question if exists
@@ -256,7 +252,7 @@ async def submit_quiz_answer(
                 question_type=q["question_type"],
                 question_text=q["question_text"],
                 options=q["options"],
-                difficulty=q["difficulty"]
+                difficulty=q["difficulty"],
             )
 
         return AnswerResponse(
@@ -266,20 +262,16 @@ async def submit_quiz_answer(
                 explanation=result["result"]["explanation"],
                 score_so_far=result["result"]["score_so_far"],
                 total_answered=result["result"]["total_answered"],
-                feedback=result["result"].get("feedback")
+                feedback=result["result"].get("feedback"),
             ),
             next_question=next_question,
-            session_complete=result["session_complete"]
+            session_complete=result["session_complete"],
         )
 
     except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to submit answer: {e}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Failed to submit answer: {str(e)}"
+            status_code=500, detail=f"Failed to submit answer: {str(e)}"
         )
