@@ -11,10 +11,11 @@ interface QuestionCardProps {
   question: string;
   type: QuestionType;
   options?: string[] | null;
-  onAnswer: (answer: string) => void;
+  onAnswer: (answer: string, inputMethod?: "click" | "text") => void;
   selectedAnswer?: string;
   showFeedback?: boolean;
   correctAnswer?: string;
+  isCorrect?: boolean;
   className?: string;
 }
 
@@ -27,6 +28,7 @@ export function QuestionCard({
   selectedAnswer,
   showFeedback = false,
   correctAnswer,
+  isCorrect,
   className = "",
 }: QuestionCardProps) {
   const getQuestionTypeLabel = (t: QuestionType) => {
@@ -52,6 +54,7 @@ export function QuestionCard({
             selectedAnswer={selectedAnswer}
             correctAnswer={correctAnswer}
             showFeedback={showFeedback}
+            isCorrect={isCorrect}
             onAnswer={onAnswer}
             questionNumber={number}
           />
@@ -63,6 +66,7 @@ export function QuestionCard({
             selectedAnswer={selectedAnswer}
             correctAnswer={correctAnswer}
             showFeedback={showFeedback}
+            isCorrect={isCorrect}
             onAnswer={onAnswer}
           />
         );
@@ -72,7 +76,7 @@ export function QuestionCard({
           <div className="space-y-4">
             <FreeTextInput
               value={selectedAnswer || ""}
-              onChange={onAnswer}
+              onChange={(value) => onAnswer(value, "text")}
               disabled={showFeedback}
               placeholder="Type your answer here..."
             />
@@ -85,7 +89,7 @@ export function QuestionCard({
                     // Append transcription to existing text with a space
                     const currentText = selectedAnswer || "";
                     const separator = currentText && !currentText.endsWith(" ") ? " " : "";
-                    onAnswer(currentText + separator + text);
+                    onAnswer(currentText + separator + text, "text");
                   }}
                   disabled={showFeedback}
                 />
@@ -180,7 +184,8 @@ interface MCQOptionsProps {
   selectedAnswer?: string;
   correctAnswer?: string;
   showFeedback: boolean;
-  onAnswer: (answer: string) => void;
+  isCorrect?: boolean;
+  onAnswer: (answer: string, inputMethod?: "click" | "text") => void;
   questionNumber: number;
 }
 
@@ -189,6 +194,7 @@ function MCQOptions({
   selectedAnswer,
   correctAnswer,
   showFeedback,
+  isCorrect,
   onAnswer,
   questionNumber,
 }: MCQOptionsProps) {
@@ -215,11 +221,13 @@ function MCQOptions({
     >
       {options.map((option, index) => {
         const isSelected = selectedAnswer === option;
-        const isCorrectOption = showFeedback && correctAnswer === option;
-        const isWrongSelection = showFeedback && isSelected && correctAnswer !== option;
+        const feedbackActive = showFeedback && typeof isCorrect === "boolean";
+        const isSelectedCorrect = feedbackActive && isCorrect && isSelected;
+        const isCorrectOption = feedbackActive && !isCorrect && correctAnswer === option;
+        const isWrongSelection = feedbackActive && !isCorrect && isSelected;
 
         // Determine visual state (priority: correct > wrong > selected > idle)
-        const visualState = isCorrectOption
+        const visualState = isCorrectOption || isSelectedCorrect
           ? "correct"
           : isWrongSelection
             ? "wrong"
@@ -229,7 +237,7 @@ function MCQOptions({
 
         // Get border/bg styles based on state
         const getContainerStyles = () => {
-          if (isCorrectOption) {
+          if (isCorrectOption || isSelectedCorrect) {
             return "border-semantic-success bg-semantic-success/10";
           }
           if (isWrongSelection) {
@@ -243,7 +251,7 @@ function MCQOptions({
 
         // Get indicator styles based on state
         const getIndicatorStyles = () => {
-          if (isCorrectOption) {
+          if (isCorrectOption || isSelectedCorrect) {
             return "bg-semantic-success text-white";
           }
           if (isWrongSelection) {
@@ -257,7 +265,7 @@ function MCQOptions({
 
         // Get text styles based on state
         const getTextStyles = () => {
-          if (isCorrectOption) {
+          if (isCorrectOption || isSelectedCorrect) {
             return "text-semantic-success font-semibold";
           }
           if (isWrongSelection) {
@@ -270,7 +278,7 @@ function MCQOptions({
           <motion.button
             key={index}
             variants={slideUpItem}
-            onClick={() => !showFeedback && onAnswer(option)}
+            onClick={() => !showFeedback && onAnswer(option, "click")}
             disabled={showFeedback}
             initial="idle"
             whileHover={showFeedback ? undefined : "hover"}
@@ -313,7 +321,7 @@ function MCQOptions({
             )}
 
             {/* Feedback indicators */}
-            {showFeedback && isCorrectOption && (
+            {showFeedback && (isCorrectOption || isSelectedCorrect) && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -343,13 +351,15 @@ interface TrueFalseOptionsProps {
   selectedAnswer?: string;
   correctAnswer?: string;
   showFeedback: boolean;
-  onAnswer: (answer: string) => void;
+  isCorrect?: boolean;
+  onAnswer: (answer: string, inputMethod?: "click" | "text") => void;
 }
 
 function TrueFalseOptions({
   selectedAnswer,
   correctAnswer,
   showFeedback,
+  isCorrect,
   onAnswer,
 }: TrueFalseOptionsProps) {
   // Hardcoded True/False options - always shown regardless of backend options
@@ -367,11 +377,13 @@ function TrueFalseOptions({
     >
       {booleanOptions.map((option) => {
         const isSelected = selectedAnswer === option.value;
-        const isCorrectOption = showFeedback && correctAnswer === option.value;
-        const isWrongSelection = showFeedback && isSelected && correctAnswer !== option.value;
+        const feedbackActive = showFeedback && typeof isCorrect === "boolean";
+        const isSelectedCorrect = feedbackActive && isCorrect && isSelected;
+        const isCorrectOption = feedbackActive && !isCorrect && correctAnswer === option.value;
+        const isWrongSelection = feedbackActive && !isCorrect && isSelected;
 
         // Determine visual state (priority: correct > wrong > selected > idle)
-        const visualState = isCorrectOption
+        const visualState = isCorrectOption || isSelectedCorrect
           ? "correct"
           : isWrongSelection
             ? "wrong"
@@ -381,7 +393,7 @@ function TrueFalseOptions({
 
         // Get border/bg styles based on state
         const getContainerStyles = () => {
-          if (isCorrectOption) {
+          if (isCorrectOption || isSelectedCorrect) {
             return "border-semantic-success bg-semantic-success/10";
           }
           if (isWrongSelection) {
@@ -395,7 +407,7 @@ function TrueFalseOptions({
 
         // Get indicator styles based on state
         const getIndicatorStyles = () => {
-          if (isCorrectOption) {
+          if (isCorrectOption || isSelectedCorrect) {
             return "bg-semantic-success text-white";
           }
           if (isWrongSelection) {
@@ -409,7 +421,7 @@ function TrueFalseOptions({
 
         // Get indicator content based on state
         const getIndicatorContent = () => {
-          if (isCorrectOption || isSelected) {
+          if (isCorrectOption || isSelectedCorrect || (!feedbackActive && isSelected)) {
             return <Check size={18} />;
           }
           return <span className="w-2 h-2 rounded-full bg-current" />;
@@ -417,7 +429,7 @@ function TrueFalseOptions({
 
         // Get text styles based on state
         const getTextStyles = () => {
-          if (isCorrectOption) {
+          if (isCorrectOption || isSelectedCorrect) {
             return "text-semantic-success font-semibold";
           }
           if (isWrongSelection) {
@@ -430,7 +442,7 @@ function TrueFalseOptions({
           <motion.button
             key={option.value}
             variants={slideUpItem}
-            onClick={() => !showFeedback && onAnswer(option.value)}
+            onClick={() => !showFeedback && onAnswer(option.value, "click")}
             disabled={showFeedback}
             initial="idle"
             whileHover={showFeedback ? undefined : "hover"}
@@ -473,7 +485,7 @@ function TrueFalseOptions({
             )}
 
             {/* Feedback indicators */}
-            {showFeedback && isCorrectOption && (
+            {showFeedback && (isCorrectOption || isSelectedCorrect) && (
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}

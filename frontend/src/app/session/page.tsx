@@ -44,6 +44,7 @@ function SessionContent() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
+  const [inputMethod, setInputMethod] = useState<"click" | "text">("text");
 
   // Timer state
   const [timeRemaining, setTimeRemaining] = useState<number | null>(() => {
@@ -131,7 +132,8 @@ function SessionContent() {
     try {
       // Always trim the answer before submitting
       const trimmedAnswer = answer.trim();
-      const result = await submitAnswer(question.question_id, trimmedAnswer, "typed");
+      setAnswer(trimmedAnswer);
+      const result = await submitAnswer(question.question_id, trimmedAnswer, inputMethod);
       setLastResult(result.result);
       setIsSessionComplete(result.session_complete);
       setShowFeedback(true);
@@ -145,12 +147,14 @@ function SessionContent() {
     setAnswer("");
     setLastResult(null);
     setIsSessionComplete(false);
+    setInputMethod("text");
     refetchQuestion();
     refetch();
   };
 
-  const handleAnswer = (selectedAnswer: string) => {
+  const handleAnswer = (selectedAnswer: string, method: "click" | "text" = "click") => {
     setAnswer(selectedAnswer);
+    setInputMethod(method);
   };
 
   const progress = session ? ((session.answered_questions / session.total_questions) * 100) : 0;
@@ -248,6 +252,7 @@ function SessionContent() {
                   selectedAnswer={answer}
                   showFeedback={showFeedback}
                   correctAnswer={lastResult?.correct_answer}
+                  isCorrect={lastResult?.is_correct}
                 />
 
                 {/* Submit button */}

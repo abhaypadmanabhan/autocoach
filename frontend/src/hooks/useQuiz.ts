@@ -89,7 +89,7 @@ export function useAnswerQuestion(sessionId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   const submitAnswer = useCallback(
-    async (questionId: string, answer: unknown, inputMethod: InputMethod = "typed"): Promise<AnswerResponse> => {
+    async (questionId: string, answer: unknown, inputMethod: InputMethod = "text"): Promise<AnswerResponse> => {
       if (!sessionId) throw new Error("No session ID");
       setSubmitting(true);
       setError(null);

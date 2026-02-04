@@ -30,7 +30,7 @@ export class ApiError extends Error {
 export type QuestionType = "mcq" | "true_false" | "free_text";
 export type Difficulty = "easy" | "medium" | "hard";
 export type QuizSessionStatus = "active" | "completed";
-export type InputMethod = "typed" | "voice";
+export type InputMethod = "click" | "text";
 
 export interface CurrentQuestion {
   question_id: string;
