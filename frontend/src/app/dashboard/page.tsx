@@ -19,6 +19,7 @@ import { useDocuments } from "@/hooks/useDocuments";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
 import { StatusBadge, ProgressBar } from "@/components/ui/StatusBadge";
+import { DocumentCardSkeleton, StatCardSkeleton, ErrorBanner } from "@/components/ui/Skeleton";
 import { staggerContainer, slideUpItem, cardLiftVariants } from "@/lib/motions";
 import type { User } from "@supabase/supabase-js";
 import type { Document } from "@/lib/types";
@@ -172,7 +173,7 @@ function EmptyState({ onUpload }: { onUpload: () => void }) {
 // Main Dashboard Component
 export default function Dashboard() {
   const router = useRouter();
-  const { documents, loading, error } = useDocuments();
+  const { documents, loading, error, refetch } = useDocuments();
   const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
 
@@ -208,9 +209,35 @@ export default function Dashboard() {
   if (loading || userLoading) {
     return (
       <AppShell>
-        <div className="h-[80vh] flex items-center justify-center">
-          <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
-        </div>
+        <PageContainer>
+          {/* Skeleton Hero */}
+          <Section spacing="sm">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div>
+                <div className="h-10 w-48 bg-surface-border/50 rounded animate-pulse mb-2" />
+                <div className="h-6 w-32 bg-surface-border/50 rounded animate-pulse" />
+              </div>
+              <div className="h-12 w-32 bg-surface-border/50 rounded-full animate-pulse" />
+            </div>
+          </Section>
+          {/* Skeleton Stats */}
+          <Section spacing="sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+              <StatCardSkeleton />
+            </div>
+          </Section>
+          {/* Skeleton Documents */}
+          <Section>
+            <div className="h-8 w-40 bg-surface-border/50 rounded animate-pulse mb-6" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <DocumentCardSkeleton />
+              <DocumentCardSkeleton />
+              <DocumentCardSkeleton />
+            </div>
+          </Section>
+        </PageContainer>
       </AppShell>
     );
   }
@@ -394,13 +421,12 @@ export default function Dashboard() {
         )}
 
         {error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="p-4 rounded-xl bg-semantic-error/10 border border-semantic-error/30 text-semantic-error"
-          >
-            Error loading documents: {error}
-          </motion.div>
+          <Section spacing="sm">
+            <ErrorBanner
+              message={`Failed to load documents: ${error}`}
+              onRetry={() => refetch()}
+            />
+          </Section>
         )}
       </PageContainer>
     </AppShell>

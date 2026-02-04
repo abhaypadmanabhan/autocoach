@@ -18,6 +18,7 @@ import { useSession } from "@/hooks/useQuiz";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { ScoreCircle, ScoreBreakdown, StatSatellite } from "@/components/results/ScoreCircle";
 import { ReviewList } from "@/components/results/ReviewRow";
 import { staggerContainer, slideUpItem, cardLiftVariants } from "@/lib/motions";
@@ -48,9 +49,38 @@ function ResultsContent() {
 
   if (loading) {
     return (
-      <div className="h-[80vh] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
-      </div>
+      <PageContainer size="xl">
+        <div className="py-8">
+          {/* Skeleton Hero */}
+          <Section spacing="sm">
+            <div className="rounded-3xl bg-surface-card border border-surface-border p-8 md:p-12">
+              <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
+                {/* Score Circle Skeleton */}
+                <Skeleton className="w-40 h-40 rounded-full shrink-0" />
+                {/* Details Skeleton */}
+                <div className="flex-1 text-center md:text-left w-full">
+                  <Skeleton className="h-10 w-48 mb-4 mx-auto md:mx-0" />
+                  <Skeleton className="h-8 w-32 rounded-full mb-6 mx-auto md:mx-0" />
+                  <div className="grid grid-cols-3 gap-4">
+                    <Skeleton className="h-16 rounded-xl" />
+                    <Skeleton className="h-16 rounded-xl" />
+                    <Skeleton className="h-16 rounded-xl" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Section>
+          {/* Skeleton Review */}
+          <Section>
+            <Skeleton className="h-8 w-40 mb-6" />
+            <div className="space-y-4">
+              <Skeleton className="h-20 rounded-xl" />
+              <Skeleton className="h-20 rounded-xl" />
+              <Skeleton className="h-20 rounded-xl" />
+            </div>
+          </Section>
+        </div>
+      </PageContainer>
     );
   }
 

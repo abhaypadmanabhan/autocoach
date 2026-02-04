@@ -15,6 +15,7 @@ import { useSession, useSubmitAnswer, useCurrentQuestion } from "@/hooks/useQuiz
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
+import { QuestionCardSkeleton, ErrorBanner } from "@/components/ui/Skeleton";
 import { QuestionCard } from "@/components/quiz/QuestionCard";
 import { TimerBar } from "@/components/quiz/TimerBar";
 import { FeedbackPanel } from "@/components/quiz/FeedbackPanel";
@@ -36,8 +37,8 @@ function SessionContent() {
   const timerParam = searchParams.get("t");
   const initialTimerSeconds = timerParam ? parseInt(timerParam, 10) : null;
 
-  const { session, loading: sessionLoading, refetch } = useSession(sessionId);
-  const { question, loading: questionLoading, refetch: refetchQuestion } = useCurrentQuestion(sessionId);
+  const { session, loading: sessionLoading, error: sessionError, refetch } = useSession(sessionId);
+  const { question, loading: questionLoading, error: questionError, refetch: refetchQuestion } = useCurrentQuestion(sessionId);
   const { submitAnswer, submitting, error: submitError } = useSubmitAnswer(sessionId);
 
   const [answer, setAnswer] = useState<string>("");
@@ -96,6 +97,13 @@ function SessionContent() {
       router.push("/dashboard");
     }
   }, [sessionId, router]);
+
+  // Redirect to results if session is already completed (handles refresh)
+  useEffect(() => {
+    if (session?.status === "completed" && sessionId) {
+      router.replace(`/results?session_id=${sessionId}`);
+    }
+  }, [session?.status, sessionId, router]);
 
   // Timer countdown
   useEffect(() => {
@@ -161,8 +169,63 @@ function SessionContent() {
 
   if (sessionLoading || questionLoading) {
     return (
-      <div className="h-[80vh] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+      <div className="pb-32">
+        <PageContainer size="lg">
+          <div className="py-8">
+            {/* Skeleton Progress Header */}
+            <div className="mb-8">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                <div>
+                  <div className="h-8 w-48 bg-surface-border/50 rounded animate-pulse mb-2" />
+                  <div className="h-5 w-32 bg-surface-border/50 rounded animate-pulse" />
+                </div>
+              </div>
+              <div className="w-full bg-surface-border/30 rounded-full h-2" />
+            </div>
+            {/* Skeleton Question Card */}
+            <QuestionCardSkeleton />
+          </div>
+        </PageContainer>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (sessionError || questionError) {
+    return (
+      <div className="h-[80vh] flex flex-col items-center justify-center px-4">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="w-20 h-20 rounded-full bg-semantic-error/20 flex items-center justify-center mb-6"
+        >
+          <AlertCircle size={40} className="text-semantic-error" />
+        </motion.div>
+        <h2 className="text-h2 font-serif text-text-primary mb-2">Something went wrong</h2>
+        <p className="text-text-muted mb-6 text-center max-w-md">
+          {sessionError || questionError || "Unable to load the quiz session"}
+        </p>
+        <div className="flex gap-4">
+          <motion.button
+            onClick={() => {
+              refetch();
+              refetchQuestion();
+            }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="px-6 py-3 rounded-xl border-2 border-surface-border text-text-primary font-semibold hover:bg-surface-card transition-colors"
+          >
+            Try Again
+          </motion.button>
+          <motion.button
+            onClick={() => router.push("/dashboard")}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="px-6 py-3 rounded-xl bg-brand-primary text-surface-dark font-semibold hover:bg-brand-primary/90 transition-colors"
+          >
+            Back to Dashboard
+          </motion.button>
+        </div>
       </div>
     );
   }

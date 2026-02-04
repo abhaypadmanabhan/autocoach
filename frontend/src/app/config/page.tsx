@@ -3,12 +3,13 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, ArrowRight, Check, Clock, Sparkles } from "lucide-react";
+import { Loader2, ArrowRight, Check, Clock, Sparkles, AlertCircle } from "lucide-react";
 import { useCreateSession } from "@/hooks/useQuiz";
 import { useDocument } from "@/hooks/useDocuments";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
+import { ErrorBanner, Skeleton } from "@/components/ui/Skeleton";
 import { SetupStepper, StepContent } from "@/components/quiz/SetupStepper";
 import { OptionPill, DifficultyCard, OptionPillGrid } from "@/components/ui/OptionPill";
 import { DiamondButton } from "@/components/ui/DiamondButton";
@@ -40,7 +41,7 @@ function ConfigContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const documentId = searchParams.get("document_id");
-  const { document, loading: docLoading } = useDocument(documentId);
+  const { document, loading: docLoading, error: docError } = useDocument(documentId);
   const { createSession, creating, error: sessionError } = useCreateSession();
 
   // State
@@ -107,9 +108,71 @@ function ConfigContent() {
 
   if (docLoading) {
     return (
-      <div className="h-[80vh] flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
-      </div>
+      <PageContainer size="xl">
+        <div className="py-8">
+          {/* Skeleton Header */}
+          <div className="text-center mb-12">
+            <Skeleton className="h-10 w-64 mx-auto mb-4" />
+            <Skeleton className="h-6 w-48 mx-auto" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            {/* Skeleton Stepper */}
+            <div className="lg:col-span-4">
+              <div className="space-y-4">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="w-10 h-10 rounded-full" />
+                    <div className="flex-1">
+                      <Skeleton className="h-5 w-24 mb-1" />
+                      <Skeleton className="h-4 w-32" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Skeleton Content */}
+            <div className="lg:col-span-8">
+              <Skeleton className="h-8 w-48 mb-4" />
+              <Skeleton className="h-6 w-64 mb-8" />
+              <div className="flex flex-wrap gap-3">
+                <Skeleton className="h-12 w-20 rounded-full" />
+                <Skeleton className="h-12 w-20 rounded-full" />
+                <Skeleton className="h-12 w-20 rounded-full" />
+                <Skeleton className="h-12 w-20 rounded-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  // Error state for document loading failure
+  if (docError || (!docLoading && !document && documentId)) {
+    return (
+      <PageContainer size="md">
+        <div className="py-16 text-center">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="w-20 h-20 rounded-full bg-semantic-error/20 flex items-center justify-center mx-auto mb-6"
+          >
+            <AlertCircle size={40} className="text-semantic-error" />
+          </motion.div>
+          <h2 className="text-h2 font-serif text-text-primary mb-2">Document Not Found</h2>
+          <p className="text-text-muted mb-6">
+            {docError || "The document you're looking for doesn't exist or you don't have access to it."}
+          </p>
+          <motion.button
+            onClick={() => router.push("/upload")}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="px-8 py-3 rounded-xl bg-brand-primary text-surface-dark font-semibold hover:bg-brand-primary/90 transition-colors"
+          >
+            Upload a Document
+          </motion.button>
+        </div>
+      </PageContainer>
     );
   }
 

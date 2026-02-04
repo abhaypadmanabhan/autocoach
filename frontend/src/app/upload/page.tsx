@@ -16,6 +16,7 @@ import { usePollDocumentStatus } from "@/hooks/useDocuments";
 import { useUploadDocument } from "@/hooks/useUploadDocument";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
+import { ErrorBanner } from "@/components/ui/Skeleton";
 import { DiamondSpinner } from "@/components/ui/DiamondButton";
 import { ProgressDots, ProgressBar } from "@/components/ui/StatusBadge";
 import { staggerContainer, slideUpItem, dropZoneVariants, circularRevealVariants } from "@/lib/motions";
@@ -25,8 +26,13 @@ export default function Upload() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [documentId, setDocumentId] = useState<string | null>(null);
-  const { upload, error: uploadError } = useUploadDocument();
+  const { upload, error: uploadError, uploading } = useUploadDocument();
   const { document } = usePollDocumentStatus(documentId);
+
+  const handleReset = useCallback(() => {
+    setUploadedFile(null);
+    setDocumentId(null);
+  }, []);
 
   // Check auth
   useEffect(() => {
@@ -221,6 +227,15 @@ export default function Upload() {
                       >
                         <CheckCircle size={40} className="text-semantic-success" />
                       </motion.div>
+                    ) : document?.status === "failed" || uploadError ? (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 200 }}
+                        className="w-20 h-20 rounded-full bg-semantic-error/20 flex items-center justify-center mx-auto mb-6"
+                      >
+                        <X size={40} className="text-semantic-error" />
+                      </motion.div>
                     ) : (
                       <div className="mx-auto mb-6">
                         <DiamondSpinner size="lg" />
@@ -238,7 +253,7 @@ export default function Upload() {
                       <p className={`font-medium ${getStatusColor()}`}>
                         {getStatusMessage()}
                       </p>
-                      {document?.status !== "ready" && (
+                      {document?.status !== "ready" && document?.status !== "failed" && !uploadError && (
                         <ProgressDots />
                       )}
                     </div>
@@ -253,6 +268,18 @@ export default function Upload() {
                       <div className="w-64 mx-auto mt-4">
                         <ProgressBar progress={60} size="sm" />
                       </div>
+                    )}
+
+                    {/* Retry button for failed uploads */}
+                    {(document?.status === "failed" || uploadError) && (
+                      <motion.button
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onClick={handleReset}
+                        className="mt-6 px-6 py-3 rounded-xl border-2 border-surface-border text-text-primary font-semibold hover:bg-surface-card transition-colors"
+                      >
+                        Try Another File
+                      </motion.button>
                     )}
                   </motion.div>
                 )}
