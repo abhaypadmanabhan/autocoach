@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { School, Settings, User, ArrowLeft } from "lucide-react";
 import { pageVariants, pageTransition } from "@/lib/motions";
+import { createBrowserClient } from "@/lib/supabase/client";
 import type { ReactNode } from "react";
 
 interface AppShellProps {
@@ -38,6 +39,12 @@ export function AppShell({
     } else {
       router.back();
     }
+  };
+
+  const handleLogout = async () => {
+    const supabase = createBrowserClient();
+    await supabase.auth.signOut();
+    router.push("/login");
   };
 
   return (
@@ -103,12 +110,15 @@ export function AppShell({
                   <Settings size={20} className="text-text-secondary" />
                 </motion.button>
 
-                <motion.div
+                <motion.button
                   whileHover={{ scale: 1.05 }}
-                  className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-surface-dark font-bold cursor-pointer"
+                  whileTap={{ scale: 0.95 }}
+                  onClick={handleLogout}
+                  className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-surface-dark font-bold cursor-pointer hover:opacity-90 transition-opacity"
+                  title="Sign out"
                 >
                   <User size={20} />
-                </motion.div>
+                </motion.button>
               </div>
             </div>
           </div>
