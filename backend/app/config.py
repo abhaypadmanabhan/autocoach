@@ -44,23 +44,31 @@ class Settings(BaseSettings):
         """Build list of allowed CORS origins based on environment."""
         origins: List[str] = []
 
-        # In development, allow localhost
-        if self.environment == "development":
+        # In development (or if not explicitly production), allow localhost
+        if self.environment != "production":
             origins.extend([
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
             ])
 
-        # Add frontend_url if set (backward compat)
-        if self.frontend_url and self.frontend_url not in origins:
-            origins.append(self.frontend_url)
-
-        # Add comma-separated origins from FRONTEND_ORIGINS
+        # Add comma-separated origins from FRONTEND_ORIGINS (primary method)
         if self.frontend_origins:
             for origin in self.frontend_origins.split(","):
                 origin = origin.strip()
+                # Remove trailing slashes for consistency
+                origin = origin.rstrip("/")
                 if origin and origin not in origins:
                     origins.append(origin)
+
+        # Add frontend_url if set (backward compat / fallback)
+        if self.frontend_url:
+            url = self.frontend_url.strip().rstrip("/")
+            if url and url not in origins:
+                origins.append(url)
+
+        # Safety: ensure we have at least localhost if nothing else is configured
+        if not origins:
+            origins = ["http://localhost:3000"]
 
         return origins
 
