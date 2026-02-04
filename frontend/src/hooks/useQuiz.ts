@@ -16,7 +16,12 @@ export function useQuizSession(sessionId: string | null) {
   const { data, error, isLoading, mutate } = useSWR<QuizSession>(
     sessionId ? `/quiz/sessions/${sessionId}` : null,
     () => apiFetch<QuizSession>(`/quiz/sessions/${sessionId}`),
-    { revalidateOnFocus: false }
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+      errorRetryCount: 1,
+      dedupingInterval: 5000,
+    }
   );
   return {
     session: data ?? null,
@@ -42,7 +47,12 @@ export function useCurrentQuestion(sessionId: string | null) {
         throw err;
       }
     },
-    { revalidateOnFocus: false }
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+      errorRetryCount: 1,
+      dedupingInterval: 5000,
+    }
   );
   return {
     question: data ?? null,

@@ -10,7 +10,12 @@ export function useDocuments() {
   const { data, error, isLoading, mutate } = useSWR<DocumentListResponse>(
     "/documents/",
     () => apiFetch<DocumentListResponse>("/documents/"),
-    { revalidateOnFocus: true, dedupingInterval: 5000 }
+    {
+      revalidateOnFocus: true,
+      dedupingInterval: 5000,
+      shouldRetryOnError: false,
+      errorRetryCount: 1,
+    }
   );
 
   return {
@@ -29,8 +34,12 @@ export function useDocument(id: string | null) {
     id ? `/documents/${id}` : null,
     () => apiFetch<Document>(`/documents/${id}`),
     {
+      // Only poll while document is processing (not on error)
       refreshInterval: (data) =>
         data && data.status !== "ready" && data.status !== "failed" ? 2000 : 0,
+      shouldRetryOnError: false,
+      errorRetryCount: 1,
+      dedupingInterval: 5000,
     }
   );
 
