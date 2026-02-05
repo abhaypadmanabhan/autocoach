@@ -10,6 +10,7 @@ const PROTECTED_ROUTES = [
   "/feedback",
   "/results",
   "/analytics",
+  "/settings",
 ];
 
 // Auth routes that should redirect to dashboard if already logged in

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, XCircle, X } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, X } from "lucide-react";
 import { ToastContext, useToastState, type Toast } from "@/hooks/useToast";
 import type { ReactNode } from "react";
 
@@ -11,7 +11,17 @@ interface ToastItemProps {
 }
 
 function ToastItem({ toast, onDismiss }: ToastItemProps) {
-  const isSuccess = toast.type === "success";
+  const variantStyles = {
+    success: "bg-semantic-success/10 border-semantic-success/30 text-semantic-success",
+    error: "bg-semantic-error/10 border-semantic-error/30 text-semantic-error",
+    warning: "bg-semantic-warning/10 border-semantic-warning/30 text-semantic-warning",
+  };
+
+  const icons = {
+    success: <CheckCircle size={20} className="flex-shrink-0" />,
+    error: <XCircle size={20} className="flex-shrink-0" />,
+    warning: <AlertTriangle size={20} className="flex-shrink-0" />,
+  };
 
   return (
     <motion.div
@@ -23,18 +33,10 @@ function ToastItem({ toast, onDismiss }: ToastItemProps) {
       className={`
         flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg
         backdrop-blur-md border
-        ${
-          isSuccess
-            ? "bg-semantic-success/10 border-semantic-success/30 text-semantic-success"
-            : "bg-semantic-error/10 border-semantic-error/30 text-semantic-error"
-        }
+        ${variantStyles[toast.type]}
       `}
     >
-      {isSuccess ? (
-        <CheckCircle size={20} className="flex-shrink-0" />
-      ) : (
-        <XCircle size={20} className="flex-shrink-0" />
-      )}
+      {icons[toast.type]}
       <p className="text-sm font-medium text-text-primary flex-1">{toast.message}</p>
       <button
         onClick={() => onDismiss(toast.id)}

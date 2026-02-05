@@ -3,10 +3,14 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { School, Settings, User, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { School, ArrowLeft } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
 import { pageVariants, pageTransition } from "@/lib/motions";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ToastProvider } from "@/components/ui/Toast";
+import { AvatarDropdown } from "@/components/ui/AvatarDropdown";
+import { useAvatar } from "@/hooks/useAvatar";
 import type { ReactNode } from "react";
 
 interface AppShellProps {
@@ -33,6 +37,26 @@ export function AppShell({
   className = "",
 }: AppShellProps) {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const { avatarUrl } = useAvatar(user?.id ?? null);
+
+  useEffect(() => {
+    const supabase = createBrowserClient();
+
+    // Get initial user
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleBack = () => {
     if (backHref) {
@@ -104,23 +128,11 @@ export function AppShell({
               <div className="flex items-center gap-2">
                 {rightContent}
 
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="w-10 h-10 rounded-full hover:bg-surface-border/50 flex items-center justify-center transition-colors"
-                >
-                  <Settings size={20} className="text-text-secondary" />
-                </motion.button>
-
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleLogout}
-                  className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-surface-dark font-bold cursor-pointer hover:opacity-90 transition-opacity"
-                  title="Sign out"
-                >
-                  <User size={20} />
-                </motion.button>
+                <AvatarDropdown
+                  user={user}
+                  avatarUrl={avatarUrl}
+                  onLogout={handleLogout}
+                />
               </div>
             </div>
           </div>
