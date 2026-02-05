@@ -29,7 +29,7 @@ export type { BadgeProps } from "./Badge"
 export { ToastProvider, ToastContainer, useToast } from "./Toast"
 export type { Toast, ToastType } from "./Toast"
 
-export { Skeleton } from "./Skeleton"
+export { Skeleton, QuestionCardSkeleton, ErrorBanner } from "./Skeleton"
 
 export { Progress } from "./Progress"
 

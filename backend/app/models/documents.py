@@ -45,6 +45,9 @@ class ChunkResult(BaseModel):
     score: float
 
 
+class SearchResponse(BaseModel):
+    """Response model for a document search."""
+
     query: str
     document_id: str
     results: list[ChunkResult]
