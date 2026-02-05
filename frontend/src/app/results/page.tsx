@@ -108,15 +108,35 @@ function ResultsContent() {
     );
   }
 
-  const score = session.score_percentage || 0;
-  const correct = session.correct_answers;
-  const total = session.total_questions;
-  const incorrect = total - correct;
+  const toSafeNumber = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const coerced = Number(value);
+      return Number.isFinite(coerced) ? coerced : 0;
+    }
+    return 0;
+  };
+
+  const questions = session.questions ?? [];
+  const hasQuestions = questions.length > 0;
+  const correctFromQuestions = questions.filter((q) => q.is_correct === true).length;
+  const answeredFromQuestions = questions.filter((q) => q.user_answer != null).length;
+  const sessionTotal = toSafeNumber(session.total_questions);
+  const sessionCorrect = toSafeNumber(session.correct_answers);
+
+  const total = hasQuestions ? questions.length : sessionTotal;
+  const correct = hasQuestions ? correctFromQuestions : sessionCorrect;
+  const answered = hasQuestions ? answeredFromQuestions : sessionTotal;
+  const incorrect = Math.max(total - correct, 0);
+
+  const scorePercent = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const accuracyPercent = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+  const hasAnyAnswers = total > 0;
 
   const getPerformanceMessage = () => {
-    if (score >= 80) return { message: "Outstanding! 🎉", color: "#22c55e" };
-    if (score >= 60) return { message: "Great job! 👏", color: "#c18c5d" };
-    if (score >= 40) return { message: "Good effort! 💪", color: "#eab308" };
+    if (scorePercent >= 80) return { message: "Outstanding! 🎉", color: "#22c55e" };
+    if (scorePercent >= 60) return { message: "Great job! 👏", color: "#c18c5d" };
+    if (scorePercent >= 40) return { message: "Good effort! 💪", color: "#eab308" };
     return { message: "Keep practicing! 📚", color: "#ef4444" };
   };
 
@@ -143,11 +163,19 @@ function ResultsContent() {
             <div className="relative flex flex-col md:flex-row items-center gap-8 md:gap-12">
               {/* Score Circle */}
               <div className="shrink-0">
-                <ScoreCircle
-                  score={score}
-                  total={100}
-                  size="lg"
-                />
+                {hasAnyAnswers ? (
+                  <ScoreCircle
+                    score={scorePercent}
+                    total={100}
+                    size="lg"
+                  />
+                ) : (
+                  <div className="relative w-64 h-64 flex items-center justify-center rounded-full bg-surface-card border border-surface-border">
+                    <span className="text-sm text-text-muted uppercase tracking-wider text-center px-6">
+                      No answers recorded
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Score Details */}
@@ -196,7 +224,7 @@ function ResultsContent() {
               <StatSatellite
                 icon={<Target size={20} />}
                 label="Accuracy"
-                value={`${Math.round(score)}%`}
+                value={hasAnyAnswers ? `${accuracyPercent}%` : "No answers recorded"}
                 orbitDelay={2}
               />
               <StatSatellite
@@ -269,7 +297,7 @@ function ResultsContent() {
               Try Again
             </Link>
 
-            {score < 100 && (
+            {scorePercent < 100 && (
               <Link
                 href={`/session?session_id=${sessionId}`}
                 className="
