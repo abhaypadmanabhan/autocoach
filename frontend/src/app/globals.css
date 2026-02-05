@@ -5,27 +5,27 @@
      AUTOCOACH DESIGN SYSTEM v2.0
      Dark Mode First - Based on Video Design Spec
      ============================================ */
-  
+
   /* Brand Colors */
   --brand-primary: #cd776a;      /* Dusty Rose */
   --brand-secondary: #c18c5d;    /* Toasted Almond */
-  
+
   /* Surface Colors */
   --surface-dark: #34344a;       /* Space Indigo (main bg) */
   --surface-darker: #2a2a3e;     /* Darker shade for bottom bars */
   --surface-card: #3a3a52;       /* Elevated surfaces */
   --surface-border: #495867;     /* Blue Slate (borders) */
-  
+
   /* Semantic Colors */
   --semantic-success: #22c55e;
   --semantic-error: #ef4444;
   --semantic-warning: #eab308;
-  
+
   /* Text Colors */
   --text-primary: #f2f5de;       /* Light cream text */
   --text-secondary: rgba(242, 245, 222, 0.7);
   --text-muted: rgba(242, 245, 222, 0.5);
-  
+
   /* Legacy colors (kept for compatibility) */
   --primary: #cd776a;
   --primary-dark: #b05d52;
@@ -46,7 +46,7 @@
   --indigo-dark: #1e1b4b;
   --slate-border: #e2d6d4;
   --slate-text: #8a625c;
-  
+
   /* Default theme (Dark Mode First) */
   --background: #34344a;
   --foreground: #f2f5de;
@@ -56,23 +56,23 @@
   /* Brand Colors */
   --color-brand-primary: var(--brand-primary);
   --color-brand-secondary: var(--brand-secondary);
-  
+
   /* Surface Colors */
   --color-surface-dark: var(--surface-dark);
   --color-surface-darker: var(--surface-darker);
   --color-surface-card: var(--surface-card);
   --color-surface-border: var(--surface-border);
-  
+
   /* Semantic Colors */
   --color-semantic-success: var(--semantic-success);
   --color-semantic-error: var(--semantic-error);
   --color-semantic-warning: var(--semantic-warning);
-  
+
   /* Text Colors */
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
-  
+
   /* Legacy colors */
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
@@ -94,7 +94,7 @@
   --color-slate-text: var(--slate-text);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  
+
   /* Typography */
   --font-sans: var(--font-inter), 'DM Sans', system-ui, sans-serif;
   --font-serif: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
@@ -953,5 +953,11 @@ body {
   .section-gap {
     margin-top: 7rem;
     margin-bottom: 7rem;
+  }
+}
+
+@layer base {
+  button {
+    cursor: pointer;
   }
 }

@@ -8,24 +8,110 @@ import {
   Plus,
   FileText,
   Play,
-  LogOut,
   Loader2,
   BookOpen,
   Trophy,
   Sparkles,
   Clock,
   Trash2,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
 import { useToast } from "@/hooks/useToast";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
-import { StatusBadge, ProgressBar } from "@/components/ui/StatusBadge";
-import { DocumentCardSkeleton, StatCardSkeleton, ErrorBanner } from "@/components/ui/Skeleton";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { staggerContainer, slideUpItem, cardLiftVariants } from "@/lib/motions";
+import { Badge } from "@/components/primitives/Badge";
+import { Progress } from "@/components/primitives/Progress";
+import { Skeleton } from "@/components/primitives/Skeleton";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogFooter,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/primitives/Modal";
+import { staggerContainer, slideUpItem } from "@/lib/motions";
 import type { User } from "@supabase/supabase-js";
 import type { Document } from "@/lib/types";
+
+// — Inline helpers (page-specific, built on primitives) ——————————————
+
+function DocumentStatusBadge({ status, pulse }: { status: string; pulse?: boolean }) {
+  let variant: "success" | "destructive" | "secondary" | "processing" = "secondary";
+  let label = "Pending";
+  let Icon = Clock;
+
+  switch (status) {
+    case "processing":
+      variant = "processing"; label = "Processing"; Icon = Loader2; break;
+    case "ready":
+      variant = "success"; label = "Ready"; Icon = CheckCircle2; break;
+    case "error":
+    case "failed":
+      variant = "destructive"; label = status === "failed" ? "Failed" : "Error"; Icon = XCircle; break;
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
+      <Badge variant={variant} className="gap-1.5 rounded-full py-1.5">
+        <Icon size={14} className={status === "processing" ? "animate-spin" : ""} />
+        {label}
+        {pulse && status === "processing" && (
+          <span className="relative flex h-2 w-2 ml-0.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-current opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
+          </span>
+        )}
+      </Badge>
+    </motion.div>
+  );
+}
+
+function StatCardSkeleton() {
+  return (
+    <div className="p-6 rounded-2xl bg-surface-card border border-surface-border">
+      <div className="flex items-center gap-4">
+        <Skeleton className="h-12 w-12 rounded-xl" />
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-16" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DocumentCardSkeleton() {
+  return (
+    <div className="p-6 rounded-2xl border-2 border-surface-border bg-surface-card">
+      <div className="flex items-start justify-between mb-4">
+        <Skeleton className="h-12 w-12 rounded-xl" />
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </div>
+      <Skeleton className="h-6 w-3/4 mb-2" />
+      <Skeleton className="h-4 w-1/2 mb-4" />
+      <Skeleton className="h-10 w-full rounded-xl" />
+    </div>
+  );
+}
+
+function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="p-4 rounded-xl bg-semantic-error/10 border border-semantic-error/30 flex items-center justify-between gap-4">
+      <p className="text-sm text-semantic-error">{message}</p>
+      {onRetry && (
+        <button onClick={onRetry} className="text-sm font-medium text-semantic-error hover:underline whitespace-nowrap">
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
 
 // Document Card Component
 interface DocumentCardProps {
@@ -107,7 +193,7 @@ function DocumentCard({ document, onContinue, onDelete, isDeleting }: DocumentCa
                 <Trash2 size={18} />
               )}
             </motion.button>
-            <StatusBadge status={document.status as "pending" | "processing" | "ready" | "error"} pulse={document.status === "processing"} />
+            <DocumentStatusBadge status={document.status} pulse={document.status === "processing"} />
           </div>
         </div>
 
@@ -122,7 +208,7 @@ function DocumentCard({ document, onContinue, onDelete, isDeleting }: DocumentCa
         {/* Processing state */}
         {document.status === "processing" && (
           <div className="mb-4">
-            <ProgressBar progress={60} size="sm" />
+            <Progress value={60} className="h-1" />
           </div>
         )}
 
@@ -490,17 +576,36 @@ export default function Dashboard() {
         )}
 
         {/* Delete Confirmation Modal */}
-        <ConfirmModal
-          isOpen={deleteModalOpen}
-          onConfirm={handleDeleteConfirm}
-          onCancel={handleDeleteCancel}
-          title="Delete Document"
-          message={`Are you sure you want to delete "${documentToDelete?.filename}"? This will also delete all associated quiz sessions and cannot be undone.`}
-          confirmText="Delete"
-          cancelText="Cancel"
-          isLoading={deleting}
-          variant="danger"
-        />
+        <AlertDialog open={deleteModalOpen} onOpenChange={(open) => { if (!open) handleDeleteCancel(); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <div className="w-12 h-12 rounded-full bg-semantic-error/10 flex items-center justify-center mx-auto mb-2">
+                <AlertTriangle size={24} className="text-semantic-error" />
+              </div>
+              <AlertDialogTitle className="text-center">Delete Document</AlertDialogTitle>
+              <AlertDialogDescription className="text-center">
+                Are you sure you want to delete &quot;{documentToDelete?.filename}&quot;? This will also delete all associated quiz sessions and cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={deleting}
+                onClick={(e) => { e.preventDefault(); handleDeleteConfirm(); }}
+                className="bg-semantic-error text-white hover:bg-semantic-error/90"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </PageContainer>
     </AppShell>
   );
