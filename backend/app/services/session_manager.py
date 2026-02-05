@@ -11,6 +11,24 @@ from app.services.answer_evaluator import evaluate_answer
 logger = logging.getLogger(__name__)
 
 
+def _recompute_session_counts(session_id: str) -> tuple[int, int]:
+    try:
+        questions_response = (
+            supabase_admin.table("questions")
+            .select("user_answer,is_correct")
+            .eq("session_id", session_id)
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"Failed to fetch questions for session counts: {e}")
+        return 0, 0
+
+    questions = questions_response.data or []
+    answered = sum(1 for q in questions if q.get("user_answer") is not None)
+    correct = sum(1 for q in questions if q.get("is_correct") is True)
+    return answered, correct
+
+
 def create_session(
     user_id: str,
     document_id: str,
@@ -332,9 +350,8 @@ def submit_answer(
             }
         ).eq("id", question_id).execute()
 
-        # Update session counts
-        new_answered = session["answered_questions"] + 1
-        new_correct = session["correct_answers"] + (1 if is_correct else 0)
+        # Update session counts from source of truth
+        new_answered, new_correct = _recompute_session_counts(session_id)
 
         session_update = {
             "answered_questions": new_answered,
@@ -347,9 +364,12 @@ def submit_answer(
             session_update["status"] = "completed"
             session_update["completed_at"] = now
 
-        supabase_admin.table("quiz_sessions").update(session_update).eq(
-            "id", session_id
-        ).execute()
+        try:
+            supabase_admin.table("quiz_sessions").update(session_update).eq(
+                "id", session_id
+            ).execute()
+        except Exception as e:
+            logger.error(f"Failed to update quiz session counts: {e}")
 
         # Get next question if not complete
         next_question = None
