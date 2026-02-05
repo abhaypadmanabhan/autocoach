@@ -3,6 +3,7 @@
 import logging
 
 from fastapi import APIRouter, HTTPException, Depends
+from uuid import UUID
 
 from app.config import get_settings
 from app.models.quiz import (
@@ -82,6 +83,21 @@ async def create_quiz_session(
                 detail=f"Document is not ready for quiz. Current status: {doc['status']}",
             )
 
+        if request.focus_concept_ids:
+            if len(request.focus_concept_ids) > 3:
+                raise HTTPException(status_code=400, detail="Maximum 3 focus concepts allowed.")
+            
+            # Check for duplicates
+            if len(set(request.focus_concept_ids)) != len(request.focus_concept_ids):
+                raise HTTPException(status_code=400, detail="Duplicate focus concept IDs requested.")
+                
+            # Validate UUID format
+            try:
+                for cid in request.focus_concept_ids:
+                    UUID(cid)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid UUID format in focus_concept_ids.")
+
         # Create session
         session_data = create_session(
             user_id=str(user_id),
@@ -89,6 +105,7 @@ async def create_quiz_session(
             num_questions=request.num_questions,
             difficulty=request.difficulty,
             question_types=request.question_types,
+            focus_concept_ids=request.focus_concept_ids,
         )
 
         return session_data

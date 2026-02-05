@@ -23,10 +23,13 @@ from app.models.documents import (
     SearchRequest,
     SearchResponse,
     ChunkResult,
+    DocumentConceptsResponse,
+    ConceptSchema,
 )
 from app.services.abuse_controls import enforce_max_documents
 from app.services.ingestion import process_document
 from app.services.retrieval import retrieve_relevant_chunks
+from app.services.concepts import get_document_concepts
 
 router = APIRouter()
 
@@ -400,6 +403,51 @@ async def get_document(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch document: {str(e)}"
+        )
+
+
+@router.get("/{document_id}/concepts", response_model=DocumentConceptsResponse)
+async def get_document_concepts_endpoint(
+    document_id: UUID, user_id: UUID = Depends(get_user_id_from_token)
+):
+    """
+    Get concepts for a document with user mastery data.
+    
+    Args:
+        document_id: The ID of the document.
+        user_id: The authenticated user's ID.
+        
+    Returns:
+        DocumentConceptsResponse with list of concepts.
+        
+    Raises:
+        HTTPException: 404 if document not found.
+    """
+    try:
+        # Verify document existence/ownership (light check)
+        doc_response = (
+            supabase_admin.table("documents")
+            .select("id")
+            .eq("id", str(document_id))
+            .eq("user_id", str(user_id))
+            .execute()
+        )
+        
+        if not doc_response.data:
+            raise HTTPException(status_code=404, detail="Document not found")
+            
+        concepts = get_document_concepts(str(document_id), str(user_id))
+        
+        return DocumentConceptsResponse(
+            document_id=document_id,
+            concepts=[ConceptSchema(**c) for c in concepts]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get document concepts: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get document concepts: {str(e)}"
         )
 
 

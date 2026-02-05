@@ -40,6 +40,7 @@ class QuizSessionCreate(BaseModel):
     num_questions: int = Field(default=5, ge=1, le=20)
     difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
     question_types: list[str] = Field(default=["mcq", "true_false", "free_text"])
+    focus_concept_ids: list[str] | None = None
 
 
 class QuestionResponse(BaseModel):

@@ -47,7 +47,8 @@ def generate_quiz_questions(
     document_id: str,
     num_questions: int = 5,
     difficulty: str = "medium",
-    question_types: list[str] = None
+    question_types: list[str] = None,
+    target_concept_names: list[str] = None
 ) -> list[dict]:
     """
     Generate quiz questions from document content using LLM.
@@ -67,8 +68,15 @@ def generate_quiz_questions(
     try:
         # Retrieve more chunks than needed for variety
         top_k = num_questions * 3
+        
+        # Custom query based on targets
+        query = "Generate quiz questions covering key concepts"
+        if target_concept_names:
+            concepts_str = ", ".join(target_concept_names)
+            query = f"Generate quiz questions about: {concepts_str}"
+            
         chunks = retrieve_relevant_chunks(
-            query="Generate quiz questions covering key concepts",
+            query=query,
             document_id=document_id,
             top_k=top_k
         )
@@ -87,7 +95,13 @@ def generate_quiz_questions(
 
         # Build user prompt
         types_str = ", ".join(question_types)
-        user_prompt = f"""Based on the following content, generate {num_questions} quiz questions.
+        
+        focus_instruction = ""
+        if target_concept_names:
+            concepts_str = ", ".join(target_concept_names)
+            focus_instruction = f"\nFOCUS: Create questions specifically testing these concepts: {concepts_str}"
+            
+        user_prompt = f"""Based on the following content, generate {num_questions} quiz questions. {focus_instruction}
 
 Difficulty: {difficulty}
 Question types to include: {types_str}

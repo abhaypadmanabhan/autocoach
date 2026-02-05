@@ -45,9 +45,32 @@ class ChunkResult(BaseModel):
     score: float
 
 
-class SearchResponse(BaseModel):
-    """Response model for document search."""
-
     query: str
     document_id: str
     results: list[ChunkResult]
+
+
+class ConceptSchema(BaseModel):
+    """Schema for a learning concept with user mastery data."""
+
+    id: UUID
+    concept_name: str
+    concept_description: str | None = None
+    importance_score: float
+    is_core: bool
+    parent_concept_id: UUID | None = None
+    created_at: datetime
+    
+    # User mastery fields (zeroed if not present)
+    mastery_score: float = 0.0
+    times_tested: int = 0
+    times_correct: int = 0
+    last_tested_at: datetime | None = None
+    mastered_at: datetime | None = None
+
+
+class DocumentConceptsResponse(BaseModel):
+    """Response model for a document's concepts."""
+    
+    document_id: UUID
+    concepts: list[ConceptSchema]

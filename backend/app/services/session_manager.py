@@ -7,8 +7,87 @@ from uuid import uuid4
 from app.core.supabase import supabase_admin
 from app.services.quiz_generator import generate_quiz_questions
 from app.services.answer_evaluator import evaluate_answer
+from app.services.concepts import get_document_concepts
 
 logger = logging.getLogger(__name__)
+
+
+def _update_concept_mastery(user_id: str, concept_ids: list[str], is_correct: bool):
+    """
+    Update mastery for a list of concepts.
+    """
+    if not concept_ids:
+        return
+
+    now = datetime.now(timezone.utc).isoformat()
+    
+    for concept_id in concept_ids:
+        try:
+            # Get current mastery
+            res = supabase_admin.table("user_concept_mastery").select("*").eq("user_id", user_id).eq("concept_id", concept_id).execute()
+            current = res.data[0] if res.data else None
+            
+            times_tested = (current["times_tested"] if current else 0) + 1
+            times_correct = (current["times_correct"] if current else 0) + (1 if is_correct else 0)
+            
+            # Simple MVP formula: (correct / tested) * 100
+            mastery_score = round((times_correct / times_tested) * 100.0, 2)
+            mastery_score = min(100.0, max(0.0, mastery_score))
+            
+            data = {
+                "user_id": user_id,
+                "concept_id": concept_id,
+                "times_tested": times_tested,
+                "times_correct": times_correct,
+                "mastery_score": mastery_score,
+                "last_tested_at": now,
+            }
+            
+            # Check if mastered (>= 80)
+            if mastery_score >= 80.0:
+                # If newly mastered or mastered_at was null
+                if not current or not current.get("mastered_at"):
+                    data["mastered_at"] = now
+            
+            supabase_admin.table("user_concept_mastery").upsert(data).execute()
+            logger.info(f"Updated mastery for concept {concept_id}: score={mastery_score}")
+            
+        except Exception as e:
+            logger.error(f"Failed to update mastery for concept {concept_id}: {e}")
+
+
+def _recompute_document_progress(user_id: str, document_id: str):
+    """
+    Recompute document completion progress based on CORE concepts.
+    MVP: Store in documents.progress_core (shared field, but treated as per-user).
+    """
+    try:
+        # Get all concepts for doc
+        concepts = get_document_concepts(document_id, user_id)
+        if not concepts:
+            return
+
+        # Filter for CORE concepts (importance >= 0.6)
+        core_concepts = [c for c in concepts if c["importance_score"] >= 0.6]
+        
+        if not core_concepts:
+            # No core concepts defined yet, can't compute core progress
+            return
+            
+        # Count mastered core concepts
+        mastered_count = sum(1 for c in core_concepts if c["mastery_score"] >= 80.0)
+        total_core = len(core_concepts)
+        
+        progress = round((mastered_count / total_core) * 100.0, 1)
+        
+        # Update document
+        # NOTE: destructive to other users' progress views if this field is shared.
+        # Per requirements: "Store progress_core into documents.progress_core... Use documents.progress_core for now"
+        supabase_admin.table("documents").update({"progress_core": progress}).eq("id", document_id).execute()
+        logger.info(f"Updated document {document_id} progress to {progress}% for user {user_id}")
+        
+    except Exception as e:
+        logger.error(f"Failed to recompute document progress: {e}")
 
 
 def _recompute_session_counts(session_id: str) -> tuple[int, int]:
@@ -35,6 +114,7 @@ def create_session(
     num_questions: int,
     difficulty: str,
     question_types: list[str],
+    focus_concept_ids: list[str] | None = None,
 ) -> dict:
     """
     Create a new quiz session.
@@ -45,17 +125,78 @@ def create_session(
         num_questions: Number of questions to generate.
         difficulty: Difficulty level.
         question_types: Types of questions to include.
+        focus_concept_ids: Optional specific concepts to target.
 
     Returns:
         Dictionary with session data and first question.
     """
     try:
+        # 1. Determine Target Concepts
+        target_concepts = []
+        target_names = []
+        
+        # Fetch all doc concepts first (we need them for validation or auto-selection)
+        all_concepts = get_document_concepts(document_id, user_id)
+        concept_map = {str(c["id"]): c for c in all_concepts}
+        
+        if focus_concept_ids:
+            # User requested specific focus
+            valid_ids = []
+            for cid in focus_concept_ids:
+                if cid in concept_map:
+                    # Validate importance >= 0.6 unless doc is complete
+                    # (Simplified: just check score for now as per "unless document core is complete (progress_core >= 100)")
+                    # We need to check document progress. For MVP speed, let's just check importance for now or fetch doc.
+                    # Per req: "Validate: only allow concepts with importance_score >= 0.6 unless document core is complete"
+                    # I'll enable it for now to be safe, but ideally we check document.progress_core
+                    c = concept_map[cid]
+                    if c["importance_score"] < 0.6:
+                        # Check doc status
+                        # Per requirement: "If document.progress_core is stored per-user incorrectly, treat it as unknown and allow only core concepts"
+                        # So unless we are SURE it is 100, we block.
+                        # Query doc again to get progress_core
+                        doc_res = supabase_admin.table("documents").select("progress_core").eq("id", document_id).execute()
+                        prog = doc_res.data[0].get("progress_core") if doc_res.data else 0
+                        
+                        # "unless document core is complete (progress_core >= 100)"
+                        if (prog or 0) < 100:
+                            raise ValueError(f"Concept '{c['concept_name']}' is not core (importance < 0.6). Finish core concepts first (current progress: {prog or 0}%).")
+                    
+                    valid_ids.append(cid)
+                    target_concepts.append(c)
+                    target_names.append(c["concept_name"])
+                else:
+                    raise ValueError(f"Concept ID {cid} not found in this document")
+            
+            logger.info(f"Targeting requested concepts: {target_names}")
+
+        else:
+            # Auto-selection: 3 weak core concepts
+            # Filter: importance >= 0.6 AND mastery < 80
+            candidates = [
+                c for c in all_concepts 
+                if c["importance_score"] >= 0.6 and c["mastery_score"] < 80.0
+            ]
+            # Sort: Importance DESC, then Mastery ASC (lowest mastery first) - wait, python sort is stable
+            # Sort by mastery ASC first
+            candidates.sort(key=lambda x: x["mastery_score"])
+            # Then by importance DESC
+            candidates.sort(key=lambda x: x["importance_score"], reverse=True)
+            
+            # Take top 3
+            target_concepts = candidates[:3]
+            target_names = [c["concept_name"] for c in target_concepts]
+            logger.info(f"Auto-selected target concepts: {target_names}")
+            
+        target_concept_ids = [str(c["id"]) for c in target_concepts]
+
         # Generate quiz questions
         questions = generate_quiz_questions(
             document_id=document_id,
             num_questions=num_questions,
             difficulty=difficulty,
             question_types=question_types,
+            target_concept_names=target_names
         )
 
         if not questions:
@@ -84,6 +225,9 @@ def create_session(
         # Create question records
         question_records = []
         for i, q in enumerate(questions, 1):
+            # Assign first 1-2 target concepts if available
+            q_concept_ids = target_concept_ids[:2] if target_concept_ids else None
+            
             question_record = {
                 "id": str(uuid4()),
                 "session_id": session_id,
@@ -93,6 +237,7 @@ def create_session(
                 "options": q.get("options"),
                 "correct_answer": q.get("correct_answer", ""),
                 "explanation": q.get("explanation"),
+                "concept_ids": q_concept_ids,
                 "user_answer": None,
                 "is_correct": None,
                 "input_method": None,
@@ -370,6 +515,32 @@ def submit_answer(
             ).execute()
         except Exception as e:
             logger.error(f"Failed to update quiz session counts: {e}")
+            
+        # Update Concept Mastery & Document Progress
+        try:
+            q_concept_ids = question.get("concept_ids")
+            if q_concept_ids:
+                # Update specific concept mastery
+                background_tasks = None  # Ideally this should be background, but existing function is sync and called from sync route wrapper
+                # We'll run it synchronously for safety/simplicity as requested ("safe defaults")
+                _update_concept_mastery(user_id, q_concept_ids, is_correct)
+                
+                # Recompute doc progress
+                _recompute_document_progress(user_id, session["document_id"])
+                
+                # Log mastery update details
+                # Fetch updated progress for logging
+                prog_res = supabase_admin.table("documents").select("progress_core").eq("id", session["document_id"]).execute()
+                current_prog = prog_res.data[0].get("progress_core") if prog_res.data else "unknown"
+                
+                logger.info(
+                    f"Mastery Update | Session: {session_id} | Question: {question_id} | "
+                    f"Concepts: {q_concept_ids} | Correct: {is_correct} | "
+                    f"DocCoreProgress: {current_prog}"
+                )
+        except Exception as e:
+            logger.error(f"Failed to update mastery/progress: {e}")
+            # Don't fail the request, this is side-effect data
 
         # Get next question if not complete
         next_question = None
