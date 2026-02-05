@@ -138,10 +138,21 @@ async def process_document(document_id: str) -> None:
                 supabase_admin.table("chunks").insert(batch).execute()
             
             logger.info(f"Saved {len(chunk_records)} chunks to database")
+            logger.info(f"Saved {len(chunk_records)} chunks to database")
         except Exception as e:
             logger.error(f"Failed to save chunks for document {document_id}: {e}")
             _mark_document_failed(document_id, f"Failed to save chunks: {str(e)}")
             return
+
+        # Extract concepts from chunks (Non-blocking: failure here should not fail the document)
+        try:
+             # Need to pass chunks in a format that concept_extractor expects (list of dicts with content)
+             # We can reuse the `chunks` variable from earlier which are dicts from `chunk_text` function
+             from app.services.concept_extractor import extract_concepts
+             await extract_concepts(document_id, chunks)
+        except Exception as e:
+             logger.error(f"Concept extraction failed for document {document_id}: {e}")
+             # Do NOT mark document as failed, just log the error.
 
         # Update document status to 'ready'
         try:

@@ -39,6 +39,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
     def get_cors_origins(self) -> List[str]:
         """Build list of allowed CORS origins based on environment."""
