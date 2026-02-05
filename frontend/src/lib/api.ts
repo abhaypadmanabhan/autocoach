@@ -88,21 +88,16 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
 
   if (response.status === 401) {
     window.location.href = "/login";
-    throw new ApiError(401, "Unauthorized");
+    throw new ApiError("Unauthorized", 401);
   }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: "Unknown error" }));
-    // Enhanced error message with status and details for easier debugging
-    const errorMessage = errorData.detail 
-      ? `${errorData.detail} (HTTP ${response.status})`
-      : errorData.message 
-        ? `${errorData.message} (HTTP ${response.status})`
-        : `HTTP ${response.status} Error`;
-    const apiError = new ApiError(response.status, errorMessage);
-    // Attach full error data for debugging
-    (apiError as unknown as { data: unknown }).data = errorData;
-    throw apiError;
+    const detail = typeof errorData.detail === "string" ? errorData.detail : undefined;
+    const message = typeof errorData.message === "string" ? errorData.message : undefined;
+    const code = typeof errorData.code === "string" ? errorData.code : undefined;
+    const errorMessage = detail || message || `HTTP ${response.status} Error`;
+    throw new ApiError(errorMessage, response.status, code, errorData);
   }
 
   return response.json();

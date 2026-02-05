@@ -32,6 +32,7 @@ class QuizGenerateResponse(BaseModel):
 
 # Session models
 
+
 class QuizSessionCreate(BaseModel):
     """Request model for creating a quiz session."""
 
@@ -57,7 +58,7 @@ class AnswerSubmit(BaseModel):
     """Request model for submitting an answer."""
 
     answer: str
-    input_method: str = Field(default="typed", pattern="^(typed|voice)$")
+    input_method: str = Field(default="typed", pattern="^(typed|click|voice)$")
 
 
 class AnswerResult(BaseModel):

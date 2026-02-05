@@ -81,7 +81,7 @@ export function useCreateSession() {
         globalMutate(`/quiz/sessions/${response.session_id}`, response, false);
         return response;
       } catch (err: unknown) {
-        const message = getErrorMessage(err);
+        const message = err instanceof Error ? err.message : getErrorMessage(err);
         setError(message);
         throw err;
       } finally {
@@ -99,7 +99,7 @@ export function useAnswerQuestion(sessionId: string | null) {
   const [error, setError] = useState<string | null>(null);
 
   const submitAnswer = useCallback(
-    async (questionId: string, answer: unknown, inputMethod: InputMethod = "text"): Promise<AnswerResponse> => {
+    async (questionId: string, answer: unknown, inputMethod: InputMethod = "typed"): Promise<AnswerResponse> => {
       if (!sessionId) throw new Error("No session ID");
       setSubmitting(true);
       setError(null);
@@ -112,6 +112,15 @@ export function useAnswerQuestion(sessionId: string | null) {
           throw new Error("Answer cannot be empty");
         }
         
+        if (process.env.NODE_ENV === "development") {
+          console.log("submitAnswer payload", {
+            answer: normalizedAnswer,
+            input_method: inputMethod,
+            sessionId,
+            questionId,
+          });
+        }
+
         const response = await apiFetch<AnswerResponse>(
           `/quiz/sessions/${sessionId}/answer?question_id=${questionId}`,
           { method: "POST", body: { answer: normalizedAnswer, input_method: inputMethod } }
@@ -121,7 +130,7 @@ export function useAnswerQuestion(sessionId: string | null) {
         await globalMutate(`/quiz/sessions/${sessionId}`);
         return response;
       } catch (err: unknown) {
-        const message = getErrorMessage(err);
+        const message = err instanceof Error ? err.message : getErrorMessage(err);
         setError(message);
         throw err;
       } finally {

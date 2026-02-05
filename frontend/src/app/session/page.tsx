@@ -45,7 +45,7 @@ function SessionContent() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
-  const [inputMethod, setInputMethod] = useState<"click" | "text">("text");
+  const [inputMethod, setInputMethod] = useState<"click" | "typed" | "voice">("typed");
 
   // Timer state
   const [timeRemaining, setTimeRemaining] = useState<number | null>(() => {
@@ -155,12 +155,12 @@ function SessionContent() {
     setAnswer("");
     setLastResult(null);
     setIsSessionComplete(false);
-    setInputMethod("text");
+    setInputMethod("typed");
     refetchQuestion();
     refetch();
   };
 
-  const handleAnswer = (selectedAnswer: string, method: "click" | "text" = "click") => {
+  const handleAnswer = (selectedAnswer: string, method: "click" | "typed" | "voice" = "click") => {
     setAnswer(selectedAnswer);
     setInputMethod(method);
   };

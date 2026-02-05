@@ -1,7 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import health, documents, quiz, sessions, voice
@@ -73,3 +75,21 @@ app.include_router(voice.router, prefix="/voice", tags=["voice"])
 async def root():
     """Root endpoint."""
     return {"message": "AutoCoach API", "docs": "/docs"}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    if request.method.upper() == "POST" and request.url.path.endswith("/answer"):
+        body = exc.body
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", errors="replace")
+
+        logger.warning(
+            "422 validation error on %s %s | body=%s | errors=%s",
+            request.method,
+            request.url.path,
+            body,
+            exc.errors(),
+        )
+
+    return await request_validation_exception_handler(request, exc)

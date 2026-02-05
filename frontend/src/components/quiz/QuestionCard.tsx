@@ -11,7 +11,7 @@ interface QuestionCardProps {
   question: string;
   type: QuestionType;
   options?: string[] | null;
-  onAnswer: (answer: string, inputMethod?: "click" | "text") => void;
+  onAnswer: (answer: string, inputMethod?: "click" | "typed" | "voice") => void;
   selectedAnswer?: string;
   showFeedback?: boolean;
   correctAnswer?: string;
@@ -76,7 +76,7 @@ export function QuestionCard({
           <div className="space-y-4">
             <FreeTextInput
               value={selectedAnswer || ""}
-              onChange={(value) => onAnswer(value, "text")}
+              onChange={(value) => onAnswer(value, "typed")}
               disabled={showFeedback}
               placeholder="Type your answer here..."
             />
@@ -89,7 +89,7 @@ export function QuestionCard({
                     // Append transcription to existing text with a space
                     const currentText = selectedAnswer || "";
                     const separator = currentText && !currentText.endsWith(" ") ? " " : "";
-                    onAnswer(currentText + separator + text, "text");
+                    onAnswer(currentText + separator + text, "voice");
                   }}
                   disabled={showFeedback}
                 />
@@ -185,7 +185,7 @@ interface MCQOptionsProps {
   correctAnswer?: string;
   showFeedback: boolean;
   isCorrect?: boolean;
-  onAnswer: (answer: string, inputMethod?: "click" | "text") => void;
+  onAnswer: (answer: string, inputMethod?: "click" | "typed" | "voice") => void;
   questionNumber: number;
 }
 
@@ -356,7 +356,7 @@ interface TrueFalseOptionsProps {
   correctAnswer?: string;
   showFeedback: boolean;
   isCorrect?: boolean;
-  onAnswer: (answer: string, inputMethod?: "click" | "text") => void;
+  onAnswer: (answer: string, inputMethod?: "click" | "typed" | "voice") => void;
 }
 
 function TrueFalseOptions({

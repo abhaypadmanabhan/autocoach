@@ -17,12 +17,16 @@ export interface DocumentListResponse {
 }
 
 export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string
-  ) {
+  public status: number;
+  public code?: string;
+  public details?: unknown;
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message);
     this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.details = details;
   }
 }
 
@@ -30,7 +34,7 @@ export class ApiError extends Error {
 export type QuestionType = "mcq" | "true_false" | "free_text";
 export type Difficulty = "easy" | "medium" | "hard";
 export type QuizSessionStatus = "active" | "completed";
-export type InputMethod = "click" | "text";
+export type InputMethod = "typed" | "click" | "voice";
 
 export interface CurrentQuestion {
   question_id: string;
