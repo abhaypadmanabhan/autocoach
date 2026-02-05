@@ -1,9 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle, XCircle, ArrowRight } from "lucide-react";
+import { CheckCircle, XCircle, ArrowRight, Trophy, Sparkles, Frown, Meh, Smile, PartyPopper } from "lucide-react";
 import { feedbackPanelVariants, feedbackStagger, feedbackItem } from "@/lib/motions";
 import { DiamondButton } from "@/components/ui/DiamondButton";
+
+const MIN_FEEDBACK_DISPLAY_MS = 1200;
 
 interface FeedbackPanelProps {
   isCorrect: boolean;
@@ -24,6 +27,22 @@ export function FeedbackPanel({
   isLastQuestion = false,
   className = "",
 }: FeedbackPanelProps) {
+  const [canProceed, setCanProceed] = useState(!isLastQuestion);
+
+  // Enforce minimum feedback display time for last question
+  useEffect(() => {
+    if (!isLastQuestion) {
+      setCanProceed(true);
+      return;
+    }
+
+    setCanProceed(false);
+    const timer = setTimeout(() => {
+      setCanProceed(true);
+    }, MIN_FEEDBACK_DISPLAY_MS);
+
+    return () => clearTimeout(timer);
+  }, [isLastQuestion]);
   return (
     <AnimatePresence>
       <motion.div
@@ -116,22 +135,81 @@ export function FeedbackPanel({
 
             {/* Next button */}
             <motion.div variants={feedbackItem} className="flex-shrink-0">
-              <motion.button
-                onClick={onNext}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="
-                  flex items-center gap-2 px-6 py-3
-                  bg-[var(--brand-primary)] text-[var(--surface-dark)]
-                  rounded-xl font-semibold
-                  hover:bg-opacity-90
-                  transition-colors
-                  shadow-lg shadow-[var(--brand-primary)]/20
-                "
-              >
-                {isLastQuestion ? "Finish" : "Next Question"}
-                <ArrowRight size={18} />
-              </motion.button>
+              {isLastQuestion ? (
+                <motion.button
+                  onClick={onNext}
+                  disabled={!canProceed}
+                  initial={{ scale: 1 }}
+                  animate={canProceed ? {
+                    scale: [1, 1.02, 1],
+                    boxShadow: [
+                      "0 10px 25px -5px rgba(205, 119, 106, 0.3)",
+                      "0 15px 35px -5px rgba(205, 119, 106, 0.5)",
+                      "0 10px 25px -5px rgba(205, 119, 106, 0.3)",
+                    ],
+                  } : {}}
+                  transition={canProceed ? {
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  } : {}}
+                  whileHover={canProceed ? { scale: 1.05 } : {}}
+                  whileTap={canProceed ? { scale: 0.98 } : {}}
+                  className={`
+                    relative flex items-center gap-3 px-8 py-4
+                    bg-gradient-to-r from-brand-primary to-brand-secondary
+                    text-surface-dark rounded-xl font-bold text-lg
+                    transition-all overflow-hidden
+                    ${canProceed
+                      ? "cursor-pointer hover:shadow-xl"
+                      : "opacity-70 cursor-not-allowed"
+                    }
+                  `}
+                >
+                  {/* Shimmer effect */}
+                  {canProceed && (
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      initial={{ x: "-100%" }}
+                      animate={{ x: "100%" }}
+                      transition={{
+                        duration: 1.5,
+                        repeat: Infinity,
+                        repeatDelay: 1,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  )}
+                  <Trophy size={22} className="relative z-10" />
+                  <span className="relative z-10">View Results</span>
+                  {canProceed && (
+                    <motion.div
+                      initial={{ rotate: 0 }}
+                      animate={{ rotate: [0, 15, -15, 0] }}
+                      transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+                    >
+                      <Sparkles size={18} className="relative z-10" />
+                    </motion.div>
+                  )}
+                </motion.button>
+              ) : (
+                <motion.button
+                  onClick={onNext}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="
+                    flex items-center gap-2 px-6 py-3
+                    bg-[var(--brand-primary)] text-[var(--surface-dark)]
+                    rounded-xl font-semibold
+                    hover:bg-opacity-90
+                    transition-colors
+                    shadow-lg shadow-[var(--brand-primary)]/20
+                  "
+                >
+                  Next Question
+                  <ArrowRight size={18} />
+                </motion.button>
+              )}
             </motion.div>
           </motion.div>
         </div>
@@ -172,8 +250,6 @@ export function InlineFeedback({
     </motion.div>
   );
 }
-
-import { Sparkles, Frown, Meh, Smile, PartyPopper } from "lucide-react";
 
 interface ScoreFeedbackProps {
   score: number;
