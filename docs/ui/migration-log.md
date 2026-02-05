@@ -29,3 +29,25 @@
 - All Framer Motion page animations (`staggerContainer`, `slideUpItem`, `whileHover`, etc.)
 - Auth flow, data fetching, delete logic, routing
 - No new dependencies added (AlertDialog primitives were already installed)
+
+## 2026-02-05 — Blocks Gallery (evaluation sandbox)
+
+**Route:** `/dev/blocks` (protected, requires auth)
+
+Added a private gallery page to preview third-party shadcn registry blocks
+before wiring them into production pages. No existing pages were modified.
+
+### Blocks installed (via `shadcn` CLI)
+
+| Block | Registry | Location |
+|-------|----------|----------|
+| stat-cards-01 | @bundui | `src/components/blocks/bundui/stat-cards-01.tsx` |
+| stepper | @formcn | `src/components/blocks/formcn/stepper.tsx` |
+| text-shimmer | @animbits | `src/components/blocks/animbits/shimmer.tsx` + `use-shimmer.ts` |
+
+### Files changed
+
+- `src/middleware.ts` — added `/dev` to `PROTECTED_ROUTES`
+- `src/app/dev/blocks/page.tsx` — gallery page (AppShell + PageContainer)
+- `src/components/ui/card.tsx` — installed via `shadcn add card`; added `CardAction` export
+- `docs/ui/migration-log.md` — this entry
