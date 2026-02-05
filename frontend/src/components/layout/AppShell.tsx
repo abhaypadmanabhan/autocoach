@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { School, Settings, User, ArrowLeft } from "lucide-react";
 import { pageVariants, pageTransition } from "@/lib/motions";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { ToastProvider } from "@/components/ui/Toast";
 import type { ReactNode } from "react";
 
 interface AppShellProps {
@@ -48,6 +49,7 @@ export function AppShell({
   };
 
   return (
+    <ToastProvider>
     <div className="min-h-screen bg-surface-dark text-text-primary relative overflow-hidden">
       {/* Decorative top circle */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-brand-primary/5 pointer-events-none -translate-y-1/2 z-0" />
@@ -151,6 +153,7 @@ export function AppShell({
         </motion.div>
       )}
     </div>
+    </ToastProvider>
   );
 }
 

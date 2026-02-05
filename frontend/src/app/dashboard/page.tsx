@@ -14,12 +14,15 @@ import {
   Trophy,
   Sparkles,
   Clock,
+  Trash2,
 } from "lucide-react";
-import { useDocuments } from "@/hooks/useDocuments";
+import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
+import { useToast } from "@/hooks/useToast";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
 import { StatusBadge, ProgressBar } from "@/components/ui/StatusBadge";
 import { DocumentCardSkeleton, StatCardSkeleton, ErrorBanner } from "@/components/ui/Skeleton";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { staggerContainer, slideUpItem, cardLiftVariants } from "@/lib/motions";
 import type { User } from "@supabase/supabase-js";
 import type { Document } from "@/lib/types";
@@ -28,9 +31,11 @@ import type { Document } from "@/lib/types";
 interface DocumentCardProps {
   document: Document;
   onContinue?: () => void;
+  onDelete?: () => void;
+  isDeleting?: boolean;
 }
 
-function DocumentCard({ document, onContinue }: DocumentCardProps) {
+function DocumentCard({ document, onContinue, onDelete, isDeleting }: DocumentCardProps) {
   const getStatusConfig = () => {
     switch (document.status) {
       case "ready":
@@ -77,7 +82,33 @@ function DocumentCard({ document, onContinue }: DocumentCardProps) {
           <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-surface-dark ${config.iconColor}`}>
             <FileText size={24} />
           </div>
-          <StatusBadge status={document.status as "pending" | "processing" | "ready" | "error"} pulse={document.status === "processing"} />
+          <div className="flex items-center gap-2">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete?.();
+              }}
+              disabled={isDeleting}
+              className={`
+                p-2 rounded-lg transition-colors
+                ${document.status === "failed"
+                  ? "text-semantic-error hover:bg-semantic-error/10"
+                  : "text-text-muted hover:text-semantic-error hover:bg-semantic-error/10"
+                }
+                disabled:opacity-50 disabled:cursor-not-allowed
+              `}
+              title="Delete document"
+            >
+              {isDeleting ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Trash2 size={18} />
+              )}
+            </motion.button>
+            <StatusBadge status={document.status as "pending" | "processing" | "ready" | "error"} pulse={document.status === "processing"} />
+          </div>
         </div>
 
         {/* Content */}
@@ -174,8 +205,35 @@ function EmptyState({ onUpload }: { onUpload: () => void }) {
 export default function Dashboard() {
   const router = useRouter();
   const { documents, loading, error, refetch } = useDocuments();
+  const { deleteDocument, deleting } = useDeleteDocument();
+  const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [userLoading, setUserLoading] = useState(true);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+
+  const handleDeleteClick = (doc: Document) => {
+    setDocumentToDelete(doc);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!documentToDelete) return;
+
+    try {
+      await deleteDocument(documentToDelete.id);
+      showToast("Document deleted successfully", "success");
+      setDeleteModalOpen(false);
+      setDocumentToDelete(null);
+    } catch {
+      showToast("Failed to delete document", "error");
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModalOpen(false);
+    setDocumentToDelete(null);
+  };
 
   // Auth check
   useEffect(() => {
@@ -369,6 +427,8 @@ export default function Dashboard() {
                     key={doc.id}
                     document={doc}
                     onContinue={() => router.push(`/config?document_id=${doc.id}`)}
+                    onDelete={() => handleDeleteClick(doc)}
+                    isDeleting={deleting && documentToDelete?.id === doc.id}
                   />
                 ))}
               </motion.div>
@@ -428,6 +488,19 @@ export default function Dashboard() {
             />
           </Section>
         )}
+
+        {/* Delete Confirmation Modal */}
+        <ConfirmModal
+          isOpen={deleteModalOpen}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+          title="Delete Document"
+          message={`Are you sure you want to delete "${documentToDelete?.filename}"? This will also delete all associated quiz sessions and cannot be undone.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          isLoading={deleting}
+          variant="danger"
+        />
       </PageContainer>
     </AppShell>
   );

@@ -8,10 +8,14 @@ from fastapi import (
     Depends,
     Header,
     BackgroundTasks,
+    Response,
 )
+
+import logging
 
 from app.config import get_settings
 from app.core.supabase import supabase_admin
+from app.core.qdrant import delete_document_vectors
 from app.models.documents import (
     DocumentResponse,
     DocumentListResponse,
@@ -470,4 +474,105 @@ async def search_document(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to search document: {str(e)}"
+        )
+
+
+logger = logging.getLogger(__name__)
+
+
+@router.delete("/{document_id}", status_code=204)
+async def delete_document(
+    document_id: UUID,
+    user_id: UUID = Depends(get_user_id_from_token),
+):
+    """
+    Delete a document and all associated data.
+
+    This removes:
+    - Questions associated with the document's quiz sessions
+    - Quiz sessions for the document
+    - Chunks in the database
+    - Vector embeddings in Qdrant
+    - The file in Supabase Storage
+    - The document record itself
+
+    Args:
+        document_id: The ID of the document to delete.
+        user_id: The authenticated user's ID (from token).
+
+    Returns:
+        204 No Content on success.
+
+    Raises:
+        HTTPException: 404 if document not found or doesn't belong to user.
+        HTTPException: 500 if deletion fails.
+    """
+    try:
+        # Verify document exists and belongs to user
+        response = (
+            supabase_admin.table("documents")
+            .select("*")
+            .eq("id", str(document_id))
+            .eq("user_id", str(user_id))
+            .execute()
+        )
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        doc = response.data[0]
+        file_path = doc.get("file_path")
+
+        # Delete questions via quiz_sessions
+        # First get all session IDs for this document
+        sessions_response = (
+            supabase_admin.table("quiz_sessions")
+            .select("id")
+            .eq("document_id", str(document_id))
+            .execute()
+        )
+
+        if sessions_response.data:
+            session_ids = [s["id"] for s in sessions_response.data]
+            # Delete questions for all sessions
+            for session_id in session_ids:
+                supabase_admin.table("questions").delete().eq(
+                    "session_id", session_id
+                ).execute()
+
+        # Delete quiz_sessions
+        supabase_admin.table("quiz_sessions").delete().eq(
+            "document_id", str(document_id)
+        ).execute()
+
+        # Delete chunks
+        supabase_admin.table("chunks").delete().eq(
+            "document_id", str(document_id)
+        ).execute()
+
+        # Delete document record
+        supabase_admin.table("documents").delete().eq(
+            "id", str(document_id)
+        ).execute()
+
+        # Delete vectors from Qdrant (best-effort)
+        try:
+            delete_document_vectors(str(document_id))
+        except Exception as e:
+            logger.warning(f"Failed to delete vectors from Qdrant: {e}")
+
+        # Delete file from storage (best-effort)
+        if file_path:
+            try:
+                supabase_admin.storage.from_("documents").remove([file_path])
+            except Exception as e:
+                logger.warning(f"Failed to delete file from storage: {e}")
+
+        return Response(status_code=204)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete document: {str(e)}"
         )

@@ -1,10 +1,13 @@
 "use client";
 
-import useSWR from "swr";
-import { apiFetch } from "@/lib/api";
+import { useState, useCallback } from "react";
+import useSWR, { useSWRConfig } from "swr";
+import { apiFetch, getAuthHeaders } from "@/lib/api";
 import type { Document, DocumentListResponse } from "@/lib/types";
 
 export type { Document, DocumentListResponse } from "@/lib/types";
+
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
 export function useDocuments() {
   const { data, error, isLoading, mutate } = useSWR<DocumentListResponse>(
@@ -60,4 +63,56 @@ export function usePollDocumentStatus(id: string | null) {
     ? document.status !== "ready" && document.status !== "failed"
     : false;
   return { document, isPolling, refetch: mutate };
+}
+
+export function useDeleteDocument() {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { mutate } = useSWRConfig();
+
+  const deleteDocument = useCallback(async (documentId: string) => {
+    setDeleting(true);
+    setError(null);
+
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${BASE_URL}/documents/${documentId}`, {
+        method: "DELETE",
+        headers,
+      });
+
+      if (response.status === 401) {
+        window.location.href = "/login";
+        throw new Error("Unauthorized");
+      }
+
+      if (!response.ok && response.status !== 204) {
+        const errorData = await response.json().catch(() => ({ detail: "Unknown error" }));
+        throw new Error(errorData.detail || `HTTP ${response.status}`);
+      }
+
+      // Mutate the documents list cache to remove the deleted document
+      mutate(
+        "/documents/",
+        (current: DocumentListResponse | undefined) => {
+          if (!current) return current;
+          return {
+            ...current,
+            documents: current.documents.filter((d) => d.id !== documentId),
+          };
+        },
+        { revalidate: false }
+      );
+
+      return true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete document";
+      setError(message);
+      throw err;
+    } finally {
+      setDeleting(false);
+    }
+  }, [mutate]);
+
+  return { deleteDocument, deleting, error };
 }

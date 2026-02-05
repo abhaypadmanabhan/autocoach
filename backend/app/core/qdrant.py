@@ -143,6 +143,34 @@ def store_vectors(
         raise
 
 
+def delete_document_vectors(
+    document_id: str,
+    collection_name: str = DEFAULT_COLLECTION_NAME
+) -> None:
+    """
+    Delete all vectors associated with a document from Qdrant.
+
+    Args:
+        document_id: The ID of the document whose vectors should be deleted.
+        collection_name: Name of the Qdrant collection to delete from.
+    """
+    try:
+        qdrant_client.delete(
+            collection_name=collection_name,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="document_id",
+                        match=MatchValue(value=document_id)
+                    )
+                ]
+            )
+        )
+        logger.info(f"Deleted vectors for document {document_id} from collection '{collection_name}'")
+    except Exception as e:
+        logger.warning(f"Failed to delete vectors for document {document_id}: {e}")
+
+
 def search_vectors(
     query_embedding: list[float],
     document_id: str,
