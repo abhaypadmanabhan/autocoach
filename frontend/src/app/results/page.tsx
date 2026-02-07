@@ -21,6 +21,7 @@ import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ScoreCircle, ScoreBreakdown, StatSatellite } from "@/components/results/ScoreCircle";
 import { ReviewList } from "@/components/results/ReviewRow";
+import { SentinelMascot } from "@/components/brand/SentinelMascot";
 import { staggerContainer, slideUpItem, cardLiftVariants } from "@/lib/motions";
 
 function ResultsContent() {
@@ -142,6 +143,13 @@ function ResultsContent() {
 
   const performance = getPerformanceMessage();
 
+  // Determine mascot variant based on score
+  const getMascotVariant = () => {
+    if (scorePercent >= 80) return "success";
+    if (scorePercent >= 40) return "neutral";
+    return "wrong";
+  };
+
   return (
     <PageContainer size="xl">
       <motion.div
@@ -185,9 +193,12 @@ function ResultsContent() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 }}
                 >
-                  <h1 className="text-h1 font-serif text-text-primary mb-2">
-                    Quiz Complete!
-                  </h1>
+                  <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
+                    <h1 className="text-h1 font-serif text-text-primary">
+                      Quiz Complete!
+                    </h1>
+                    <SentinelMascot variant={getMascotVariant()} className="w-14 h-14" />
+                  </div>
                   <div
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-6"
                     style={{

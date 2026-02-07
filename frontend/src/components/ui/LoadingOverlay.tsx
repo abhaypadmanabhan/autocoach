@@ -2,11 +2,8 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import {
-  overlayVariants,
-  diamondSpinnerVariants,
-  slideUpItem,
-} from "@/lib/motions";
+import { overlayVariants, slideUpItem } from "@/lib/motions";
+import { SentinelMascot } from "@/components/brand/SentinelMascot";
 
 const STUDY_TIPS = [
   "Taking breaks improves retention",
@@ -47,13 +44,10 @@ function LoadingOverlayContent({ message }: { message?: string }) {
       exit="exit"
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-surface-dark/95 backdrop-blur-sm"
     >
-      {/* Diamond Spinner */}
-      <motion.div
-        variants={diamondSpinnerVariants}
-        animate="animate"
-        className="w-12 h-12 border-2 border-brand-primary rotate-45 mb-8"
-        style={{ borderRadius: "4px" }}
-      />
+      {/* Sentinel Mascot */}
+      <div className="mb-6">
+        <SentinelMascot variant="thinking" className="w-16 h-16" />
+      </div>
 
       {/* Message or Rotating Tips */}
       <div className="h-8 flex items-center justify-center">

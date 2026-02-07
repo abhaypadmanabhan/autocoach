@@ -20,6 +20,7 @@ import { QuestionCard } from "@/components/quiz/QuestionCard";
 import { TimerBar } from "@/components/quiz/TimerBar";
 import { FeedbackPanel } from "@/components/quiz/FeedbackPanel";
 import { ProgressBar } from "@/components/ui/StatusBadge";
+import { SentinelMascot } from "@/components/brand/SentinelMascot";
 import { staggerContainer, slideUpItem, pageVariants } from "@/lib/motions";
 import type { AnswerResult } from "@/lib/types";
 
@@ -272,13 +273,20 @@ function SessionContent() {
           {/* Progress Header */}
           <motion.div variants={slideUpItem} className="mb-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <div>
-                <h1 className="text-h2 font-serif text-text-primary">
-                  Question {question?.question_number} of {question?.total_questions}
-                </h1>
-                <p className="text-text-muted mt-1">
-                  {session?.correct_answers || 0} correct so far
-                </p>
+              <div className="flex items-center gap-3">
+                <div>
+                  <h1 className="text-h2 font-serif text-text-primary">
+                    Question {question?.question_number} of {question?.total_questions}
+                  </h1>
+                  <p className="text-text-muted mt-1">
+                    {session?.correct_answers || 0} correct so far
+                  </p>
+                </div>
+                {/* Sentinel Mascot - reactive to quiz state */}
+                <SentinelMascot
+                  variant={timeUp ? "timeout" : showFeedback ? (lastResult?.is_correct ? "success" : "wrong") : "thinking"}
+                  className="w-12 h-12"
+                />
               </div>
 
               {initialTimerSeconds && timeRemaining !== null && (
@@ -403,15 +411,10 @@ function SessionContent() {
               transition={{ type: "spring", stiffness: 200, damping: 20 }}
               className="text-center"
             >
-              <motion.div
-                animate={{
-                  rotate: [0, -10, 10, -10, 10, 0],
-                  scale: [1, 1.1, 1],
-                }}
-                transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
-              >
-                <Timer size={80} className="text-semantic-error mx-auto mb-6" />
-              </motion.div>
+              {/* Timeout mascot with whistle */}
+              <div className="flex justify-center mb-6">
+                <SentinelMascot variant="timeout" className="w-20 h-20" />
+              </div>
               <h2 className="text-4xl font-bold text-text-primary mb-2">Time&apos;s Up!</h2>
               <p className="text-text-muted mb-6">Redirecting to results...</p>
               <motion.div className="w-48 h-1 bg-surface-border rounded-full mx-auto overflow-hidden">
