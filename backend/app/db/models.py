@@ -21,6 +21,37 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from app.db.base import Base
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("auth.users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    email: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    full_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    avatar_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # Daily Sprint fields
+    streak_count: Mapped[int] = mapped_column(
+        Integer, server_default="0", nullable=False
+    )
+    last_sprint_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    total_xp: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
 class Document(Base):
     __tablename__ = "documents"
     __table_args__ = (
@@ -288,7 +319,8 @@ class Chunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     embedding_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     page_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    metadata: Mapped[Optional[dict]] = mapped_column(
+    chunk_metadata: Mapped[Optional[dict]] = mapped_column(
+        "metadata",
         JSONB,
         nullable=True,
         server_default=text("'{}'::jsonb"),

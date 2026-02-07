@@ -11,6 +11,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
 import { DocumentSidebar } from "@/components/sidebar/DocumentSidebar";
 import { DocumentDashboard } from "@/components/dashboard/DocumentDashboard";
+import { DailySprintCard } from "@/components/dashboard/DailySprintCard";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -130,6 +131,18 @@ function DashboardContent() {
                   <Plus size={20} />
                   Study New
                 </Link>
+              </motion.div>
+            </motion.div>
+
+            {/* Daily Sprint */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="w-full"
+            >
+              <motion.div variants={slideUpItem}>
+                <DailySprintCard />
               </motion.div>
             </motion.div>
 

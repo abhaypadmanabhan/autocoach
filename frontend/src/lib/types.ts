@@ -108,3 +108,24 @@ export interface AnswerResponse {
   next_question: CurrentQuestion | null;
   session_complete: boolean;
 }
+
+export interface SprintStatusResponse {
+  status: "ready" | "completed";
+  streak_count: number;
+  total_xp: number;
+  last_sprint_date: string | null;
+  next_sprint_available_at: string | null;
+}
+
+export interface StartSprintResponse {
+  session_id: string;
+  document_id: string;
+  document_title: string;
+}
+
+export interface CompleteSprintResponse {
+  xp_awarded: number;
+  new_streak: number;
+  new_total_xp: number;
+  message: string;
+}
