@@ -1,12 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, XCircle, ArrowRight, Trophy, Sparkles, Frown, Meh, Smile, PartyPopper } from "lucide-react";
 import { feedbackPanelVariants, feedbackStagger, feedbackItem } from "@/lib/motions";
-import { DiamondButton } from "@/components/ui/DiamondButton";
 
 const MIN_FEEDBACK_DISPLAY_MS = 1200;
+
+// Subscribe function for useSyncExternalStore that triggers after mount
+function createTimeoutStore(delayMs: number) {
+  return {
+    subscribe(callback: () => void) {
+      const timeoutId = setTimeout(callback, delayMs);
+      return () => clearTimeout(timeoutId);
+    },
+    getSnapshot() {
+      return false;
+    },
+  };
+}
 
 interface FeedbackPanelProps {
   isCorrect: boolean;
@@ -27,22 +39,17 @@ export function FeedbackPanel({
   isLastQuestion = false,
   className = "",
 }: FeedbackPanelProps) {
-  const [canProceed, setCanProceed] = useState(!isLastQuestion);
+  // Use useSyncExternalStore to handle the timer without setState in effect
+  // This returns true after MIN_FEEDBACK_DISPLAY_MS has elapsed
+  const hasEnoughTimeElapsed = useSyncExternalStore(
+    createTimeoutStore(MIN_FEEDBACK_DISPLAY_MS).subscribe,
+    () => true, // Client snapshot (after hydration, time has passed)
+    () => false // Server snapshot (never enough time on server)
+  );
 
-  // Enforce minimum feedback display time for last question
-  useEffect(() => {
-    if (!isLastQuestion) {
-      setCanProceed(true);
-      return;
-    }
-
-    setCanProceed(false);
-    const timer = setTimeout(() => {
-      setCanProceed(true);
-    }, MIN_FEEDBACK_DISPLAY_MS);
-
-    return () => clearTimeout(timer);
-  }, [isLastQuestion]);
+  // For non-last questions, always allow proceeding
+  // For last question, wait until minimum display time has elapsed
+  const canProceed = !isLastQuestion || hasEnoughTimeElapsed;
   return (
     <AnimatePresence>
       <motion.div

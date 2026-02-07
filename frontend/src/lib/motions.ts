@@ -347,10 +347,10 @@ export const cardHoverVariants = {
     boxShadow: "0 12px 24px -8px rgba(205, 119, 106, 0.25)",
     transition: {
       duration: 0.3,
-      ease: [0.4, 0, 0.2, 1],
+      ease: [0.4, 0, 0.2, 1] as const,
     },
   },
-};
+} satisfies Variants;
 
 export const cardLiftVariants: Variants = {
   initial: {
