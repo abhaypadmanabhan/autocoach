@@ -2,13 +2,15 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Plus, Loader2, AlertTriangle } from "lucide-react";
 import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
 import { useToast } from "@/hooks/useToast";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
+import { DocumentSidebar } from "@/components/sidebar/DocumentSidebar";
+import { DocumentDashboard } from "@/components/dashboard/DocumentDashboard";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -29,7 +31,9 @@ import { ErrorBanner } from "@/components/features/dashboard/ErrorBanner";
 import type { User } from "@supabase/supabase-js";
 import type { Document } from "@/lib/types";
 
-export default function Dashboard() {
+import { Suspense } from "react";
+
+function DashboardContent() {
   const router = useRouter();
   const { documents, loading, error, refetch } = useDocuments();
   const { deleteDocument, deleting } = useDeleteDocument();
@@ -83,110 +87,126 @@ export default function Dashboard() {
   const processingDocuments = documents.filter((d) => d.status === "processing").length;
   const recentDocument = documents.find((d) => d.status === "ready");
 
+  // Get active document from URL
+  const searchParams = useSearchParams();
+  const docId = searchParams.get("docId");
+
   if (loading || userLoading) return <DashboardSkeleton />;
 
   return (
-    <AppShell>
-      <PageContainer>
-        <div className={cn("space-y-8")}>
-          {/* Hero */}
-          <motion.div
-            variants={staggerContainer}
-            initial="hidden"
-            animate="show"
-            className="flex flex-col md:flex-row md:items-end justify-between gap-6"
-          >
-            <motion.div variants={slideUpItem}>
-              <h1 className="text-h1 font-serif text-text-primary mb-2">
-                Ready to learn?
-              </h1>
-              <p className="text-text-secondary text-lg">
-                Welcome back, {user?.email?.split("@")[0] || "Student"}
-              </p>
+    <AppShell sidebar={<DocumentSidebar />}>
+      {docId ? (
+        <DocumentDashboard documentId={docId} />
+      ) : (
+        <PageContainer>
+          <div className={cn("space-y-8")}>
+            {/* Hero */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="flex flex-col md:flex-row md:items-end justify-between gap-6"
+            >
+              <motion.div variants={slideUpItem}>
+                <h1 className="text-h1 font-serif text-text-primary mb-2">
+                  Ready to learn?
+                </h1>
+                <p className="text-text-secondary text-lg">
+                  Welcome back, {user?.email?.split("@")[0] || "Student"}
+                </p>
+              </motion.div>
+
+              <motion.div variants={slideUpItem}>
+                <Link
+                  href="/upload"
+                  className={cn(
+                    "inline-flex items-center gap-2 px-6 py-3 rounded-full",
+                    "bg-brand-primary text-surface-dark",
+                    "font-semibold",
+                    "hover:bg-brand-primary/90 transition-all",
+                    "hover:shadow-lg hover:shadow-brand-primary/20"
+                  )}
+                >
+                  <Plus size={20} />
+                  Study New
+                </Link>
+              </motion.div>
             </motion.div>
 
-            <motion.div variants={slideUpItem}>
-              <Link
-                href="/upload"
-                className={cn(
-                  "inline-flex items-center gap-2 px-6 py-3 rounded-full",
-                  "bg-brand-primary text-surface-dark",
-                  "font-semibold",
-                  "hover:bg-brand-primary/90 transition-all",
-                  "hover:shadow-lg hover:shadow-brand-primary/20"
-                )}
-              >
-                <Plus size={20} />
-                Study New
-              </Link>
-            </motion.div>
-          </motion.div>
-
-          {/* Stats */}
-          <StatsGrid
-            totalDocuments={totalDocuments}
-            readyDocuments={readyDocuments}
-            processingDocuments={processingDocuments}
-          />
-
-          {/* Continue Learning */}
-          {recentDocument && (
-            <ContinueLearning
-              document={recentDocument}
-              onContinue={() => router.push(`/config?document_id=${recentDocument.id}`)}
+            {/* Stats */}
+            <StatsGrid
+              totalDocuments={totalDocuments}
+              readyDocuments={readyDocuments}
+              processingDocuments={processingDocuments}
             />
-          )}
 
-          {/* Documents */}
-          <DocumentsGrid
-            documents={documents}
-            onContinue={(id) => router.push(`/config?document_id=${id}`)}
-            onDelete={handleDeleteClick}
-            deletingId={deleting && documentToDelete ? documentToDelete.id : null}
-            onUpload={() => router.push("/upload")}
-          />
+            {/* Continue Learning */}
+            {recentDocument && (
+              <ContinueLearning
+                document={recentDocument}
+                onContinue={() => router.push(`/dashboard?docId=${recentDocument.id}`)}
+              />
+            )}
 
-          {/* Error */}
-          {error && (
-            <ErrorBanner
-              message={`Failed to load documents: ${error}`}
-              onRetry={() => refetch()}
+            {/* Documents */}
+            <DocumentsGrid
+              documents={documents}
+              onContinue={(id) => router.push(`/dashboard?docId=${id}`)}
+              onDelete={handleDeleteClick}
+              deletingId={deleting && documentToDelete ? documentToDelete.id : null}
+              onUpload={() => router.push("/upload")}
             />
-          )}
-        </div>
 
-        {/* Delete Confirmation Modal */}
-        <AlertDialog open={deleteModalOpen} onOpenChange={(open) => { if (!open) handleDeleteCancel(); }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <div className="w-12 h-12 rounded-full bg-semantic-error/10 flex items-center justify-center mx-auto mb-2">
-                <AlertTriangle size={24} className="text-semantic-error" />
-              </div>
-              <AlertDialogTitle className="text-center">Delete Document</AlertDialogTitle>
-              <AlertDialogDescription className="text-center">
-                Are you sure you want to delete &quot;{documentToDelete?.filename}&quot;? This will also delete all associated quiz sessions and cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                disabled={deleting}
-                onClick={(e) => { e.preventDefault(); handleDeleteConfirm(); }}
-                className="bg-semantic-error text-white hover:bg-semantic-error/90"
-              >
-                {deleting ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  "Delete"
-                )}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </PageContainer>
+            {/* Error */}
+            {error && (
+              <ErrorBanner
+                message={`Failed to load documents: ${error}`}
+                onRetry={() => refetch()}
+              />
+            )}
+          </div>
+
+          {/* Delete Confirmation Modal */}
+          <AlertDialog open={deleteModalOpen} onOpenChange={(open) => { if (!open) handleDeleteCancel(); }}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <div className="w-12 h-12 rounded-full bg-semantic-error/10 flex items-center justify-center mx-auto mb-2">
+                  <AlertTriangle size={24} className="text-semantic-error" />
+                </div>
+                <AlertDialogTitle className="text-center">Delete Document</AlertDialogTitle>
+                <AlertDialogDescription className="text-center">
+                  Are you sure you want to delete &quot;{documentToDelete?.filename}&quot;? This will also delete all associated quiz sessions and cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  disabled={deleting}
+                  onClick={(e) => { e.preventDefault(); handleDeleteConfirm(); }}
+                  className="bg-semantic-error text-white hover:bg-semantic-error/90"
+                >
+                  {deleting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    "Delete"
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </PageContainer>
+      )}
     </AppShell>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent />
+    </Suspense>
   );
 }

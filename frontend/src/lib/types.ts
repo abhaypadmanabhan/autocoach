@@ -10,6 +10,8 @@ export interface Document {
   chunk_count?: number;
   page_count?: number;
   error_message?: string;
+  ai_title?: string;
+  progress?: number;
 }
 
 export interface DocumentListResponse {
