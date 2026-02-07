@@ -132,8 +132,7 @@ def create_session(
     """
     try:
         # 1. Determine Target Concepts
-        target_concepts = []
-        target_names = []
+        target_concepts_list = []  # List of dicts {name, description}
         
         # Fetch all doc concepts first (we need them for validation or auto-selection)
         all_concepts = get_document_concepts(document_id, user_id)
@@ -141,7 +140,6 @@ def create_session(
         
         if focus_concept_ids:
             # User requested specific focus
-            valid_ids = []
             for cid in focus_concept_ids:
                 if cid in concept_map:
                     # Validate importance >= 0.6 unless doc is complete
@@ -162,13 +160,14 @@ def create_session(
                         if (prog or 0) < 100:
                             raise ValueError(f"Concept '{c['concept_name']}' is not core (importance < 0.6). Finish core concepts first (current progress: {prog or 0}%).")
                     
-                    valid_ids.append(cid)
-                    target_concepts.append(c)
-                    target_names.append(c["concept_name"])
+                    target_concepts_list.append({
+                        "name": c["concept_name"],
+                        "description": c.get("concept_description", "")
+                    })
                 else:
                     raise ValueError(f"Concept ID {cid} not found in this document")
             
-            logger.info(f"Targeting requested concepts: {target_names}")
+            logger.info(f"Targeting requested concepts: {[c['name'] for c in target_concepts_list]}")
 
         else:
             # Auto-selection: 3 weak core concepts
@@ -184,11 +183,25 @@ def create_session(
             candidates.sort(key=lambda x: x["importance_score"], reverse=True)
             
             # Take top 3
-            target_concepts = candidates[:3]
-            target_names = [c["concept_name"] for c in target_concepts]
-            logger.info(f"Auto-selected target concepts: {target_names}")
+            selected_candidates = candidates[:3]
+            target_concepts_list = [
+                {"name": c["concept_name"], "description": c.get("concept_description", "")}
+                for c in selected_candidates
+            ]
+            logger.info(f"Auto-selected target concepts: {[c['name'] for c in target_concepts_list]}")
             
-        target_concept_ids = [str(c["id"]) for c in target_concepts]
+        # Target Concept IDs are derived from the same source, but we need to map names back if we want to 
+        # (Actually we just used the IDs to get the names, so we can reconstruct or just use focus_ids if present.
+        # But for Auto-selected, we need the IDs to save to the question record.)
+        # Let's map names back to IDs from the candidate list for exact matching
+        target_concept_ids = []
+        if focus_concept_ids:
+            target_concept_ids = focus_concept_ids
+        else:
+            # Map names back to IDs (safe because names should be unique enough within doc, or just use the candidate objects directly)
+            # Actually we computed `selected_candidates` above, so we can just grab IDs from there.
+            if 'selected_candidates' in locals():
+                target_concept_ids = [str(c["id"]) for c in selected_candidates]
 
         # Generate quiz questions
         questions = generate_quiz_questions(
@@ -196,7 +209,7 @@ def create_session(
             num_questions=num_questions,
             difficulty=difficulty,
             question_types=question_types,
-            target_concept_names=target_names
+            target_concepts=target_concepts_list
         )
 
         if not questions:

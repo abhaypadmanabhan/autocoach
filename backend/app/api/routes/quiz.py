@@ -79,6 +79,7 @@ async def generate_quiz(
             num_questions=request.num_questions,
             difficulty=request.difficulty,
             question_types=request.question_types,
+            target_concepts=None,  # transform to list[dict] if we wanted to support it in this endpoint
         )
 
         if not questions_data:

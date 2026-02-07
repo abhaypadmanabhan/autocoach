@@ -3,12 +3,9 @@
 import { useDocuments } from "@/hooks/useDocuments";
 import { cn } from "@/lib/utils";
 import { groupDocumentsByDate } from "@/lib/date";
-import { FileText, Loader2, Plus, AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { FileText, Loader2, Plus, AlertCircle, CheckCircle2, Clock, XCircle, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
 
 export function DocumentSidebar() {
     const { documents, isLoading, error } = useDocuments();
@@ -39,15 +36,31 @@ export function DocumentSidebar() {
 
     return (
         <div className="flex flex-col h-full bg-surface-darker text-text-primary">
-            {/* New Chat / Upload Header */}
-            <div className="p-4">
-                <Link
-                    href="/upload"
-                    className="flex items-center gap-2 w-full p-3 rounded-md border border-surface-border bg-surface-card hover:bg-surface-border/50 text-text-primary transition-colors text-sm font-medium"
-                >
-                    <Plus size={16} className="text-brand-primary" />
-                    <span>New Document</span>
+            {/* Action Area */}
+            <div className="p-4 border-b border-surface-border/50 space-y-3">
+                <Link href="/upload">
+                    <button className="w-full flex items-center justify-center gap-2 bg-brand-primary text-surface-dark py-2.5 rounded-lg font-medium hover:bg-brand-primary/90 transition-colors shadow-lg shadow-brand-primary/20">
+                        <Plus size={18} />
+                        New Document
+                    </button>
                 </Link>
+
+                {activeDocId && (
+                    <div className="grid grid-cols-2 gap-2">
+                        <Link href={`/dashboard?docId=${activeDocId}`}>
+                            <button className="w-full h-full flex items-center justify-center gap-2 bg-surface-card text-text-secondary py-2 rounded-lg text-xs font-medium border border-surface-border hover:text-text-primary hover:border-text-secondary transition-all">
+                                <FileText size={14} />
+                                Dashboard
+                            </button>
+                        </Link>
+                        <Link href={`/config?document_id=${activeDocId}&mode=recommend`}>
+                            <button className="w-full h-full flex items-center justify-center gap-2 bg-surface-card text-brand-primary py-2 rounded-lg text-xs font-medium border border-brand-primary/20 hover:bg-brand-primary/10 transition-all">
+                                <Sparkles size={14} />
+                                Start Quiz
+                            </button>
+                        </Link>
+                    </div>
+                )}
             </div>
 
             {isLoading && (

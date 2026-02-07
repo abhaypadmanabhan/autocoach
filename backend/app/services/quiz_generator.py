@@ -48,7 +48,7 @@ def generate_quiz_questions(
     num_questions: int = 5,
     difficulty: str = "medium",
     question_types: list[str] = None,
-    target_concept_names: list[str] = None
+    target_concepts: list[dict] = None  # Changed from list[str] to list[dict] {name, description}
 ) -> list[dict]:
     """
     Generate quiz questions from document content using LLM.
@@ -58,6 +58,7 @@ def generate_quiz_questions(
         num_questions: Number of questions to generate (default 5).
         difficulty: Difficulty level - "easy", "medium", or "hard".
         question_types: List of question types to include (mcq, true_false, free_text).
+        target_concepts: List of dicts [{"name":Str, "description":Str}] to focus on.
 
     Returns:
         List of question dictionaries, or empty list on failure.
@@ -71,8 +72,10 @@ def generate_quiz_questions(
         
         # Custom query based on targets
         query = "Generate quiz questions covering key concepts"
-        if target_concept_names:
-            concepts_str = ", ".join(target_concept_names)
+        target_names = []
+        if target_concepts:
+            target_names = [c["name"] for c in target_concepts]
+            concepts_str = ", ".join(target_names)
             query = f"Generate quiz questions about: {concepts_str}"
             
         chunks = retrieve_relevant_chunks(
@@ -97,9 +100,17 @@ def generate_quiz_questions(
         types_str = ", ".join(question_types)
         
         focus_instruction = ""
-        if target_concept_names:
-            concepts_str = ", ".join(target_concept_names)
-            focus_instruction = f"\nFOCUS: Create questions specifically testing these concepts: {concepts_str}"
+        if target_concepts:
+            focus_details = []
+            for c in target_concepts:
+                desc = c.get("description", "")
+                if desc:
+                    focus_details.append(f"- {c['name']}: {desc}")
+                else:
+                    focus_details.append(f"- {c['name']}")
+            
+            focus_block = "\n".join(focus_details)
+            focus_instruction = f"\nFOCUS: Create questions specifically testing these concepts:\n{focus_block}"
             
         user_prompt = f"""Based on the following content, generate {num_questions} quiz questions. {focus_instruction}
 

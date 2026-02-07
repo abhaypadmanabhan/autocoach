@@ -12,6 +12,7 @@ class DocumentResponse(BaseModel):
     file_type: str
     file_size: int
     status: str
+    ai_title: str | None = None
     created_at: datetime
 
 

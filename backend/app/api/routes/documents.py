@@ -181,6 +181,7 @@ async def upload_document(
             file_size=created_document["file_size"],
             status=created_document["status"],
             created_at=created_document["created_at"],
+            ai_title=created_document.get("ai_title"),
         )
     except HTTPException:
         raise
@@ -302,6 +303,7 @@ async def register_document(
             file_size=created_document["file_size"],
             status=created_document["status"],
             created_at=created_document["created_at"],
+            ai_title=created_document.get("ai_title"),
         )
     except HTTPException:
         raise
@@ -345,6 +347,7 @@ async def list_documents(user_id: UUID = Depends(get_user_id_from_token)):
                 file_size=doc["file_size"],
                 status=doc["status"],
                 created_at=doc["created_at"],
+                ai_title=doc.get("ai_title"),
             )
             for doc in response.data
         ]
@@ -397,6 +400,7 @@ async def get_document(
             file_size=doc["file_size"],
             status=doc["status"],
             created_at=doc["created_at"],
+            ai_title=doc.get("ai_title"),
         )
     except HTTPException:
         raise

@@ -164,5 +164,77 @@ async def extract_concepts(document_id: str, chunks: List[dict]) -> None:
 
         logger.info(f"Concept extraction completed for document {document_id}")
 
+        # Step 3: Generate AI Title
+        await generate_ai_title(document_id, concepts, chunks)
+
     except Exception as e:
         logger.exception(f"Unexpected error in concept extraction: {e}")
+
+
+async def generate_ai_title(document_id: str, concepts: List[ExtractedConcept], chunks: List[dict]) -> None:
+    """
+    Generate a short, study-friendly title for the document.
+    
+    Strategy:
+    1. Check if title already exists (idempotency).
+    2. detailed concepts: "Concept A & Concept B" (Top 2 core).
+    3. Fallback LLM: "Generate title from text".
+    """
+    try:
+        # 1. Idempotency check
+        doc = supabase_admin.table("documents").select("ai_title").eq("id", document_id).single().execute()
+        if doc.data and doc.data.get("ai_title"):
+            logger.info("Document already has an AI title, skipping generation.")
+            return
+
+        new_title = ""
+
+        # 2. Strategy A: Use Core Concepts
+        # Sort by importance
+        sorted_concepts = sorted(concepts, key=lambda c: (c.importance_score), reverse=True)
+        core_concepts = [c for c in sorted_concepts if c.importance_score >= 0.7]
+
+        if len(core_concepts) >= 1:
+            # Take top 2
+            top_concepts = core_concepts[:2]
+            title_parts = [c.concept_name for c in top_concepts]
+            new_title = " & ".join(title_parts)
+            
+            # Truncate if too long (simple heuristic)
+            if len(new_title) > 40:
+                new_title = top_concepts[0].concept_name + " Guide"
+
+        # 3. Strategy B: LLM Fallback
+        if not new_title:
+             logger.info("No suitable concepts for title, using LLM fallback...")
+             # Use first 2 chunks or ~2000 chars
+             sample_text = "\n".join([c.get("content", "") for c in chunks[:2]])
+             sample_text = sample_text[:2000]
+
+             prompt = (
+                 "Generate a concise, study-friendly title (max 40 characters) for this document. "
+                 "Do not use quotes or prefixes like 'Title:'. Just the title."
+             )
+             
+             try:
+                 ai_response = call_kimi(
+                     system_prompt="You are a helpful assistant that generates short document titles.",
+                     user_prompt=f"{prompt}\n\nText:\n{sample_text}"
+                 )
+                 new_title = ai_response.strip().replace('"', '').replace("Title:", "").strip()
+             except Exception as e:
+                 logger.error(f"LLM title generation failed: {e}")
+
+        # 4. Save if we have a title
+        if new_title:
+            # Enforce hard limit
+            if len(new_title) > 60:
+                new_title = new_title[:57] + "..."
+            
+            logger.info(f"Setting AI title for document {document_id}: {new_title}")
+            supabase_admin.table("documents").update({"ai_title": new_title}).eq("id", document_id).execute()
+        else:
+            logger.warning("Failed to generate AI title.")
+
+    except Exception as e:
+        logger.error(f"Error generating AI title: {e}")

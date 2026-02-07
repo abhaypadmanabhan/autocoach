@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, useMotionValue, useSpring } from "framer-motion";
+import { motion, useSpring } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 type Variant = "neutral" | "thinking" | "wrong" | "success" | "timeout";
@@ -43,7 +43,7 @@ const RIGHT_EYE_CENTER = { x: 1566, y: 750 };
 export function SentinelMascot({ variant = "neutral", className }: SentinelMascotProps) {
   const mousePosition = useMousePosition();
   const [isBlinking, setIsBlinking] = useState(false);
-  
+
   // Smooth spring animation for eye movement (up to 10px)
   const leftEyeX = useSpring(0, { stiffness: 150, damping: 15 });
   const leftEyeY = useSpring(0, { stiffness: 150, damping: 15 });
@@ -288,7 +288,7 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
         {variant === "timeout" && (
           <motion.g
             initial={{ opacity: 0 }}
-            animate={{ 
+            animate={{
               opacity: 1,
               x: [-5, 5, -5, 5, -5],
             }}
