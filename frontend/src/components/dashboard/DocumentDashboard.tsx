@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { useDocument } from "@/hooks/useDocuments";
 import { useDocumentConcepts } from "@/hooks/useConcepts";
 import { PlayCircle, Star, GraduationCap, CheckCircle2 } from "lucide-react";
@@ -19,7 +21,15 @@ interface DocumentDashboardProps {
 
 export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const { document, loading: documentLoading, error: documentError } = useDocument(documentId);
-    const { concepts, loading: conceptsLoading, error: conceptsError } = useDocumentConcepts(documentId);
+    const { concepts, loading: conceptsLoading, error: conceptsError, refetch } = useDocumentConcepts(documentId);
+
+    // Auto-refresh concepts when document becomes ready
+    useEffect(() => {
+        if (document?.status === "ready" && concepts.length === 0) {
+            console.log("Document ready but no concepts, triggering refetch...");
+            refetch();
+        }
+    }, [document?.status, concepts.length, refetch]);
 
     if (documentLoading || conceptsLoading) {
         return <DashboardSkeleton />;
@@ -44,6 +54,15 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const coreConcepts = concepts.filter(c => c.is_core);
     const masteredConcepts = concepts.filter(c => (c.mastery_score || 0) >= 80);
     const totalMastery = document.progress || 0;
+
+    // Debugging
+    console.log("DocumentDashboard render:", {
+        docId: documentId,
+        conceptsCount: concepts.length,
+        conceptsLoading,
+        conceptsError,
+        mappedConcepts: concepts
+    });
 
     return (
         <div className="p-6 md:p-8 space-y-8 max-w-5xl mx-auto pb-20">
@@ -73,12 +92,23 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                     </div>
                 </div>
 
-                <Link href={`/config?document_id=${document.id}&mode=recommend`}>
-                    <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
-                        <PlayCircle className="mr-2 h-5 w-5" />
-                        Continue Learning
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={() => window.location.reload()}
+                        className="rounded-full"
+                    >
+                        Refresh Data
                     </Button>
-                </Link>
+
+                    <Link href={`/config?document_id=${document.id}&mode=recommend`}>
+                        <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
+                            <PlayCircle className="mr-2 h-5 w-5" />
+                            Continue Learning
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {/* Stats Grid */}

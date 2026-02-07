@@ -68,10 +68,12 @@ interface FetchOptions {
   body?: unknown;
   headers?: Record<string, string>;
   isFormData?: boolean;
+  cache?: RequestCache;
+  next?: NextFetchRequestConfig;
 }
 
 export async function apiFetch<T>(path: string, options: FetchOptions = {}): Promise<T> {
-  const { method = "GET", body, headers = {}, isFormData = false } = options;
+  const { method = "GET", body, headers = {}, isFormData = false, cache, next } = options;
 
   const authHeaders = await getAuthHeaders();
   const fetchHeaders: Record<string, string> = { ...authHeaders, ...headers };
@@ -84,6 +86,8 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
     method,
     headers: fetchHeaders,
     body: isFormData ? (body as FormData) : body ? JSON.stringify(body) : undefined,
+    cache,
+    next,
   });
 
   if (response.status === 401) {

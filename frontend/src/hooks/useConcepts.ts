@@ -7,7 +7,7 @@ import type { DocumentConceptsResponse } from "@/lib/types";
 export function useDocumentConcepts(documentId: string | null) {
     const { data, error, isLoading, mutate } = useSWR<DocumentConceptsResponse>(
         documentId ? `/documents/${documentId}/concepts` : null,
-        () => apiFetch<DocumentConceptsResponse>(`/documents/${documentId}/concepts`),
+        () => apiFetch<DocumentConceptsResponse>(`/documents/${documentId}/concepts`, { cache: "no-store" }),
         {
             revalidateOnFocus: true,
             dedupingInterval: 5000,
