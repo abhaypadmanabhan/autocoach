@@ -4,13 +4,15 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { School, ArrowLeft } from "lucide-react";
+import { School, ArrowLeft, Flame, Trophy, Loader2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { pageVariants, pageTransition } from "@/lib/motions";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AvatarDropdown } from "@/components/ui/AvatarDropdown";
 import { useAvatar } from "@/hooks/useAvatar";
+import { useUserStats } from "@/hooks/useDailySprint";
+import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
 interface AppShellProps {
@@ -24,6 +26,36 @@ interface AppShellProps {
   bottomNavContent?: ReactNode;
   sidebar?: ReactNode;
   className?: string;
+  showStatsHUD?: boolean;
+}
+
+// Stats HUD Component - Premium minimal design
+function StatsHUD({ className }: { className?: string }) {
+  const { streak, totalXp, isLoading } = useUserStats();
+
+  if (isLoading) {
+    return (
+      <div className={cn("flex items-center gap-3", className)}>
+        <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("flex items-center gap-1 sm:gap-2", className)}>
+      {/* Streak */}
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20">
+        <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />
+        <span className="text-sm font-semibold text-orange-500">{streak}</span>
+      </div>
+
+      {/* XP */}
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+        <Trophy className="w-4 h-4 text-yellow-500" />
+        <span className="text-sm font-semibold text-yellow-500">{totalXp.toLocaleString()}</span>
+      </div>
+    </div>
+  );
 }
 
 export function AppShell({
@@ -37,6 +69,7 @@ export function AppShell({
   bottomNavContent,
   sidebar,
   className = "",
+  showStatsHUD = true,
 }: AppShellProps) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -137,7 +170,12 @@ export function AppShell({
                   </div>
 
                   {/* Right section */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 sm:gap-4">
+                    {/* Stats HUD - Always visible when logged in */}
+                    {showStatsHUD && user && (
+                      <StatsHUD className="hidden sm:flex" />
+                    )}
+
                     {rightContent}
 
                     <AvatarDropdown

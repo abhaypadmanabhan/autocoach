@@ -3,41 +3,87 @@ import { useCallback, useState } from "react";
 import { apiFetch, getErrorMessage } from "@/lib/api";
 import type {
     SprintStatusResponse,
-    StartSprintResponse,
-    CompleteSprintResponse
+    SprintQuiz,
+    SprintAnswerResponse,
+    CompleteSprintResponse,
+    SprintQuestion
 } from "@/lib/types";
 
-export function useDailySprint() {
-    const { mutate } = useSWRConfig();
+// Cache key for sprint data
+const SPRINT_TODAY_KEY = "/sprint/today";
 
+export function useDailySprint() {
+    const { mutate: globalMutate } = useSWRConfig();
+
+    // Fetch sprint status - includes active session info if any
     const { data: status, error, isLoading, mutate: refreshStatus } = useSWR<SprintStatusResponse>(
-        "/daily-sprint/",
-        () => apiFetch<SprintStatusResponse>("/daily-sprint/")
+        SPRINT_TODAY_KEY,
+        () => apiFetch<SprintStatusResponse>(SPRINT_TODAY_KEY),
+        {
+            revalidateOnFocus: false,
+            shouldRetryOnError: false,
+        }
     );
 
     const [starting, setStarting] = useState(false);
     const [completing, setCompleting] = useState(false);
+    const [submittingAnswer, setSubmittingAnswer] = useState(false);
+    const [fetchingQuestions, setFetchingQuestions] = useState(false);
 
-    const startSprint = useCallback(async () => {
+    // Start a new sprint
+    const startSprint = useCallback(async (): Promise<SprintQuiz> => {
         setStarting(true);
         try {
-            const res = await apiFetch<StartSprintResponse>("/daily-sprint/start", {
+            const res = await apiFetch<SprintQuiz>("/sprint/start", {
                 method: "POST",
+                body: {},
             });
+            // Invalidate status cache after starting
+            await refreshStatus();
             return res;
         } finally {
             setStarting(false);
         }
+    }, [refreshStatus]);
+
+    // Fetch questions for an active sprint session
+    const fetchSprintQuestions = useCallback(async (sessionId: string): Promise<SprintQuestion[]> => {
+        setFetchingQuestions(true);
+        try {
+            // The backend returns questions array from the sprint session endpoint
+            const res = await apiFetch<{ questions: SprintQuestion[] }>(`/sprint/${sessionId}/questions`);
+            return res.questions;
+        } finally {
+            setFetchingQuestions(false);
+        }
     }, []);
 
+    // Submit an answer
+    const submitAnswer = useCallback(async (
+        questionId: string,
+        answer: string
+    ): Promise<SprintAnswerResponse> => {
+        setSubmittingAnswer(true);
+        try {
+            const res = await apiFetch<SprintAnswerResponse>("/sprint/answer", {
+                method: "POST",
+                body: { question_id: questionId, answer },
+            });
+            return res;
+        } finally {
+            setSubmittingAnswer(false);
+        }
+    }, []);
+
+    // Complete the sprint
     const completeSprint = useCallback(async (
         sessionId: string,
         correctCount: number,
         totalQuestions: number
-    ) => {
+    ): Promise<CompleteSprintResponse> => {
         setCompleting(true);
         try {
-            const res = await apiFetch<CompleteSprintResponse>("/daily-sprint/complete", {
+            const res = await apiFetch<CompleteSprintResponse>("/sprint/complete", {
                 method: "POST",
                 body: {
                     session_id: sessionId,
@@ -58,9 +104,35 @@ export function useDailySprint() {
         isLoading,
         error: error ? getErrorMessage(error) : null,
         startSprint,
+        fetchSprintQuestions,
+        submitAnswer,
         completeSprint,
         starting,
         completing,
+        submittingAnswer,
+        fetchingQuestions,
         refreshStatus
+    };
+}
+
+// Hook for user stats (XP + Streak) to display in HUD
+export function useUserStats() {
+    const { data: status, error, isLoading } = useSWR<SprintStatusResponse>(
+        SPRINT_TODAY_KEY,
+        () => apiFetch<SprintStatusResponse>(SPRINT_TODAY_KEY),
+        {
+            revalidateOnFocus: false,
+            shouldRetryOnError: false,
+            dedupingInterval: 60000, // 1 minute
+        }
+    );
+
+    return {
+        streak: status?.streak_count ?? 0,
+        totalXp: status?.total_xp ?? 0,
+        xpEarnedToday: status?.xp_earned_today ?? 0,
+        completedToday: status?.status === "completed",
+        isLoading,
+        error: error ? getErrorMessage(error) : null,
     };
 }

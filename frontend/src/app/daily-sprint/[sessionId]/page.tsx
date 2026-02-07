@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -10,11 +10,15 @@ import {
     Trophy,
     Flame,
     Share2,
-    CheckCircle2
+    CheckCircle2,
+    Target,
+    Sparkles,
+    Home,
+    AlertCircle
 } from "lucide-react";
 
-import { useSession, useSubmitAnswer, useCurrentQuestion } from "@/hooks/useQuiz";
 import { useDailySprint } from "@/hooks/useDailySprint";
+import { apiFetch } from "@/lib/api";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
 import { QuestionCard } from "@/components/quiz/QuestionCard";
@@ -23,32 +27,289 @@ import { SentinelMascot } from "@/components/brand/SentinelMascot";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { AnswerResult } from "@/lib/types";
+import type { SprintQuestion, SprintAnswerResult } from "@/lib/types";
 import confetti from "canvas-confetti";
+
+// Progress bar component
+function ProgressBar({ current, total }: { current: number; total: number }) {
+    const progress = Math.min((current / total) * 100, 100);
+    
+    return (
+        <div className="w-full">
+            <div className="flex justify-between text-xs text-muted-foreground mb-2">
+                <span>Question {current} of {total}</span>
+                <span>{Math.round(progress)}%</span>
+            </div>
+            <div className="w-full bg-surface-border/30 rounded-full h-2.5 overflow-hidden">
+                <motion.div
+                    className="h-full bg-gradient-to-r from-brand-primary to-brand-secondary rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                />
+            </div>
+        </div>
+    );
+}
+
+// Segmented progress (dots)
+function SegmentedProgress({ current, total }: { current: number; total: number }) {
+    return (
+        <div className="flex gap-1.5 h-1.5">
+            {Array.from({ length: total }).map((_, i) => (
+                <div key={i} className={cn(
+                    "h-full flex-1 rounded-full transition-all duration-500",
+                    i < current ? "bg-brand-primary" :
+                        i === current ? "bg-brand-primary/50 animate-pulse" : "bg-surface-border"
+                )} />
+            ))}
+        </div>
+    );
+}
+
+// Sprint Completion Screen
+function SprintCompletion({
+    xp,
+    streak,
+    message,
+    onContinue,
+    onShare
+}: {
+    xp: number;
+    streak: number;
+    message: string;
+    onContinue: () => void;
+    onShare: () => void;
+}) {
+    useEffect(() => {
+        // Fire confetti on mount
+        const duration = 3000;
+        const end = Date.now() + duration;
+
+        const frame = () => {
+            confetti({
+                particleCount: 3,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0 },
+                colors: ['#CD776A', '#D4A574', '#E8B86D']
+            });
+            confetti({
+                particleCount: 3,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1 },
+                colors: ['#CD776A', '#D4A574', '#E8B86D']
+            });
+
+            if (Date.now() < end) {
+                requestAnimationFrame(frame);
+            }
+        };
+        frame();
+    }, []);
+
+    return (
+        <PageContainer size="md">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex flex-col items-center justify-center min-h-[80vh] py-12 text-center"
+            >
+                {/* Mascot Celebration */}
+                <motion.div
+                    initial={{ scale: 0.5, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+                    className="relative mb-8"
+                >
+                    <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-500/20 blur-3xl rounded-full scale-150" />
+                    <SentinelMascot variant="success" className="relative w-48 h-48 md:w-64 md:h-64" />
+                </motion.div>
+
+                {/* Title */}
+                <motion.h1
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-500 mb-3"
+                >
+                    Sprint Complete!
+                </motion.h1>
+
+                {/* Message */}
+                <motion.p
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="text-lg text-muted-foreground mb-8 max-w-md"
+                >
+                    {message}
+                </motion.p>
+
+                {/* Stats Cards */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="grid grid-cols-2 gap-4 mb-8 w-full max-w-md"
+                >
+                    <Card className="p-5 border-none bg-gradient-to-br from-orange-500/10 to-orange-600/5 flex flex-col items-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-orange-500/20 flex items-center justify-center">
+                            <Flame className="w-6 h-6 text-orange-500" />
+                        </div>
+                        <span className="text-3xl font-bold text-orange-500">{streak}</span>
+                        <span className="text-sm text-muted-foreground">Day Streak</span>
+                    </Card>
+                    
+                    <Card className="p-5 border-none bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 flex flex-col items-center gap-2">
+                        <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
+                            <Trophy className="w-6 h-6 text-yellow-500" />
+                        </div>
+                        <span className="text-3xl font-bold text-yellow-500">+{xp}</span>
+                        <span className="text-sm text-muted-foreground">XP Earned</span>
+                    </Card>
+                </motion.div>
+
+                {/* Action Buttons */}
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="flex flex-col sm:flex-row gap-3 w-full max-w-md"
+                >
+                    <Button 
+                        onClick={onContinue} 
+                        size="lg" 
+                        className="flex-1 bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-semibold"
+                    >
+                        <Home className="w-4 h-4 mr-2" />
+                        Continue Learning
+                    </Button>
+                    
+                    <Button 
+                        variant="outline" 
+                        size="lg" 
+                        onClick={onShare}
+                        className="flex-1 border-surface-border hover:bg-surface-card"
+                    >
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Share
+                    </Button>
+                </motion.div>
+            </motion.div>
+        </PageContainer>
+    );
+}
+
+// Error State
+function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+    return (
+        <div className="h-screen flex flex-col items-center justify-center px-4">
+            <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="w-20 h-20 rounded-full bg-semantic-error/20 flex items-center justify-center mb-6"
+            >
+                <AlertCircle size={40} className="text-semantic-error" />
+            </motion.div>
+            <h2 className="text-h2 font-serif text-text-primary mb-2">Something went wrong</h2>
+            <p className="text-text-muted mb-6 text-center max-w-md">{message}</p>
+            <div className="flex gap-4">
+                {onRetry && (
+                    <Button onClick={onRetry} variant="outline">
+                        Try Again
+                    </Button>
+                )}
+                <Button onClick={() => window.location.href = "/dashboard"}>
+                    Back to Dashboard
+                </Button>
+            </div>
+        </div>
+    );
+}
 
 function SprintContent() {
     const router = useRouter();
     const params = useParams();
-    const sessionId = params.session_id as string; // Check path param name in next.js
+    const sessionId = params.sessionId as string;
 
-    // Actually params might be { sessionId: ... } depending on folder name [sessionId]
-    // Let's use generic access
-    const safeSessionId = (Array.isArray(params.sessionId) ? params.sessionId[0] : params.sessionId) || null;
+    const { 
+        submitAnswer: submitSprintAnswer, 
+        submittingAnswer, 
+        completeSprint, 
+        completing,
+        fetchSprintQuestions,
+        fetchingQuestions
+    } = useDailySprint();
 
-    const { session, loading: sessionLoading } = useSession(safeSessionId);
-    const { question, loading: questionLoading, refetch: refetchQuestion } = useCurrentQuestion(safeSessionId);
-    const { submitAnswer, submitting } = useSubmitAnswer(safeSessionId);
-    const { completeSprint, completing } = useDailySprint();
-
+    // Local state for quiz flow
+    const [questions, setQuestions] = useState<SprintQuestion[]>([]);
+    const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [answer, setAnswer] = useState<string>("");
     const [showFeedback, setShowFeedback] = useState(false);
-    const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
-    const [isSprintComplete, setIsSprintComplete] = useState(false);
+    const [lastResult, setLastResult] = useState<SprintAnswerResult | null>(null);
+    const [correctCount, setCorrectCount] = useState(0);
+    const [isComplete, setIsComplete] = useState(false);
     const [completionData, setCompletionData] = useState<{
         xp: number;
         streak: number;
         message: string;
     } | null>(null);
+    const [targetsWeak, setTargetsWeak] = useState<boolean>(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // Fetch questions on mount
+    useEffect(() => {
+        const loadQuestions = async () => {
+            if (!sessionId) return;
+            
+            try {
+                setLoading(true);
+                setError(null);
+                
+                // Try to fetch sprint questions from the dedicated endpoint
+                // Fallback to session endpoint if needed
+                let sprintQuestions: SprintQuestion[] = [];
+                
+                try {
+                    sprintQuestions = await fetchSprintQuestions(sessionId);
+                } catch (err) {
+                    // Fallback: fetch from /sprint/today if it returns questions
+                    const status = await apiFetch<{ 
+                        questions?: SprintQuestion[];
+                        targets_weak_concepts?: boolean;
+                    }>("/sprint/today");
+                    
+                    if (status.questions) {
+                        sprintQuestions = status.questions;
+                        setTargetsWeak(status.targets_weak_concepts ?? false);
+                    } else {
+                        throw new Error("Could not load sprint questions");
+                    }
+                }
+                
+                if (sprintQuestions.length === 0) {
+                    setIsComplete(true);
+                } else {
+                    setQuestions(sprintQuestions);
+                    // Calculate starting index based on answered questions
+                    const answeredCount = sprintQuestions.findIndex(q => !q.question_id);
+                    if (answeredCount > 0) {
+                        setCurrentQuestionIndex(answeredCount);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to load sprint:", err);
+                setError("Failed to load sprint questions. Please try again.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadQuestions();
+    }, [sessionId, fetchSprintQuestions]);
 
     // Auth check
     useEffect(() => {
@@ -62,29 +323,36 @@ function SprintContent() {
 
     // Handle Quit
     const handleQuit = () => {
-        if (confirm("Quit Daily Sprint? Your progress will be lost.")) {
+        if (confirm("Quit Daily Sprint? Your progress will be saved.")) {
             router.push("/dashboard");
         }
     };
 
     const handleSubmit = async () => {
-        if (!question || !answer.trim()) return;
+        if (!questions[currentQuestionIndex] || !answer.trim()) return;
+
+        const currentQuestion = questions[currentQuestionIndex];
 
         try {
             const trimmedAnswer = answer.trim();
             setAnswer(trimmedAnswer);
-            const result = await submitAnswer(question.question_id, trimmedAnswer, "click");
+            
+            // Submit via sprint API
+            const result = await submitSprintAnswer(currentQuestion.question_id, trimmedAnswer);
+            
             setLastResult(result.result);
+            
+            if (result.result.is_correct) {
+                setCorrectCount(prev => prev + 1);
+            }
 
-            // If validation passed, show feedback
             setShowFeedback(true);
 
-            if (result.session_complete) {
-                // Don't auto-redirect, let user click "Finish"
-                setIsSprintComplete(true);
+            if (result.session_complete || currentQuestionIndex >= questions.length - 1) {
+                setIsComplete(true);
             }
         } catch (e) {
-            console.error(e);
+            console.error("Failed to submit answer:", e);
         }
     };
 
@@ -92,159 +360,145 @@ function SprintContent() {
         setShowFeedback(false);
         setAnswer("");
         setLastResult(null);
-        refetchQuestion();
+        
+        if (currentQuestionIndex < questions.length - 1) {
+            setCurrentQuestionIndex(prev => prev + 1);
+        }
     };
 
-    const handleFinishSprint = async () => {
-        if (!session || !safeSessionId) return;
+    const handleFinishSprint = useCallback(async () => {
+        if (!sessionId) return;
+        
         try {
-            // Calculate correct answers including the one just submitted if needed?
-            // session object might not be updated yet with last answer result immediately?
-            // We can use session.correct_answers IF it is updated.
-            // Or we use local state? Simpler to trust backend session data, but we might need to refetch session first?
-            // Actually completeSprint just needs totals. 
-            // The backend complete endpoint calculates XP based on passed count (trusting client? or verifying?)
-            // My implementation trusts client for v1 but verifies in future. `complete_sprint` (backend) is trustworthy if IT queries questions.
-            // But looking at my backend code: `xp_gain = 100 + (request.correct_count * 10)`. It uses request body!
-            // So I should pass accurate count.
-
-            // Count = session.correct_answers.
-            // Is session.correct_answers updated? `useSubmitAnswer` calls mutate global.
-            // So it should be fine.
-
-            let correct = session.correct_answers;
-            // If we just finished logic, session SWR might not have revalidated yet?
-            // But `useSubmitAnswer` does `await globalMutate`.
-            // So it should be fine.
-
-            const res = await completeSprint(safeSessionId, correct, session.total_questions);
+            const finalCorrect = correctCount + (lastResult?.is_correct ? 1 : 0);
+            const res = await completeSprint(sessionId, finalCorrect, questions.length);
+            
             setCompletionData({
                 xp: res.xp_awarded,
                 streak: res.new_streak,
                 message: res.message
             });
-
-            // Fire confetti
-            confetti({
-                particleCount: 100,
-                spread: 70,
-                origin: { y: 0.6 }
-            });
-
         } catch (e) {
-            console.error("Failed to complete sprint", e);
+            console.error("Failed to complete sprint:", e);
+        }
+    }, [sessionId, correctCount, lastResult, completeSprint, questions.length]);
+
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: 'Daily Sprint Complete!',
+                text: `I just completed my Daily Sprint with a ${completionData?.streak || 0} day streak and earned ${completionData?.xp || 0} XP!`,
+                url: window.location.origin,
+            }).catch(() => {
+                // User cancelled or share failed
+            });
+        } else {
+            // Copy to clipboard fallback
+            const text = `I just completed my Daily Sprint with a ${completionData?.streak || 0} day streak and earned ${completionData?.xp || 0} XP!`;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Copied to clipboard!');
+            });
         }
     };
 
-    // ------------------------------------------------------------------
-    // COMPLETION VIEW
-    // ------------------------------------------------------------------
+    const handleContinueLearning = () => {
+        router.push("/dashboard");
+    };
+
+    // Show completion screen
     if (completionData) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 text-center animate-in fade-in duration-500">
-                <SentinelMascot variant="success" className="w-64 h-64 mb-8" />
-
-                <h1 className="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 mb-2">
-                    Sprint Crushed!
-                </h1>
-                <p className="text-lg text-muted-foreground mb-8">
-                    {completionData.message}
-                </p>
-
-                <div className="grid grid-cols-2 gap-4 mb-8 w-full max-w-md">
-                    <Card className="p-4 border-none bg-surface-card flex flex-col items-center gap-2">
-                        <Flame className="w-8 h-8 text-orange-500" />
-                        <span className="text-2xl font-bold">{completionData.streak} Day Streak</span>
-                    </Card>
-                    <Card className="p-4 border-none bg-surface-card flex flex-col items-center gap-2">
-                        <Trophy className="w-8 h-8 text-yellow-500" />
-                        <span className="text-2xl font-bold">+{completionData.xp} XP</span>
-                    </Card>
-                </div>
-
-                <div className="flex gap-4">
-                    <Button onClick={() => router.push("/dashboard")} size="lg" className="px-8">
-                        Back to Dashboard
-                    </Button>
-                    <Button variant="outline" size="lg">
-                        <Share2 className="w-4 h-4 mr-2" /> Share
-                    </Button>
-                </div>
-            </div>
+            <SprintCompletion
+                xp={completionData.xp}
+                streak={completionData.streak}
+                message={completionData.message}
+                onContinue={handleContinueLearning}
+                onShare={handleShare}
+            />
         );
     }
 
-    // ------------------------------------------------------------------
-    // LOADING STATE
-    // ------------------------------------------------------------------
-    if (sessionLoading || questionLoading || !question) {
-        if (isSprintComplete && !completionData) {
-            // Transition state between last answer and completion modal
-            // Call finish automatically?
-            // No, we wait for user to click "See Results" (Finish Sprint) in Feedback Panel?
-            // Or purely auto?
-            // Let's rely on standard flow.
-            return <div className="h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
-        }
+    // Error state
+    if (error) {
+        return <ErrorState message={error} />;
+    }
 
+    // Loading state
+    if (loading || fetchingQuestions || questions.length === 0) {
         return (
             <div className="h-screen flex items-center justify-center">
-                <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
             </div>
         );
     }
 
-    // ------------------------------------------------------------------
-    // ACTIVE SPRINT VIEW
-    // ------------------------------------------------------------------
+    const currentQuestion = questions[currentQuestionIndex];
+    const totalQuestions = questions.length;
 
-    // Calculate Progress
-    const total = session?.total_questions || 5;
-    const current = question.question_number;
-    const progress = ((current - 1) / total) * 100;
-
-    // Mascot Variant Logic
+    // Mascot variant based on state
     let mascotVariant: "neutral" | "thinking" | "success" | "wrong" = "neutral";
-    if (submitting) mascotVariant = "thinking";
+    if (submittingAnswer) mascotVariant = "thinking";
     else if (showFeedback) mascotVariant = lastResult?.is_correct ? "success" : "wrong";
 
+    // Focus messaging
+    const focusLabel = targetsWeak
+        ? { text: "Focused on weak spots", icon: Target, color: "text-orange-400 bg-orange-400/10 border-orange-400/20" }
+        : { text: "Core concepts today", icon: Sparkles, color: "text-blue-400 bg-blue-400/10 border-blue-400/20" };
+
+    const FocusIcon = focusLabel.icon;
+
     return (
-        <div className="max-w-4xl mx-auto px-4 py-6 md:py-12 min-h-screen flex flex-col">
+        <div className="max-w-4xl mx-auto px-4 py-6 md:py-10 min-h-screen flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8">
-                <div className="flex flex-col">
-                    <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Daily Sprint</span>
-                    <span className="text-xs text-muted-foreground">Question {current} of {total}</span>
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col gap-1">
+                    <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
+                        Daily Sprint
+                    </span>
+                    
+                    {/* Focus Label */}
+                    <span className={cn(
+                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium w-fit",
+                        "border",
+                        focusLabel.color
+                    )}>
+                        <FocusIcon className="w-3 h-3" />
+                        {focusLabel.text}
+                    </span>
                 </div>
 
-                <Button variant="ghost" size="icon" onClick={handleQuit} className="rounded-full hover:bg-destructive/10 hover:text-destructive">
-                    <X className="w-6 h-6" />
+                <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={handleQuit} 
+                    className="rounded-full hover:bg-destructive/10 hover:text-destructive"
+                >
+                    <X className="w-5 h-5" />
                 </Button>
             </div>
 
-            {/* Progress Bar (Segmented) */}
-            <div className="flex gap-2 mb-8 h-2">
-                {Array.from({ length: total }).map((_, i) => (
-                    <div key={i} className={cn(
-                        "h-full flex-1 rounded-full transition-all duration-500",
-                        i < current - 1 ? "bg-primary" :
-                            i === current - 1 ? "bg-primary/50" : "bg-secondary"
-                    )} />
-                ))}
+            {/* Progress Bar */}
+            <div className="mb-6">
+                <ProgressBar current={currentQuestionIndex + 1} total={totalQuestions} />
+            </div>
+
+            {/* Segmented Progress */}
+            <div className="mb-8">
+                <SegmentedProgress current={currentQuestionIndex} total={totalQuestions} />
             </div>
 
             {/* Mascot */}
-            <div className="flex justify-center mb-8 h-40">
-                <SentinelMascot variant={mascotVariant} className="w-40 h-40" />
+            <div className="flex justify-center mb-6 h-32 md:h-40">
+                <SentinelMascot variant={mascotVariant} className="w-32 h-32 md:w-40 md:h-40" />
             </div>
 
             {/* Question */}
             <div className="flex-1">
                 <QuestionCard
-                    number={current}
-                    question={question.question_text}
-                    type={question.question_type}
-                    options={question.options || undefined}
+                    number={currentQuestionIndex + 1}
+                    question={currentQuestion.question_text}
+                    type={currentQuestion.question_type}
+                    options={currentQuestion.options || undefined}
                     onAnswer={(val) => setAnswer(val)}
                     selectedAnswer={answer}
                     showFeedback={showFeedback}
@@ -254,26 +508,25 @@ function SprintContent() {
                 />
             </div>
 
-            {/* Subfooter */}
+            {/* Submit Button */}
             <div className="mt-8 flex justify-end">
                 {!showFeedback ? (
                     <Button
                         size="lg"
                         onClick={handleSubmit}
-                        disabled={!answer || submitting}
+                        disabled={!answer || submittingAnswer}
                         className="text-lg px-8 py-6 rounded-2xl shadow-lg shadow-primary/20"
                     >
-                        {submitting ? <Loader2 className="animate-spin" /> : "Check Answer"}
+                        {submittingAnswer ? (
+                            <Loader2 className="animate-spin" />
+                        ) : (
+                            <>Check Answer <ArrowRight className="ml-2 w-5 h-5" /></>
+                        )}
                     </Button>
-                ) : (
-                    // Feedback shown, waiting for next
-                    null
-                    // FeedbackPanel handles the "Next" button usually? 
-                    // Wait, FeedbackPanel is an overlay or inline?
-                    // In session/page.tsx it acts as overlay.
-                )}
+                ) : null}
             </div>
 
+            {/* Feedback Panel */}
             <AnimatePresence>
                 {showFeedback && lastResult && (
                     <FeedbackPanel
@@ -281,10 +534,9 @@ function SprintContent() {
                         explanation={lastResult.explanation || undefined}
                         correctAnswer={lastResult.correct_answer}
                         userAnswer={answer}
-                        onNext={isSprintComplete ? handleFinishSprint : handleNext}
-                        isLastQuestion={isSprintComplete}
+                        onNext={isComplete ? handleFinishSprint : handleNext}
+                        isLastQuestion={isComplete}
                         className="z-50"
-                    // Override button text for last question
                     />
                 )}
             </AnimatePresence>
@@ -294,8 +546,12 @@ function SprintContent() {
 
 export default function DailySprintSessionPage() {
     return (
-        <AppShell showNav={false}>
-            <Suspense fallback={<Loader2 className="animate-spin mx-auto mt-20" />}>
+        <AppShell showNav={false} showStatsHUD={false}>
+            <Suspense fallback={
+                <div className="h-screen flex items-center justify-center">
+                    <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+                </div>
+            }>
                 <SprintContent />
             </Suspense>
         </AppShell>

@@ -5,22 +5,14 @@ import { SentinelMascot } from "@/components/brand/SentinelMascot";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
-import { Loader2, Zap, CheckCircle2, Flame, Trophy } from "lucide-react";
+import { useToast } from "@/hooks/useToast";
+import { Loader2, Zap, CheckCircle2, Flame, Trophy, Target, Sparkles, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function DailySprintCard() {
     const { status, isLoading, startSprint, starting } = useDailySprint();
     const router = useRouter();
-
-    const handleStart = async () => {
-        try {
-            const res = await startSprint();
-            router.push(`/daily-sprint/${res.session_id}`);
-        } catch (err) {
-            console.error("Failed to start sprint", err);
-            // Ideally show toast
-        }
-    };
+    const { showToast } = useToast();
 
     if (isLoading) {
         return (
@@ -30,9 +22,91 @@ export function DailySprintCard() {
         );
     }
 
+    // Determine sprint state
     const isCompleted = status?.status === "completed";
-    const streak = status?.streak_count || 0;
-    const xp = status?.total_xp || 0;
+    const isActive = status?.status === "active";
+    const isReady = status?.status === "ready" || !status?.status;
+    
+    // User stats
+    const streak = status?.streak_count ?? 0;
+    const xp = status?.total_xp ?? 0;
+    const xpEarnedToday = status?.xp_earned_today ?? 0;
+    
+    // Progress for active sprint
+    const progressCurrent = status?.progress?.completed ?? 0;
+    const progressTotal = status?.progress?.total ?? 5;
+    
+    // Focus messaging (only show for non-completed states)
+    const targetsWeak = status?.targets_weak_concepts;
+    const focusLabel = targetsWeak
+        ? { text: "Focused on weak spots", icon: Target, color: "text-orange-400 bg-orange-400/10" }
+        : { text: "Core concepts today", icon: Sparkles, color: "text-blue-400 bg-blue-400/10" };
+    const FocusIcon = focusLabel.icon;
+
+    // Handle CTA click
+    const handleStart = async () => {
+        // If there's an active session, resume it
+        if (isActive && status?.session_id) {
+            router.push(`/daily-sprint/${status.session_id}`);
+            return;
+        }
+
+        // Otherwise start a new sprint
+        try {
+            const quiz = await startSprint();
+            router.push(`/daily-sprint/${quiz.session_id}`);
+        } catch (err) {
+            console.error("Failed to start sprint", err);
+            showToast("Failed to start sprint. Try again!", "error");
+        }
+    };
+
+    // Get title based on state
+    const getTitle = () => {
+        if (isCompleted) return "Daily Goal Achieved!";
+        if (isActive) return `Resume Sprint (${progressCurrent}/${progressTotal})`;
+        return "Start Today's Sprint (5Q)";
+    };
+
+    // Get subtitle based on state
+    const getSubtitle = () => {
+        if (isCompleted) {
+            return `You've earned ${xpEarnedToday} XP today. Come back tomorrow to keep your streak alive!`;
+        }
+        if (isActive) {
+            return `You have a sprint in progress. Finish it to keep your streak!`;
+        }
+        return "Sharpen your mind with 5 quick questions. Daily consistency builds lasting knowledge.";
+    };
+
+    // Get CTA button config
+    const getCtaConfig = () => {
+        if (isCompleted) return null; // No CTA for completed state
+        
+        if (starting) {
+            return {
+                text: isActive ? "Resuming..." : "Starting...",
+                icon: <Loader2 className="mr-2 h-5 w-5 animate-spin" />,
+                disabled: true
+            };
+        }
+        
+        if (isActive) {
+            return {
+                text: "Resume Sprint",
+                icon: <Play className="mr-2 h-5 w-5" />,
+                disabled: false
+            };
+        }
+        
+        return {
+            text: "Start Sprint",
+            icon: <Zap className="mr-2 h-5 w-5" />,
+            disabled: false
+        };
+    };
+
+    const ctaConfig = getCtaConfig();
 
     return (
         <Card className={cn(
@@ -45,54 +119,76 @@ export function DailySprintCard() {
                 {/* Left Content */}
                 <div className="flex-1 space-y-4 text-center md:text-left z-10">
                     <div className="space-y-2">
-                        <div className="flex items-center justify-center md:justify-start gap-2">
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
                             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider">
-                                Daily Habit
+                                Daily Sprint
                             </span>
+
+                            {/* Streak Badge */}
                             <div className="flex items-center gap-1 text-orange-500">
-                                <Flame className="w-4 h-4 fill-orange-500 animate-pulse" />
+                                <Flame className="w-4 h-4 fill-orange-500" />
                                 <span className="text-xs font-bold">{streak} Day Streak</span>
                             </div>
+
+                            {/* Focus Label - hide when completed */}
+                            {!isCompleted && (
+                                <span className={cn(
+                                    "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
+                                    focusLabel.color
+                                )}>
+                                    <FocusIcon className="w-3 h-3" />
+                                    {focusLabel.text}
+                                </span>
+                            )}
                         </div>
 
                         <h2 className="text-3xl font-bold tracking-tight text-white">
-                            {isCompleted ? "Daily Goal Achieved" : "Daily Insight Sprint"}
+                            {getTitle()}
                         </h2>
 
                         <p className="text-muted-foreground max-w-md">
-                            {isCompleted
-                                ? "You've fed your brain today. Come back tomorrow to keep the streak alive!"
-                                : "Sharpen your mind with 5 quick questions based on your weakest concepts."}
+                            {getSubtitle()}
                         </p>
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-2">
-                        {!isCompleted ? (
+                        {/* CTA Button */}
+                        {!isCompleted && ctaConfig && (
                             <Button
                                 size="lg"
                                 onClick={handleStart}
-                                disabled={starting}
+                                disabled={ctaConfig.disabled}
                                 className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95"
                             >
-                                {starting ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Preparing...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Zap className="mr-2 h-5 w-5" /> Start Sprint
-                                    </>
-                                )}
-                            </Button>
-                        ) : (
-                            <Button variant="outline" className="border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-400 cursor-default">
-                                <CheckCircle2 className="mr-2 h-5 w-5" /> Sprint Complete
+                                {ctaConfig.icon}
+                                {ctaConfig.text}
                             </Button>
                         )}
 
+                        {/* Completed State */}
+                        {isCompleted && (
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <Button
+                                    variant="outline"
+                                    className="border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-400 cursor-default"
+                                >
+                                    <CheckCircle2 className="mr-2 h-5 w-5" /> Sprint Complete
+                                </Button>
+
+                                {/* XP Earned Today Badge */}
+                                {xpEarnedToday > 0 && (
+                                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-500">
+                                        <Trophy className="w-4 h-4" />
+                                        <span className="text-sm font-semibold">+{xpEarnedToday} XP today</span>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Total XP */}
                         <div className="flex items-center gap-2 text-sm text-zinc-500 font-medium">
                             <Trophy className="w-4 h-4 text-yellow-500" />
-                            <span>{xp} Total XP</span>
+                            <span>{xp.toLocaleString()} Total XP</span>
                         </div>
                     </div>
                 </div>
@@ -102,11 +198,11 @@ export function DailySprintCard() {
                     {/* Background Glow */}
                     <div className={cn(
                         "absolute inset-0 rounded-full blur-[60px] opacity-20",
-                        isCompleted ? "bg-green-500" : "bg-primary"
+                        isCompleted ? "bg-green-500" : isActive ? "bg-orange-500" : "bg-primary"
                     )} />
 
                     <SentinelMascot
-                        variant={isCompleted ? "success" : "neutral"}
+                        variant={isCompleted ? "success" : isActive ? "thinking" : "neutral"}
                         className="w-full h-full drop-shadow-2xl"
                     />
                 </div>

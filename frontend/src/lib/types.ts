@@ -110,17 +110,62 @@ export interface AnswerResponse {
 }
 
 export interface SprintStatusResponse {
-  status: "ready" | "completed";
+  status: "ready" | "active" | "completed";
   streak_count: number;
   total_xp: number;
   last_sprint_date: string | null;
   next_sprint_available_at: string | null;
+  xp_earned_today?: number;
+  targets_weak_concepts?: boolean;
+  // Active session details
+  session_id?: string;
+  document_title?: string;
+  progress?: { completed: number; total: number };
 }
 
 export interface StartSprintResponse {
   session_id: string;
   document_id: string;
   document_title: string;
+  question_count?: number;
+  targets_weak_concepts?: boolean;
+}
+
+export interface SprintQuestion {
+  question_id: string;
+  question_number: number;
+  total_questions: number;
+  question_type: QuestionType;
+  question_text: string;
+  options?: string[] | null;
+  difficulty: Difficulty;
+}
+
+export interface SprintQuiz {
+  session_id: string;
+  document_id: string;
+  document_title: string;
+  questions: SprintQuestion[];
+  targets_weak_concepts: boolean;
+}
+
+export interface SprintAnswerRequest {
+  question_id: string;
+  answer: string;
+}
+
+export interface SprintAnswerResult {
+  is_correct: boolean;
+  correct_answer: string;
+  explanation?: string | null;
+  feedback?: string | null;
+}
+
+export interface SprintAnswerResponse {
+  result: SprintAnswerResult;
+  next_question: SprintQuestion | null;
+  session_complete: boolean;
+  xp_earned?: number;
 }
 
 export interface CompleteSprintResponse {
