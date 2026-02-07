@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, AnimatePresence, useInView, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
 import {
-  School,
   PlayCircle,
   Sparkles,
   LogIn,
@@ -25,7 +24,23 @@ import {
   Loader2,
   Check,
   ArrowRight,
+  Lightbulb,
+  Target,
+  Clock,
+  Award,
+  MessageCircle,
 } from "lucide-react";
+
+// Shadcn components
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+
+// Brand components
+import { Logo } from "@/components/brand/Logo";
+import { HeroMascot, FeatureMascot, MascotGuide } from "@/components/brand/MascotGuide";
+import { SentinelMascot } from "@/components/brand/SentinelMascot";
+import { cn } from "@/lib/utils";
 
 // ============================================
 // NAVIGATION COMPONENT
@@ -55,24 +70,18 @@ function Navigation() {
         initial={{ y: -100 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.6, ease: "easeOut" }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled ? "glass-nav shadow-sm" : "bg-transparent"
-        }`}
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          isScrolled 
+            ? "glass border-b border-[var(--surface-border)]" 
+            : "bg-transparent"
+        )}
       >
         <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
           <div className="flex h-16 lg:h-20 items-center justify-between">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-2.5 text-indigo-space">
-              <motion.div
-                whileHover={{ scale: 1.05, rotate: 5 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"
-              >
-                <School size={22} />
-              </motion.div>
-              <h2 className="text-xl font-extrabold tracking-tight text-indigo-space font-heading">
-                AutoCoach
-              </h2>
+            {/* Logo with Mascot */}
+            <Link href="/" className="flex items-center">
+              <Logo size="md" animated />
             </Link>
 
             {/* Desktop Navigation */}
@@ -87,9 +96,10 @@ function Navigation() {
                   <a
                     key={link.href}
                     href={link.href}
-                    className="nav-link text-sm font-medium text-indigo-space-light hover:text-indigo-space transition-colors"
+                    className="relative text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors py-2 group"
                   >
                     {link.label}
+                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--brand-primary)] transition-all duration-300 group-hover:w-full" />
                   </a>
                 ))}
               </motion.div>
@@ -102,86 +112,87 @@ function Navigation() {
               transition={{ delay: 0.4 }}
               className="hidden lg:flex items-center gap-3"
             >
-              <Link
-                href="/login"
-                className="flex items-center justify-center rounded-lg border border-slate-border hover:bg-gray-50 transition-all px-4 py-2 text-indigo-space text-sm font-medium"
-              >
-                <LogIn className="w-4 h-4 mr-2" />
-                Log In
-              </Link>
-              <Link
-                href="/signup"
-                className="flex items-center justify-center rounded-xl bg-primary hover:bg-primary-dark transition-all px-5 py-2.5 text-white text-sm font-bold shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30"
-              >
-                Sign Up
-              </Link>
+              <Button variant="ghost" asChild>
+                <Link href="/login" className="flex items-center gap-2">
+                  <LogIn className="w-4 h-4" />
+                  Log In
+                </Link>
+              </Button>
+              <Button asChild className="shadow-lg shadow-[var(--brand-primary)]/20">
+                <Link href="/signup">
+                  Sign Up
+                </Link>
+              </Button>
             </motion.div>
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="lg:hidden p-2 rounded-lg hover:bg-[var(--surface-card)] transition-colors"
             >
-              <Menu size={24} className="text-indigo-space" />
+              <Menu size={24} className="text-[var(--text-primary)]" />
             </button>
           </div>
         </div>
       </motion.nav>
 
       {/* Mobile Menu Overlay */}
-      <div
-        className={`mobile-menu-overlay ${mobileMenuOpen ? "open" : ""}`}
-        onClick={() => setMobileMenuOpen(false)}
-      />
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Mobile Menu Panel */}
-      <div className={`mobile-menu-panel ${mobileMenuOpen ? "open" : ""}`}>
+      <motion.div
+        initial={{ x: "100%" }}
+        animate={{ x: mobileMenuOpen ? 0 : "100%" }}
+        transition={{ type: "spring", damping: 25, stiffness: 200 }}
+        className="fixed top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-[var(--surface-dark)] z-50 lg:hidden shadow-2xl"
+      >
         <div className="p-6">
           <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <School size={20} />
-              </div>
-              <span className="font-bold text-indigo-space font-heading">AutoCoach</span>
-            </div>
+            <Logo size="sm" animated={false} />
             <button
               onClick={() => setMobileMenuOpen(false)}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              className="p-2 rounded-lg hover:bg-[var(--surface-card)] transition-colors"
             >
-              <X size={24} className="text-indigo-space" />
+              <X size={24} className="text-[var(--text-primary)]" />
             </button>
           </div>
 
-          <nav className="flex flex-col gap-4">
+          <nav className="flex flex-col gap-2">
             {navLinks.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
-                className="text-lg font-medium text-indigo-space hover:text-primary transition-colors py-2"
+                className="text-lg font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] transition-all py-3 px-4 rounded-xl"
               >
                 {link.label}
               </a>
             ))}
           </nav>
 
-          <div className="mt-8 pt-8 border-t border-slate-border flex flex-col gap-3">
-            <Link
-              href="/login"
-              className="flex items-center justify-center rounded-lg border border-slate-border hover:bg-gray-50 transition-all px-4 py-3 text-indigo-space font-medium"
-            >
-              <LogIn className="w-4 h-4 mr-2" />
-              Log In
-            </Link>
-            <Link
-              href="/signup"
-              className="flex items-center justify-center rounded-xl bg-primary hover:bg-primary-dark transition-all px-5 py-3 text-white font-bold"
-            >
-              Sign Up
-            </Link>
+          <div className="mt-8 pt-8 border-t border-[var(--surface-border)] flex flex-col gap-3">
+            <Button variant="outline" asChild className="w-full justify-center">
+              <Link href="/login">
+                <LogIn className="w-4 h-4 mr-2" />
+                Log In
+              </Link>
+            </Button>
+            <Button asChild className="w-full justify-center">
+              <Link href="/signup">Sign Up</Link>
+            </Button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </>
   );
 }
@@ -190,31 +201,46 @@ function Navigation() {
 // HERO SECTION
 // ============================================
 function HeroSection() {
+  const containerRef = useRef(null);
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end start"],
+  });
+  
+  const y = useTransform(scrollYProgress, [0, 1], [0, 150]);
+  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+
   return (
-    <section className="relative min-h-screen pt-24 lg:pt-32 pb-16 lg:pb-24 overflow-hidden gradient-mesh noise-bg">
+    <section 
+      ref={containerRef}
+      className="relative min-h-screen pt-24 lg:pt-32 pb-16 lg:pb-24 overflow-hidden gradient-mesh noise-bg"
+    >
       {/* Floating decorative shapes */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-20 left-10 w-64 h-64 bg-primary/10 rounded-full blur-3xl float-slow"
+          className="absolute top-20 left-10 w-64 h-64 bg-[var(--brand-primary)]/10 rounded-full blur-3xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1 }}
         />
         <motion.div
-          className="absolute top-40 right-20 w-48 h-48 bg-orange-400/10 rounded-full blur-3xl float-medium"
+          className="absolute top-40 right-20 w-48 h-48 bg-[var(--brand-secondary)]/10 rounded-full blur-3xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.2 }}
         />
         <motion.div
-          className="absolute bottom-20 left-1/3 w-56 h-56 bg-primary/5 rounded-full blur-3xl float-fast"
+          className="absolute bottom-20 left-1/3 w-56 h-56 bg-[var(--brand-primary)]/5 rounded-full blur-3xl"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 1, delay: 0.4 }}
         />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
+      <motion.div 
+        className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8"
+        style={{ y, opacity }}
+      >
         <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
           {/* Left Content */}
           <div className="flex flex-col items-start gap-6">
@@ -222,21 +248,22 @@ function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
-              className="inline-flex items-center rounded-full border border-primary/20 bg-white/80 backdrop-blur-sm px-4 py-1.5 text-sm font-medium text-primary shadow-sm"
             >
-              <motion.span
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="flex h-2 w-2 rounded-full bg-primary mr-2"
-              />
-              AI-Powered Learning Platform
+              <Badge variant="outline" className="px-4 py-1.5 text-sm font-medium border-[var(--brand-primary)]/30 bg-[var(--surface-card)]/50 backdrop-blur-sm">
+                <motion.span
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="flex h-2 w-2 rounded-full bg-[var(--brand-primary)] mr-2"
+                />
+                AI-Powered Learning Platform
+              </Badge>
             </motion.div>
 
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.1 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-indigo-space font-heading"
+              className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-[var(--text-primary)] font-heading"
             >
               Master Any Topic with{" "}
               <span className="gradient-text">AI-Generated</span> Quizzes
@@ -246,7 +273,7 @@ function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-lg lg:text-xl text-slate-600 leading-relaxed max-w-lg"
+              className="text-lg lg:text-xl text-[var(--text-secondary)] leading-relaxed max-w-lg"
             >
               Transform your documents, notes, and lectures into interactive learning
               experiences. AutoCoach adapts to your pace and helps you retain more.
@@ -257,20 +284,20 @@ function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.25 }}
-              className="flex flex-wrap items-center gap-6 text-sm text-slate-text"
+              className="flex flex-wrap items-center gap-6 text-sm text-[var(--text-secondary)]"
             >
               <div className="flex items-center gap-2">
                 <div className="flex -space-x-2">
                   {[1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
-                      className="w-7 h-7 rounded-full bg-gradient-to-br from-primary/20 to-orange-400/20 border-2 border-white flex items-center justify-center text-xs font-medium text-primary"
+                      className="w-7 h-7 rounded-full bg-gradient-to-br from-[var(--brand-primary)]/30 to-[var(--brand-secondary)]/30 border-2 border-[var(--surface-dark)] flex items-center justify-center text-xs font-medium text-[var(--text-primary)]"
                     >
                       {String.fromCharCode(64 + i)}
                     </div>
                   ))}
                 </div>
-                <span className="font-medium text-indigo-space">10,000+ students</span>
+                <span className="font-medium text-[var(--text-primary)]">10,000+ students</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="flex">
@@ -282,7 +309,7 @@ function HeroSection() {
                     />
                   ))}
                 </div>
-                <span className="font-medium text-indigo-space">98% satisfaction</span>
+                <span className="font-medium text-[var(--text-primary)]">98% satisfaction</span>
               </div>
             </motion.div>
 
@@ -293,35 +320,33 @@ function HeroSection() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mt-2"
             >
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Link
-                  href="/signup"
-                  className="flex items-center justify-center rounded-xl bg-primary hover:bg-primary-dark transition-all duration-300 px-7 py-4 text-white text-base font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 w-full sm:w-auto pulse-cta"
-                >
+              <Button size="lg" asChild className="text-base shadow-xl shadow-[var(--brand-primary)]/20 animate-pulse-subtle">
+                <Link href="/signup">
                   <Sparkles className="w-5 h-5 mr-2" />
                   Create Your First Quiz
                 </Link>
-              </motion.div>
-              <motion.a
-                href="#demo"
-                whileHover={{ scale: 1.02, backgroundColor: "#ffffff" }}
-                whileTap={{ scale: 0.98 }}
-                className="flex items-center justify-center rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200 text-indigo-space px-6 py-4 text-base font-medium w-full sm:w-auto transition-all shadow-sm hover:shadow-md"
-              >
-                <PlayCircle className="w-5 h-5 mr-2" />
-                Watch Demo
-              </motion.a>
+              </Button>
+              <Button size="lg" variant="outline" asChild className="text-base border-[var(--surface-border)]">
+                <Link href="#demo">
+                  <PlayCircle className="w-5 h-5 mr-2" />
+                  Watch Demo
+                </Link>
+              </Button>
             </motion.div>
           </div>
 
-          {/* Right Content - App Preview */}
+          {/* Right Content - Hero Mascot + Demo Preview */}
           <motion.div
             initial={{ opacity: 0, x: 50, scale: 0.95 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.3 }}
-            className="relative"
+            className="relative flex flex-col items-center gap-8"
           >
-            <div className="demo-window">
+            {/* Large Hero Mascot */}
+            <HeroMascot />
+
+            {/* Demo Card below mascot */}
+            <div className="w-full max-w-md demo-window">
               <div className="demo-window-header">
                 <div className="demo-window-dot red" />
                 <div className="demo-window-dot yellow" />
@@ -330,31 +355,31 @@ function HeroSection() {
                   AutoCoach Dashboard
                 </span>
               </div>
-              <div className="p-6 bg-gradient-to-br from-background-light to-white min-h-[320px] lg:min-h-[400px]">
+              <div className="p-6 bg-gradient-to-br from-[var(--background-light)] to-white min-h-[200px]">
                 {/* Mock Quiz Interface */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <FileText size={16} className="text-primary" />
+                      <div className="w-8 h-8 rounded-lg bg-[var(--brand-primary)]/10 flex items-center justify-center">
+                        <FileText size={16} className="text-[var(--brand-primary)]" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-indigo-space">
+                        <p className="text-sm font-semibold text-[var(--indigo-space)]">
                           Machine Learning Basics
                         </p>
-                        <p className="text-xs text-slate-text">12 questions</p>
+                        <p className="text-xs text-[var(--slate-text)]">12 questions</p>
                       </div>
                     </div>
-                    <div className="px-3 py-1 rounded-full bg-success/10 text-success text-xs font-medium">
+                    <Badge className="bg-[var(--success)]/10 text-[var(--success)] hover:bg-[var(--success)]/20">
                       In Progress
-                    </div>
+                    </Badge>
                   </div>
 
-                  <div className="bg-white rounded-xl p-4 border border-slate-border/50 shadow-sm">
-                    <p className="text-xs text-primary font-medium mb-2">
+                  <div className="bg-white rounded-xl p-4 border border-[var(--slate-border)]/50 shadow-sm">
+                    <p className="text-xs text-[var(--brand-primary)] font-medium mb-2">
                       Question 3 of 12
                     </p>
-                    <p className="text-sm font-medium text-indigo-space mb-4">
+                    <p className="text-sm font-medium text-[var(--indigo-space)] mb-4">
                       What is the primary goal of supervised learning?
                     </p>
                     <div className="space-y-2">
@@ -369,36 +394,17 @@ function HeroSection() {
                           initial={{ opacity: 0, x: -10 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: 0.5 + i * 0.1 }}
-                          className={`p-3 rounded-lg border text-sm cursor-pointer transition-all ${
+                          className={cn(
+                            "p-3 rounded-lg border text-sm cursor-pointer transition-all",
                             i === 0
-                              ? "border-primary bg-primary/5 text-primary font-medium"
-                              : "border-slate-border/50 text-slate-600 hover:border-primary/30"
-                          }`}
+                              ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5 text-[var(--brand-primary)] font-medium"
+                              : "border-[var(--slate-border)]/50 text-slate-600 hover:border-[var(--brand-primary)]/30"
+                          )}
                         >
                           {option}
                         </motion.div>
                       ))}
                     </div>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-24 h-2 rounded-full bg-slate-border/30 overflow-hidden">
-                        <motion.div
-                          className="h-full bg-primary rounded-full"
-                          initial={{ width: "0%" }}
-                          animate={{ width: "25%" }}
-                          transition={{ duration: 1, delay: 0.8 }}
-                        />
-                      </div>
-                      <span className="text-xs text-slate-text">25%</span>
-                    </div>
-                    <motion.div
-                      whileHover={{ scale: 1.05 }}
-                      className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-lg cursor-pointer"
-                    >
-                      Submit Answer
-                    </motion.div>
                   </div>
                 </div>
               </div>
@@ -409,29 +415,46 @@ function HeroSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 1 }}
-              className="absolute -bottom-4 -left-4 lg:-left-8 bg-white rounded-xl p-3 shadow-lg border border-slate-border/50"
+              className="absolute -bottom-4 -left-4 lg:-left-8 bg-[var(--surface-card)] rounded-xl p-3 shadow-lg border border-[var(--surface-border)]"
             >
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
-                  <Check size={16} className="text-success" />
+                <div className="w-8 h-8 rounded-full bg-[var(--success)]/10 flex items-center justify-center">
+                  <Check size={16} className="text-[var(--success)]" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-indigo-space">
+                  <p className="text-xs font-medium text-[var(--text-primary)]">
                     Instant Feedback
                   </p>
-                  <p className="text-xs text-slate-text">AI evaluates your answers</p>
+                  <p className="text-xs text-[var(--text-muted)]">AI evaluates your answers</p>
                 </div>
               </div>
             </motion.div>
           </motion.div>
         </div>
-      </div>
+      </motion.div>
+
+      {/* Scroll indicator */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+      >
+        <span className="text-xs text-[var(--text-muted)]">Scroll to explore</span>
+        <motion.div
+          animate={{ y: [0, 8, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+          className="w-5 h-8 rounded-full border-2 border-[var(--surface-border)] flex justify-center pt-2"
+        >
+          <motion.div className="w-1 h-2 rounded-full bg-[var(--brand-primary)]" />
+        </motion.div>
+      </motion.div>
     </section>
   );
 }
 
 // ============================================
-// FEATURES SECTION (6 Cards)
+// FEATURES SECTION
 // ============================================
 function FeaturesSection() {
   const ref = useRef(null);
@@ -440,36 +463,42 @@ function FeaturesSection() {
   const features = [
     {
       icon: Brain,
+      mascotVariant: "thinking" as const,
       title: "AI-Powered Quiz Generation",
       description:
         "Advanced AI analyzes your documents and creates relevant, challenging questions tailored to the content.",
     },
     {
       icon: FileText,
+      mascotVariant: "neutral" as const,
       title: "Multiple Question Types",
       description:
         "Support for MCQ, True/False, and Free Text questions to test different levels of understanding.",
     },
     {
       icon: CheckCircle,
+      mascotVariant: "success" as const,
       title: "Smart Answer Evaluation",
       description:
         "AI evaluates free-text responses for semantic correctness, not just exact matches.",
     },
     {
       icon: BarChart3,
+      mascotVariant: "neutral" as const,
       title: "Progress Tracking",
       description:
         "Track your learning journey with detailed analytics on performance and areas for improvement.",
     },
     {
       icon: FileUp,
+      mascotVariant: "thinking" as const,
       title: "Document Processing",
       description:
         "Upload PDFs and PowerPoint files. Our system extracts and processes content automatically.",
     },
     {
       icon: Zap,
+      mascotVariant: "success" as const,
       title: "Adaptive Learning",
       description:
         "The system adapts to your performance, focusing on areas where you need more practice.",
@@ -477,21 +506,26 @@ function FeaturesSection() {
   ];
 
   return (
-    <section id="features" className="section-padding bg-white noise-bg" ref={ref}>
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
+    <section id="features" className="section-padding bg-[var(--surface-dark)] noise-bg relative" ref={ref}>
+      {/* Mascot decoration */}
+      <div className="absolute top-20 right-10 opacity-30 pointer-events-none hidden lg:block">
+        <FeatureMascot variant="thinking" />
+      </div>
+
+      <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
             Features
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-indigo-space mb-4 font-heading">
+          </Badge>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
             Everything You Need to Learn Smarter
           </h2>
-          <p className="text-slate-600 max-w-2xl mx-auto text-lg">
+          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg">
             Powerful features designed to transform how you study and retain information
           </p>
         </motion.div>
@@ -503,15 +537,27 @@ function FeaturesSection() {
               initial={{ opacity: 0, y: 30 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="card-glow-border p-6 lg:p-8"
             >
-              <div className="feature-icon mb-5">
-                <feature.icon size={24} className="text-primary" />
-              </div>
-              <h3 className="text-lg font-bold text-indigo-space mb-3 font-heading">
-                {feature.title}
-              </h3>
-              <p className="text-slate-600 leading-relaxed">{feature.description}</p>
+              <Card className="h-full bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--brand-primary)]/5 group">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="feature-icon">
+                      <feature.icon size={24} className="text-[var(--brand-primary)]" />
+                    </div>
+                    <div className="w-10 h-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <SentinelMascot variant={feature.mascotVariant} className="w-full h-full" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <h3 className="text-lg font-bold text-[var(--text-primary)] mb-3 font-heading">
+                    {feature.title}
+                  </h3>
+                  <p className="text-[var(--text-secondary)] leading-relaxed">
+                    {feature.description}
+                  </p>
+                </CardContent>
+              </Card>
             </motion.div>
           ))}
         </div>
@@ -521,7 +567,7 @@ function FeaturesSection() {
 }
 
 // ============================================
-// HOW IT WORKS SECTION (3 Steps)
+// HOW IT WORKS SECTION
 // ============================================
 function HowItWorksSection() {
   const ref = useRef(null);
@@ -554,7 +600,7 @@ function HowItWorksSection() {
   return (
     <section
       id="how-it-works"
-      className="section-padding bg-gradient-to-b from-background-light to-white"
+      className="section-padding bg-gradient-to-b from-[var(--surface-dark)] to-[var(--surface-darker)]"
       ref={ref}
     >
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
@@ -564,13 +610,13 @@ function HowItWorksSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
             How It Works
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-indigo-space mb-4 font-heading">
+          </Badge>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
             Three Simple Steps to Success
           </h2>
-          <p className="text-slate-600 max-w-2xl mx-auto text-lg">
+          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg">
             Get started in minutes and transform your learning experience
           </p>
         </motion.div>
@@ -582,7 +628,7 @@ function HowItWorksSection() {
               initial={{ scaleX: 0 }}
               animate={isInView ? { scaleX: 1 } : {}}
               transition={{ duration: 1, delay: 0.5 }}
-              className="h-full bg-gradient-to-r from-primary via-primary to-primary/30 origin-left"
+              className="h-full bg-gradient-to-r from-[var(--brand-primary)] via-[var(--brand-secondary)] to-[var(--brand-primary)]/30 origin-left"
             />
           </div>
 
@@ -597,17 +643,17 @@ function HowItWorksSection() {
               >
                 <motion.div
                   whileHover={{ scale: 1.05 }}
-                  className="relative inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white border-2 border-primary/20 shadow-lg shadow-primary/10 mb-6 z-10"
+                  className="relative inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--surface-card)] border-2 border-[var(--brand-primary)]/20 shadow-lg shadow-[var(--brand-primary)]/10 mb-6 z-10"
                 >
-                  <step.icon size={32} className="text-primary" />
-                  <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-primary text-white text-sm font-bold flex items-center justify-center">
+                  <step.icon size={32} className="text-[var(--brand-primary)]" />
+                  <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-[var(--brand-primary)] text-[var(--surface-dark)] text-sm font-bold flex items-center justify-center">
                     {i + 1}
                   </span>
                 </motion.div>
-                <h3 className="text-xl font-bold text-indigo-space mb-3 font-heading">
+                <h3 className="text-xl font-bold text-[var(--text-primary)] mb-3 font-heading">
                   {step.title}
                 </h3>
-                <p className="text-slate-600 leading-relaxed">{step.description}</p>
+                <p className="text-[var(--text-secondary)] leading-relaxed">{step.description}</p>
               </motion.div>
             ))}
           </div>
@@ -626,11 +672,11 @@ function DemoSection() {
   const [stage, setStage] = useState(0);
 
   const stages = [
-    { name: "Upload", duration: 3000 },
-    { name: "Processing", duration: 2000 },
-    { name: "Quiz", duration: 4000 },
-    { name: "Answer", duration: 2000 },
-    { name: "Feedback", duration: 2000 },
+    { name: "Upload", duration: 3000, mascotVariant: "neutral" as const },
+    { name: "Processing", duration: 2000, mascotVariant: "thinking" as const },
+    { name: "Quiz", duration: 4000, mascotVariant: "thinking" as const },
+    { name: "Answer", duration: 2000, mascotVariant: "neutral" as const },
+    { name: "Feedback", duration: 2000, mascotVariant: "success" as const },
   ];
 
   useEffect(() => {
@@ -646,14 +692,23 @@ function DemoSection() {
   return (
     <section
       id="demo"
-      className="section-padding bg-indigo-space text-white relative overflow-hidden"
+      className="section-padding bg-[var(--surface-darker)] relative overflow-hidden"
       ref={ref}
     >
       {/* Background decorations */}
       <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-20 left-10 w-64 h-64 bg-primary rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-48 h-48 bg-orange-400 rounded-full blur-3xl" />
+        <div className="absolute top-20 left-10 w-64 h-64 bg-[var(--brand-primary)] rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-10 w-48 h-48 bg-[var(--brand-secondary)] rounded-full blur-3xl" />
       </div>
+
+      {/* Mascot peeking from corner */}
+      <motion.div
+        className="absolute bottom-0 right-0 w-32 h-32 opacity-50 hidden lg:block"
+        animate={{ y: stage === 4 ? [0, -10, 0] : 0 }}
+        transition={{ duration: 0.5 }}
+      >
+        <SentinelMascot variant={stages[stage].mascotVariant} className="w-full h-full" />
+      </motion.div>
 
       <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
@@ -662,13 +717,13 @@ function DemoSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <span className="inline-block px-4 py-1.5 rounded-full bg-white/10 text-white/90 text-sm font-medium mb-4">
+          <Badge className="mb-4 bg-white/10 text-white/90 hover:bg-white/20">
             See It In Action
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold mb-4 font-heading">
+          </Badge>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
             Watch AutoCoach Work Its Magic
           </h2>
-          <p className="text-white/70 max-w-2xl mx-auto text-lg">
+          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg">
             From document upload to quiz mastery in seconds
           </p>
         </motion.div>
@@ -687,7 +742,7 @@ function DemoSection() {
               <div className="demo-window-dot green" />
               <span className="ml-4 text-xs text-gray-500 font-medium">AutoCoach</span>
             </div>
-            <div className="p-6 bg-white min-h-[300px] flex items-center justify-center">
+            <div className="p-6 bg-[var(--surface-dark)] min-h-[300px] flex items-center justify-center">
               <AnimatePresence mode="wait">
                 {stage === 0 && (
                   <motion.div
@@ -700,16 +755,16 @@ function DemoSection() {
                     <motion.div
                       animate={{ y: [0, -10, 0] }}
                       transition={{ duration: 1.5, repeat: Infinity }}
-                      className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary/10 flex items-center justify-center"
+                      className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--brand-primary)]/10 flex items-center justify-center"
                     >
-                      <Upload size={32} className="text-primary" />
+                      <Upload size={32} className="text-[var(--brand-primary)]" />
                     </motion.div>
-                    <p className="text-indigo-space font-medium mb-2">
+                    <p className="text-[var(--text-primary)] font-medium mb-2">
                       Uploading document...
                     </p>
-                    <div className="w-48 h-2 mx-auto rounded-full bg-slate-border/30 overflow-hidden">
+                    <div className="w-48 h-2 mx-auto rounded-full bg-[var(--surface-border)]/30 overflow-hidden">
                       <motion.div
-                        className="h-full bg-primary rounded-full"
+                        className="h-full bg-[var(--brand-primary)] rounded-full"
                         initial={{ width: "0%" }}
                         animate={{ width: "100%" }}
                         transition={{ duration: 2.5 }}
@@ -731,9 +786,9 @@ function DemoSection() {
                       transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                       className="w-16 h-16 mx-auto mb-4"
                     >
-                      <Loader2 size={64} className="text-primary" />
+                      <Loader2 size={64} className="text-[var(--brand-primary)]" />
                     </motion.div>
-                    <p className="text-indigo-space font-medium mb-2">
+                    <p className="text-[var(--text-primary)] font-medium mb-2">
                       AI is analyzing content...
                     </p>
                     <motion.div
@@ -741,9 +796,9 @@ function DemoSection() {
                       transition={{ duration: 1, repeat: Infinity }}
                       className="flex justify-center gap-1"
                     >
-                      <Sparkles size={16} className="text-primary" />
-                      <Sparkles size={16} className="text-orange-400" />
-                      <Sparkles size={16} className="text-primary" />
+                      <Sparkles size={16} className="text-[var(--brand-primary)]" />
+                      <Sparkles size={16} className="text-[var(--brand-secondary)]" />
+                      <Sparkles size={16} className="text-[var(--brand-primary)]" />
                     </motion.div>
                   </motion.div>
                 )}
@@ -756,10 +811,10 @@ function DemoSection() {
                     exit={{ opacity: 0, scale: 0.9 }}
                     className="w-full max-w-sm"
                   >
-                    <p className="text-xs text-primary font-medium mb-2">
+                    <p className="text-xs text-[var(--brand-primary)] font-medium mb-2">
                       Question 1 of 10
                     </p>
-                    <p className="text-sm font-medium text-indigo-space mb-4">
+                    <p className="text-sm font-medium text-[var(--text-primary)] mb-4">
                       What is the capital of France?
                     </p>
                     <div className="space-y-2">
@@ -769,7 +824,7 @@ function DemoSection() {
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: i * 0.15 }}
-                          className="p-3 rounded-lg border border-slate-border/50 text-sm text-slate-600"
+                          className="p-3 rounded-lg border border-[var(--surface-border)] text-sm text-[var(--text-secondary)]"
                         >
                           {opt}
                         </motion.div>
@@ -786,21 +841,22 @@ function DemoSection() {
                     exit={{ opacity: 0, scale: 0.9 }}
                     className="w-full max-w-sm"
                   >
-                    <p className="text-xs text-primary font-medium mb-2">
+                    <p className="text-xs text-[var(--brand-primary)] font-medium mb-2">
                       Question 1 of 10
                     </p>
-                    <p className="text-sm font-medium text-indigo-space mb-4">
+                    <p className="text-sm font-medium text-[var(--text-primary)] mb-4">
                       What is the capital of France?
                     </p>
                     <div className="space-y-2">
                       {["Paris", "London", "Berlin", "Madrid"].map((opt, i) => (
                         <div
                           key={opt}
-                          className={`p-3 rounded-lg border text-sm transition-all ${
+                          className={cn(
+                            "p-3 rounded-lg border text-sm transition-all",
                             i === 0
-                              ? "border-primary bg-primary/10 text-primary font-medium"
-                              : "border-slate-border/50 text-slate-600"
-                          }`}
+                              ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-medium"
+                              : "border-[var(--surface-border)] text-[var(--text-secondary)]"
+                          )}
                         >
                           {opt}
                           {i === 0 && (
@@ -809,7 +865,7 @@ function DemoSection() {
                               animate={{ scale: 1 }}
                               className="float-right"
                             >
-                              <Check size={16} className="text-primary" />
+                              <Check size={16} className="text-[var(--brand-primary)]" />
                             </motion.span>
                           )}
                         </div>
@@ -830,17 +886,17 @@ function DemoSection() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: "spring", damping: 10 }}
-                      className="w-20 h-20 mx-auto mb-4 rounded-full bg-success/10 flex items-center justify-center"
+                      className="w-20 h-20 mx-auto mb-4"
                     >
-                      <Check size={40} className="text-success" />
+                      <SentinelMascot variant="success" className="w-full h-full" />
                     </motion.div>
-                    <p className="text-xl font-bold text-success mb-2">Correct!</p>
-                    <p className="text-slate-600 text-sm mb-4">
+                    <p className="text-xl font-bold text-[var(--success)] mb-2">Correct!</p>
+                    <p className="text-[var(--text-secondary)] text-sm mb-4">
                       Paris is the capital of France.
                     </p>
                     <div className="flex items-center justify-center gap-2">
-                      <span className="text-sm text-slate-text">Score:</span>
-                      <span className="font-bold text-indigo-space">1/1</span>
+                      <span className="text-sm text-[var(--text-muted)]">Score:</span>
+                      <span className="font-bold text-[var(--text-primary)]">1/1</span>
                     </div>
                   </motion.div>
                 )}
@@ -862,21 +918,28 @@ function DemoSection() {
                 className="flex items-start gap-4"
               >
                 <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                    stage === i ? "bg-primary text-white" : "bg-white/10 text-white/50"
-                  }`}
+                  className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
+                    stage === i 
+                      ? "bg-[var(--brand-primary)] text-[var(--surface-dark)]" 
+                      : "bg-[var(--surface-card)] text-[var(--text-muted)]"
+                  )}
                 >
                   {i + 1}
                 </div>
-                <div>
+                <div className="flex-1">
                   <h4
-                    className={`font-bold mb-1 transition-colors ${
-                      stage === i ? "text-white" : "text-white/50"
-                    }`}
+                    className={cn(
+                      "font-bold mb-1 transition-colors",
+                      stage === i ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                    )}
                   >
                     {s.name}
                   </h4>
-                  <p className={`text-sm ${stage === i ? "text-white/70" : "text-white/30"}`}>
+                  <p className={cn(
+                    "text-sm",
+                    stage === i ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"
+                  )}>
                     {i === 0 && "Drag and drop your document to upload"}
                     {i === 1 && "AI extracts content and generates questions"}
                     {i === 2 && "Questions appear with multiple choice options"}
@@ -884,15 +947,28 @@ function DemoSection() {
                     {i === 4 && "Get instant feedback and explanations"}
                   </p>
                 </div>
+                {stage === i && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="w-10 h-10 hidden sm:block"
+                  >
+                    <SentinelMascot variant={s.mascotVariant} className="w-full h-full" />
+                  </motion.div>
+                )}
               </motion.div>
             ))}
 
             {/* Stage Progress Dots */}
             <div className="flex items-center gap-2 pt-4">
               {stages.map((_, i) => (
-                <div
+                <motion.div
                   key={i}
-                  className={`stage-dot ${stage === i ? "active" : ""}`}
+                  animate={{
+                    scale: stage === i ? 1.25 : 1,
+                    backgroundColor: stage === i ? "var(--brand-primary)" : "var(--surface-border)",
+                  }}
+                  className="w-2.5 h-2.5 rounded-full"
                 />
               ))}
             </div>
@@ -902,7 +978,6 @@ function DemoSection() {
     </section>
   );
 }
-
 // ============================================
 // TESTIMONIALS SECTION
 // ============================================
@@ -942,7 +1017,7 @@ function TestimonialsSection() {
   ];
 
   return (
-    <section id="testimonials" className="section-padding bg-background-light" ref={ref}>
+    <section id="testimonials" className="section-padding bg-[var(--surface-dark)]" ref={ref}>
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -950,13 +1025,13 @@ function TestimonialsSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
             Testimonials
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-indigo-space mb-4 font-heading">
+          </Badge>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
             Loved by Students Everywhere
           </h2>
-          <p className="text-slate-600 max-w-2xl mx-auto text-lg">
+          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg">
             Join thousands of learners who have transformed their study habits
           </p>
         </motion.div>
@@ -968,31 +1043,34 @@ function TestimonialsSection() {
               initial={{ opacity: 0, y: 30 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="testimonial-card"
             >
-              <div className="flex mb-3">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    size={14}
-                    className="text-yellow-400 fill-yellow-400"
-                  />
-                ))}
-              </div>
-              <p className="text-slate-600 text-sm leading-relaxed mb-4 italic">
-                &ldquo;{testimonial.content}&rdquo;
-              </p>
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-border/30">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-orange-400/20 flex items-center justify-center text-sm font-bold text-primary">
-                  {testimonial.avatar}
-                </div>
-                <div>
-                  <p className="font-semibold text-indigo-space text-sm">
-                    {testimonial.name}
+              <Card className="h-full bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/30 transition-all hover:-translate-y-1">
+                <CardContent className="p-6">
+                  <div className="flex mb-3">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star
+                        key={star}
+                        size={14}
+                        className="text-yellow-400 fill-yellow-400"
+                      />
+                    ))}
+                  </div>
+                  <p className="text-[var(--text-secondary)] text-sm leading-relaxed mb-4 italic">
+                    &ldquo;{testimonial.content}&rdquo;
                   </p>
-                  <p className="text-slate-text text-xs">{testimonial.role}</p>
-                </div>
-              </div>
+                  <div className="flex items-center gap-3 pt-4 border-t border-[var(--surface-border)]">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--brand-primary)]/30 to-[var(--brand-secondary)]/30 flex items-center justify-center text-sm font-bold text-[var(--text-primary)]">
+                      {testimonial.avatar}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[var(--text-primary)] text-sm">
+                        {testimonial.name}
+                      </p>
+                      <p className="text-[var(--text-muted)] text-xs">{testimonial.role}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </motion.div>
           ))}
         </div>
@@ -1041,7 +1119,7 @@ function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="section-padding bg-white" ref={ref}>
+    <section id="pricing" className="section-padding bg-[var(--surface-darker)]" ref={ref}>
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1049,42 +1127,44 @@ function PricingSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
             Pricing
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-indigo-space mb-4 font-heading">
+          </Badge>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
             Simple, Transparent Pricing
           </h2>
-          <p className="text-slate-600 max-w-2xl mx-auto text-lg mb-8">
+          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg mb-8">
             Choose the plan that fits your learning journey
           </p>
 
           {/* Toggle */}
           <div className="flex items-center justify-center gap-4">
             <span
-              className={`text-sm font-medium ${
-                !isYearly ? "text-indigo-space" : "text-slate-text"
-              }`}
+              className={cn(
+                "text-sm font-medium transition-colors",
+                !isYearly ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+              )}
             >
               Monthly
             </span>
             <button
               onClick={() => setIsYearly(!isYearly)}
-              className="relative w-14 h-7 rounded-full bg-primary/20 transition-colors"
+              className="relative w-14 h-7 rounded-full bg-[var(--surface-card)] transition-colors"
             >
               <motion.div
                 animate={{ x: isYearly ? 26 : 2 }}
                 transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                className="absolute top-1 w-5 h-5 rounded-full bg-primary"
+                className="absolute top-1 w-5 h-5 rounded-full bg-[var(--brand-primary)]"
               />
             </button>
             <span
-              className={`text-sm font-medium ${
-                isYearly ? "text-indigo-space" : "text-slate-text"
-              }`}
+              className={cn(
+                "text-sm font-medium transition-colors",
+                isYearly ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+              )}
             >
               Yearly{" "}
-              <span className="text-success text-xs font-bold">Save 22%</span>
+              <span className="text-[var(--success)] text-xs font-bold">Save 22%</span>
             </span>
           </div>
         </motion.div>
@@ -1096,53 +1176,61 @@ function PricingSection() {
               initial={{ opacity: 0, y: 30 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className={`relative rounded-2xl p-8 ${
-                plan.popular
-                  ? "bg-white border-2 border-primary shadow-xl shadow-primary/10 pricing-popular"
-                  : "bg-background-light border border-slate-border/50"
-              }`}
             >
-              <h3 className="text-xl font-bold text-indigo-space mb-2 font-heading">
-                {plan.name}
-              </h3>
-              <p className="text-slate-text text-sm mb-6">{plan.description}</p>
-
-              <div className="mb-6">
-                <span className="text-4xl font-extrabold text-indigo-space font-heading">
-                  ${isYearly ? plan.price.yearly : plan.price.monthly}
-                </span>
-                <span className="text-slate-text">/month</span>
-                {isYearly && plan.price.yearly > 0 && (
-                  <p className="text-xs text-slate-text mt-1">
-                    Billed annually (${plan.price.yearly * 12}/year)
-                  </p>
+              <Card className={cn(
+                "h-full relative overflow-hidden",
+                plan.popular 
+                  ? "bg-[var(--surface-card)] border-[var(--brand-primary)] shadow-xl shadow-[var(--brand-primary)]/10" 
+                  : "bg-[var(--surface-dark)] border-[var(--surface-border)]"
+              )}>
+                {plan.popular && (
+                  <div className="absolute top-0 right-0 bg-[var(--brand-primary)] text-[var(--surface-dark)] text-xs font-bold px-3 py-1 rounded-bl-lg">
+                    POPULAR
+                  </div>
                 )}
-              </div>
+                <CardContent className="p-8">
+                  <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 font-heading">
+                    {plan.name}
+                  </h3>
+                  <p className="text-[var(--text-muted)] text-sm mb-6">{plan.description}</p>
 
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, fi) => (
-                  <li key={fi} className="flex items-start gap-3">
-                    <Check
-                      size={18}
-                      className={`flex-shrink-0 mt-0.5 ${
-                        plan.popular ? "text-primary" : "text-success"
-                      }`}
-                    />
-                    <span className="text-slate-600 text-sm">{feature}</span>
-                  </li>
-                ))}
-              </ul>
+                  <div className="mb-6">
+                    <span className="text-4xl font-extrabold text-[var(--text-primary)] font-heading">
+                      ${isYearly ? plan.price.yearly : plan.price.monthly}
+                    </span>
+                    <span className="text-[var(--text-muted)]">/month</span>
+                    {isYearly && plan.price.yearly > 0 && (
+                      <p className="text-xs text-[var(--text-muted)] mt-1">
+                        Billed annually (${plan.price.yearly * 12}/year)
+                      </p>
+                    )}
+                  </div>
 
-              <Link
-                href="/signup"
-                className={`block w-full text-center py-3 rounded-xl font-bold transition-all ${
-                  plan.popular
-                    ? "bg-primary hover:bg-primary-dark text-white shadow-md shadow-primary/20 hover:shadow-lg"
-                    : "bg-white border border-slate-border hover:border-primary text-indigo-space"
-                }`}
-              >
-                {plan.cta}
-              </Link>
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, fi) => (
+                      <li key={fi} className="flex items-start gap-3">
+                        <Check
+                          size={18}
+                          className={cn(
+                            "flex-shrink-0 mt-0.5",
+                            plan.popular ? "text-[var(--brand-primary)]" : "text-[var(--success)]"
+                          )}
+                        />
+                        <span className="text-[var(--text-secondary)] text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button 
+                    asChild 
+                    className="w-full" 
+                    variant={plan.popular ? "default" : "outline"}
+                    size="lg"
+                  >
+                    <Link href="/signup">{plan.cta}</Link>
+                  </Button>
+                </CardContent>
+              </Card>
             </motion.div>
           ))}
         </div>
@@ -1193,7 +1281,7 @@ function FAQSection() {
   ];
 
   return (
-    <section className="section-padding bg-background-light" ref={ref}>
+    <section className="section-padding bg-[var(--surface-dark)]" ref={ref}>
       <div className="mx-auto max-w-[800px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1201,13 +1289,13 @@ function FAQSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
+          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
             FAQ
-          </span>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-indigo-space mb-4 font-heading">
+          </Badge>
+          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
             Frequently Asked Questions
           </h2>
-          <p className="text-slate-600 text-lg">
+          <p className="text-[var(--text-secondary)] text-lg">
             Got questions? We&apos;ve got answers.
           </p>
         </motion.div>
@@ -1219,30 +1307,34 @@ function FAQSection() {
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.05 }}
-              className="bg-white rounded-xl border border-slate-border/50 overflow-hidden"
             >
-              <button
-                onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                className="w-full flex items-center justify-between p-5 text-left"
-              >
-                <span className="font-semibold text-indigo-space pr-4">
-                  {faq.question}
-                </span>
-                <motion.div
-                  animate={{ rotate: openIndex === i ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex-shrink-0"
+              <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] overflow-hidden">
+                <button
+                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
+                  className="w-full flex items-center justify-between p-5 text-left"
                 >
-                  <ChevronDown size={20} className="text-slate-text" />
-                </motion.div>
-              </button>
-              <div className={`accordion-content ${openIndex === i ? "open" : ""}`}>
-                <div>
-                  <p className="px-5 pb-5 text-slate-600 leading-relaxed">
-                    {faq.answer}
-                  </p>
+                  <span className="font-semibold text-[var(--text-primary)] pr-4">
+                    {faq.question}
+                  </span>
+                  <motion.div
+                    animate={{ rotate: openIndex === i ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex-shrink-0"
+                  >
+                    <ChevronDown size={20} className="text-[var(--text-muted)]" />
+                  </motion.div>
+                </button>
+                <div className={cn(
+                  "grid transition-all duration-300",
+                  openIndex === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                )}>
+                  <div className="overflow-hidden">
+                    <p className="px-5 pb-5 text-[var(--text-secondary)] leading-relaxed">
+                      {faq.answer}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </Card>
             </motion.div>
           ))}
         </div>
@@ -1264,24 +1356,44 @@ function FinalCTASection() {
       ref={ref}
     >
       {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background-light to-orange-400/10" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[var(--brand-primary)]/10 via-[var(--surface-dark)] to-[var(--brand-secondary)]/10" />
 
       {/* Floating shapes */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-10 left-10 w-32 h-32 bg-primary/10 rounded-full blur-2xl float-slow" />
-        <div className="absolute bottom-10 right-10 w-40 h-40 bg-orange-400/10 rounded-full blur-2xl float-medium" />
+        <div className="absolute top-10 left-10 w-32 h-32 bg-[var(--brand-primary)]/10 rounded-full blur-2xl float-slow" />
+        <div className="absolute bottom-10 right-10 w-40 h-40 bg-[var(--brand-secondary)]/10 rounded-full blur-2xl float-medium" />
       </div>
+
+      {/* Mascot in corner */}
+      <motion.div
+        className="absolute bottom-0 left-0 w-40 h-40 opacity-40 hidden lg:block"
+        initial={{ y: 100, opacity: 0 }}
+        animate={isInView ? { y: 0, opacity: 0.4 } : {}}
+        transition={{ duration: 0.8, delay: 0.3 }}
+      >
+        <SentinelMascot variant="success" className="w-full h-full" />
+      </motion.div>
 
       <div className="relative z-10 mx-auto max-w-[800px] px-6 lg:px-8 text-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6 }}
+          className="flex flex-col items-center"
         >
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-indigo-space mb-6 font-heading">
+          {/* CTA Mascot */}
+          <motion.div
+            className="w-24 h-24 mb-6"
+            animate={{ y: [-4, 4, -4] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <SentinelMascot variant="success" className="w-full h-full" />
+          </motion.div>
+
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-[var(--text-primary)] mb-6 font-heading">
             Start Learning Smarter Today
           </h2>
-          <p className="text-slate-600 text-lg mb-8 max-w-lg mx-auto">
+          <p className="text-[var(--text-secondary)] text-lg mb-8 max-w-lg mx-auto">
             Join thousands of students who are already mastering their subjects with
             AI-powered quizzes.
           </p>
@@ -1289,18 +1401,16 @@ function FinalCTASection() {
           <motion.div
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            className="inline-block"
           >
-            <Link
-              href="/signup"
-              className="inline-flex items-center justify-center rounded-xl bg-primary hover:bg-primary-dark transition-all duration-300 px-8 py-4 text-white text-lg font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
-            >
-              Get Started Free
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Link>
+            <Button size="lg" asChild className="text-lg px-8 shadow-xl shadow-[var(--brand-primary)]/20">
+              <Link href="/signup">
+                Get Started Free
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Link>
+            </Button>
           </motion.div>
 
-          <p className="mt-4 text-sm text-slate-text">
+          <p className="mt-4 text-sm text-[var(--text-muted)]">
             No credit card required. Start learning in seconds.
           </p>
         </motion.div>
@@ -1333,37 +1443,32 @@ function Footer() {
   };
 
   return (
-    <footer className="bg-indigo-space text-white py-16">
+    <footer className="bg-[var(--surface-darker)] text-[var(--text-primary)] py-16 border-t border-[var(--surface-border)]">
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 lg:gap-12 mb-12">
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-3 lg:col-span-1">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white">
-                <School size={22} />
-              </div>
-              <span className="text-xl font-bold font-heading">AutoCoach</span>
-            </div>
-            <p className="text-white/60 text-sm mb-6 max-w-xs">
+            <Logo size="md" animated={false} className="mb-4" />
+            <p className="text-[var(--text-muted)] text-sm mb-6 max-w-xs">
               Transform your documents into interactive learning experiences with
               AI-powered quizzes.
             </p>
             <div className="flex items-center gap-3">
               <a
                 href="#"
-                className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--brand-primary)]/20 flex items-center justify-center transition-colors"
               >
                 <Twitter size={18} />
               </a>
               <a
                 href="#"
-                className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--brand-primary)]/20 flex items-center justify-center transition-colors"
               >
                 <Linkedin size={18} />
               </a>
               <a
                 href="#"
-                className="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                className="w-9 h-9 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--brand-primary)]/20 flex items-center justify-center transition-colors"
               >
                 <Github size={18} />
               </a>
@@ -1372,13 +1477,13 @@ function Footer() {
 
           {/* Product Links */}
           <div>
-            <h4 className="font-semibold mb-4">Product</h4>
+            <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Product</h4>
             <ul className="space-y-3">
               {footerLinks.product.map((link) => (
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-white/60 hover:text-white text-sm transition-colors"
+                    className="text-[var(--text-muted)] hover:text-[var(--brand-primary)] text-sm transition-colors"
                   >
                     {link.label}
                   </a>
@@ -1389,13 +1494,13 @@ function Footer() {
 
           {/* Resources Links */}
           <div>
-            <h4 className="font-semibold mb-4">Resources</h4>
+            <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Resources</h4>
             <ul className="space-y-3">
               {footerLinks.resources.map((link) => (
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-white/60 hover:text-white text-sm transition-colors"
+                    className="text-[var(--text-muted)] hover:text-[var(--brand-primary)] text-sm transition-colors"
                   >
                     {link.label}
                   </a>
@@ -1406,13 +1511,13 @@ function Footer() {
 
           {/* Company Links */}
           <div>
-            <h4 className="font-semibold mb-4">Company</h4>
+            <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Company</h4>
             <ul className="space-y-3">
               {footerLinks.company.map((link) => (
                 <li key={link.label}>
                   <a
                     href={link.href}
-                    className="text-white/60 hover:text-white text-sm transition-colors"
+                    className="text-[var(--text-muted)] hover:text-[var(--brand-primary)] text-sm transition-colors"
                   >
                     {link.label}
                   </a>
@@ -1423,39 +1528,36 @@ function Footer() {
 
           {/* Newsletter */}
           <div>
-            <h4 className="font-semibold mb-4">Stay Updated</h4>
-            <p className="text-white/60 text-sm mb-4">
+            <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Stay Updated</h4>
+            <p className="text-[var(--text-muted)] text-sm mb-4">
               Get tips and updates delivered to your inbox.
             </p>
             <form className="flex gap-2">
               <input
                 type="email"
                 placeholder="Enter your email"
-                className="flex-1 px-3 py-2 rounded-lg bg-white/10 border border-white/10 text-white placeholder:text-white/40 text-sm focus:outline-none focus:border-primary"
+                className="flex-1 px-3 py-2 rounded-lg bg-[var(--surface-card)] border border-[var(--surface-border)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] text-sm focus:outline-none focus:border-[var(--brand-primary)]"
               />
-              <button
-                type="submit"
-                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-dark text-white text-sm font-semibold transition-colors"
-              >
+              <Button type="submit" size="sm">
                 Join
-              </button>
+              </Button>
             </form>
           </div>
         </div>
 
         {/* Bottom Bar */}
-        <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-white/40 text-sm">
+        <div className="pt-8 border-t border-[var(--surface-border)] flex flex-col md:flex-row justify-between items-center gap-4">
+          <p className="text-[var(--text-muted)] text-sm">
             © 2026 AutoCoach. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
-            <a href="#" className="text-white/40 hover:text-white/60 text-sm transition-colors">
+            <a href="#" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
               Privacy Policy
             </a>
-            <a href="#" className="text-white/40 hover:text-white/60 text-sm transition-colors">
+            <a href="#" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
               Terms of Service
             </a>
-            <a href="#" className="text-white/40 hover:text-white/60 text-sm transition-colors">
+            <a href="#" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
               Cookie Policy
             </a>
           </div>
@@ -1470,7 +1572,7 @@ function Footer() {
 // ============================================
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-background-light text-indigo-space overflow-x-hidden">
+    <div className="min-h-screen bg-[var(--surface-dark)] text-[var(--text-primary)] overflow-x-hidden">
       <Navigation />
       <HeroSection />
       <FeaturesSection />
@@ -1481,6 +1583,9 @@ export default function LandingPage() {
       <FAQSection />
       <FinalCTASection />
       <Footer />
+      
+      {/* Floating Mascot Guide */}
+      <MascotGuide enabled={true} />
     </div>
   );
 }

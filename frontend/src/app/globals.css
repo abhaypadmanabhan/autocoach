@@ -360,6 +360,15 @@ body {
   }
 }
 
+@keyframes pulse-subtle {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(205, 119, 106, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(205, 119, 106, 0);
+  }
+}
+
 /* Float variations */
 @keyframes float-slow {
   0%, 100% { transform: translateY(0) rotate(0deg); }
@@ -426,6 +435,10 @@ body {
 
 .animate-pulse-cta {
   animation: pulse-cta 2s ease-in-out infinite;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
 }
 
 .animate-progress-dot {
