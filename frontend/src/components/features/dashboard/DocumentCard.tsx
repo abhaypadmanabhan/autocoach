@@ -176,7 +176,7 @@ export function DocumentCard({
 
         {/* Content */}
         <h3 className="text-lg font-semibold text-text-primary mb-2 line-clamp-1">
-          {document.filename}
+          {document.ai_title || document.filename}
         </h3>
         <p className="text-sm text-text-muted mb-4">
           {(document.file_size / 1024 / 1024).toFixed(2)} MB &bull;{" "}

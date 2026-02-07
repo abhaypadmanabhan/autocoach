@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, ArrowRight, Check, Clock, Sparkles, AlertCircle, Target, Lock } from "lucide-react";
@@ -50,6 +50,9 @@ function ConfigContent() {
   const { createSession, creating, error: sessionError } = useCreateSession();
   const { showToast } = useToast();
 
+  // Get focus concept from URL if present (from "Quiz this concept" link)
+  const focusConceptIdFromUrl = searchParams.get("focus");
+
   // State
   const [currentStep, setCurrentStep] = useState(0);
   const [studyMode, setStudyMode] = useState<"recommended" | "custom">("recommended");
@@ -58,6 +61,28 @@ function ConfigContent() {
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [questionTypes, setQuestionTypes] = useState<QuestionType[]>(["mcq", "true_false"]);
   const [timerSeconds, setTimerSeconds] = useState<number | null>(null);
+
+  // Track focus concept selection from URL using external store pattern
+  // This avoids setState in effect while properly syncing with URL param
+  const urlFocusConcept = useSyncExternalStore(
+    () => () => {}, // No cleanup needed
+    () => {
+      // Client-side: validate and return focus concept if valid
+      if (!focusConceptIdFromUrl || concepts.length === 0) return null;
+      const valid = concepts.find(c => c.id === focusConceptIdFromUrl);
+      return valid ? focusConceptIdFromUrl : null;
+    },
+    () => null // Server snapshot
+  );
+
+  // Apply URL focus concept to state once on mount/when concepts load
+  useEffect(() => {
+    if (urlFocusConcept && !selectedConceptIds.includes(urlFocusConcept)) {
+      setSelectedConceptIds([urlFocusConcept]);
+      setStudyMode("custom");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlFocusConcept]);
 
   // Auth guard
   useEffect(() => {

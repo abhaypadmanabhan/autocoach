@@ -2,6 +2,7 @@
 
 import { useDocuments } from "@/hooks/useDocuments";
 import { cn } from "@/lib/utils";
+import { groupDocumentsByDate } from "@/lib/date";
 import { FileText, Loader2, Plus, AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -14,9 +15,14 @@ export function DocumentSidebar() {
     const searchParams = useSearchParams();
     const activeDocId = searchParams.get("docId");
 
+    // Sort documents by date first
     const sortedDocuments = [...documents].sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
+
+    // Group documents
+    const groupedDocuments = groupDocumentsByDate(sortedDocuments);
+    const groups = ["Today", "Yesterday", "Previous 7 Days", "Previous 30 Days", "Older"] as const;
 
     const StatusIcon = ({ status }: { status: string }) => {
         switch (status) {
@@ -32,17 +38,15 @@ export function DocumentSidebar() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-surface-darker/50 text-text-primary p-4 gap-4">
-            <div className="flex items-center justify-between px-2">
-                <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
-                    Library
-                </h2>
+        <div className="flex flex-col h-full bg-surface-darker text-text-primary">
+            {/* New Chat / Upload Header */}
+            <div className="p-4">
                 <Link
                     href="/upload"
-                    className="p-1.5 rounded-md hover:bg-surface-border/50 text-text-secondary hover:text-text-primary transition-colors"
-                    title="Upload new document"
+                    className="flex items-center gap-2 w-full p-3 rounded-md border border-surface-border bg-surface-card hover:bg-surface-border/50 text-text-primary transition-colors text-sm font-medium"
                 >
-                    <Plus size={16} />
+                    <Plus size={16} className="text-brand-primary" />
+                    <span>New Document</span>
                 </Link>
             </div>
 
@@ -53,95 +57,75 @@ export function DocumentSidebar() {
             )}
 
             {error && (
-                <div className="bg-semantic-error/10 text-semantic-error text-sm p-3 rounded-md flex items-start gap-2">
+                <div className="mx-4 bg-semantic-error/10 text-semantic-error text-sm p-3 rounded-md flex items-start gap-2">
                     <AlertCircle size={16} className="mt-0.5 shrink-0" />
                     <span>Failed to load documents</span>
                 </div>
             )}
 
             {!isLoading && !error && (
-                <div className="flex flex-col gap-2 overflow-y-auto flex-1 -mx-2 px-2 scrollbar-thin scrollbar-thumb-surface-border scrollbar-track-transparent">
+                <div className="flex-1 overflow-y-auto px-2 pb-4 scrollbar-thin scrollbar-thumb-surface-border scrollbar-track-transparent">
                     {sortedDocuments.length === 0 ? (
                         <div className="text-center py-8 px-4">
                             <p className="text-text-muted text-sm mb-4">No documents yet.</p>
-                            <Link
-                                href="/upload"
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-brand-primary/10 text-brand-primary text-sm font-medium hover:bg-brand-primary/20 transition-colors"
-                            >
-                                Start Learning
-                            </Link>
                         </div>
                     ) : (
-                        sortedDocuments.map((doc) => {
-                            const isActive = activeDocId === doc.id;
+                        <div className="space-y-6">
+                            {groups.map((group) => {
+                                const groupDocs = groupedDocuments[group];
+                                if (!groupDocs || groupDocs.length === 0) return null;
 
-                            return (
-                                <Link
-                                    key={doc.id}
-                                    href={`/dashboard?docId=${doc.id}`}
-                                    className={cn(
-                                        "group flex flex-col gap-2 p-3 rounded-lg transition-all border border-transparent",
-                                        isActive
-                                            ? "bg-brand-primary/10 border-brand-primary/20 shadow-sm"
-                                            : "hover:bg-surface-card/50 hover:border-surface-border/50"
-                                    )}
-                                >
-                                    <div className="flex items-start gap-3">
-                                        <div className={cn(
-                                            "mt-0.5 p-1.5 rounded-md",
-                                            isActive ? "bg-brand-primary/20 text-brand-primary" : "bg-surface-card text-text-muted group-hover:text-text-secondary"
-                                        )}>
-                                            <FileText size={16} />
-                                        </div>
+                                return (
+                                    <div key={group} className="space-y-1">
+                                        <h3 className="px-3 text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+                                            {group}
+                                        </h3>
+                                        <div className="space-y-0.5">
+                                            {groupDocs.map((doc) => {
+                                                const isActive = activeDocId === doc.id;
 
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between gap-2 mb-1">
-                                                <h3 className={cn(
-                                                    "text-sm font-medium truncate",
-                                                    isActive ? "text-brand-primary" : "text-text-primary"
-                                                )}>
-                                                    {doc.ai_title || doc.filename}
-                                                </h3>
-                                                <StatusIcon status={doc.status} />
-                                            </div>
+                                                return (
+                                                    <Link
+                                                        key={doc.id}
+                                                        href={`/dashboard?docId=${doc.id}`}
+                                                        className={cn(
+                                                            "group flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm",
+                                                            isActive
+                                                                ? "bg-surface-card text-text-primary"
+                                                                : "text-text-muted hover:bg-surface-card/50 hover:text-text-secondary"
+                                                        )}
+                                                        title={doc.ai_title || doc.filename}
+                                                    >
+                                                        <FileText size={14} className={cn(
+                                                            "shrink-0",
+                                                            isActive ? "text-brand-primary" : "text-text-muted group-hover:text-text-secondary"
+                                                        )} />
 
-                                            {doc.status === "ready" && (
-                                                <div className="space-y-1">
-                                                    <div className="flex items-center justify-between text-[10px] text-text-muted uppercase tracking-wider font-semibold">
-                                                        <span>Mastery</span>
-                                                        <span>{Math.round(doc.progress || 0)}%</span>
-                                                    </div>
-                                                    <Progress value={doc.progress || 0} className="h-1 bg-surface-border/30" />
-                                                </div>
-                                            )}
+                                                        <span className="truncate flex-1">
+                                                            {doc.ai_title || doc.filename}
+                                                        </span>
 
-                                            {doc.status === "processing" && (
-                                                <span className="text-xs text-brand-primary flex items-center gap-1.5">
-                                                    <span className="w-1 h-1 rounded-full bg-brand-primary animate-pulse" />
-                                                    Processing...
-                                                </span>
-                                            )}
-
-                                            {doc.status === "failed" && (
-                                                <span className="text-xs text-semantic-error">
-                                                    Processing failed
-                                                </span>
-                                            )}
+                                                        {doc.status !== "ready" && (
+                                                            <div className="shrink-0">
+                                                                <StatusIcon status={doc.status} />
+                                                            </div>
+                                                        )}
+                                                    </Link>
+                                                );
+                                            })}
                                         </div>
                                     </div>
-                                </Link>
-                            );
-                        })
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
             )}
 
-            {/* Footer / User Tip */}
-            <div className="pt-4 border-t border-surface-border/30">
-                <div className="p-3 rounded-lg bg-surface-card/30 border border-surface-border/30">
-                    <p className="text-xs text-text-muted">
-                        <strong className="text-text-secondary">Tip:</strong> Select a document to view detailed concepts and start targeted quizzes.
-                    </p>
+            {/* Footer */}
+            <div className="p-4 border-t border-surface-border/30">
+                <div className="flex items-center gap-3 px-2 py-2 text-xs text-text-muted">
+                    {/* User profile or settings link could go here */}
                 </div>
             </div>
         </div>
