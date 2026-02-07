@@ -175,47 +175,128 @@ export function MascotGuide({ className, enabled = true }: MascotGuideProps) {
   );
 }
 
-// Hero-specific mascot with larger presence
+// Hero-specific mascot with larger presence and dynamic emotions
 export function HeroMascot({ className }: { className?: string }) {
+  // Cycle through emotions
+  const emotions: Array<"neutral" | "thinking" | "success" | "wrong"> = [
+    "success",
+    "thinking", 
+    "neutral",
+    "success",
+    "wrong",
+    "thinking",
+  ];
+  
+  const [currentEmotion, setCurrentEmotion] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+
+  // Auto-cycle emotions every 3 seconds
+  useEffect(() => {
+    if (isHovering) return; // Pause on hover
+    
+    const interval = setInterval(() => {
+      setCurrentEmotion((prev) => (prev + 1) % emotions.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [isHovering, emotions.length]);
+
   return (
     <motion.div
       className={cn("relative", className)}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
       {/* Glow rings */}
       <motion.div
         className="absolute inset-0 bg-[var(--brand-primary)] opacity-10 blur-3xl rounded-full scale-150"
-        animate={{ scale: [1.5, 1.7, 1.5], opacity: [0.1, 0.15, 0.1] }}
+        animate={{ 
+          scale: [1.5, 1.7, 1.5], 
+          opacity: [0.1, 0.2, 0.1],
+        }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
       />
       
+      {/* Secondary glow */}
+      <motion.div
+        className="absolute inset-0 bg-[var(--brand-secondary)] opacity-10 blur-2xl rounded-full"
+        animate={{ 
+          scale: [1.3, 1.5, 1.3], 
+          opacity: [0.08, 0.15, 0.08],
+        }}
+        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+      />
+      
       {/* Main mascot container */}
-      <div className="relative w-32 h-32 lg:w-40 lg:h-40 xl:w-48 xl:h-48">
-        <SentinelMascot variant="success" className="w-full h-full" />
+      <div className="relative w-36 h-36 lg:w-48 lg:h-48 xl:w-56 xl:h-56">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentEmotion}
+            initial={{ opacity: 0, scale: 0.9, rotate: -5 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={{ opacity: 0, scale: 0.9, rotate: 5 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full h-full"
+          >
+            <SentinelMascot variant={emotions[currentEmotion]} className="w-full h-full" />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Hover hint */}
+        {isHovering && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-[var(--surface-card)] px-3 py-1 rounded-full text-xs text-[var(--text-secondary)] whitespace-nowrap border border-[var(--surface-border)]"
+          >
+            I&apos;m {emotions[currentEmotion]}!
+          </motion.div>
+        )}
       </div>
 
       {/* Floating particles */}
-      {[...Array(3)].map((_, i) => (
+      {[...Array(5)].map((_, i) => (
         <motion.div
           key={i}
           className="absolute w-2 h-2 rounded-full bg-[var(--brand-primary)]"
           style={{
-            top: `${20 + i * 30}%`,
-            left: i % 2 === 0 ? "-10%" : "110%",
+            top: `${15 + i * 18}%`,
+            left: i % 2 === 0 ? "-15%" : "115%",
           }}
           animate={{
-            y: [-10, 10, -10],
-            opacity: [0.3, 0.8, 0.3],
+            y: [-15, 15, -15],
+            opacity: [0.2, 0.8, 0.2],
+            scale: [0.8, 1.2, 0.8],
           }}
           transition={{
-            duration: 2 + i * 0.5,
+            duration: 2 + i * 0.4,
             repeat: Infinity,
             delay: i * 0.3,
+            ease: "easeInOut",
           }}
         />
       ))}
+
+      {/* Emotion indicator dots */}
+      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5">
+        {emotions.map((_, i) => (
+          <motion.div
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-[var(--surface-border)]"
+            animate={{
+              backgroundColor: i === currentEmotion 
+                ? "var(--brand-primary)" 
+                : "var(--surface-border)",
+              scale: i === currentEmotion ? 1.3 : 1,
+            }}
+            transition={{ duration: 0.3 }}
+          />
+        ))}
+      </div>
     </motion.div>
   );
 }

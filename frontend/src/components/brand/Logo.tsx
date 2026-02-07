@@ -17,10 +17,11 @@ const MASCOT_HEAD_PATH = "M1006.98 666.764C1120.11 308.446 1605.94 269.517 1779.
 const LEFT_EYE = { cx: 1250, cy: 750, r: 40 };
 const RIGHT_EYE = { cx: 1566, cy: 750, r: 40 };
 
+// Increased mascot sizes for better visibility
 const sizes = {
-  sm: { mascot: "w-8 h-8", text: "text-xl", gap: "gap-2" },
-  md: { mascot: "w-10 h-10", text: "text-2xl", gap: "gap-2.5" },
-  lg: { mascot: "w-14 h-14", text: "text-3xl", gap: "gap-3" },
+  sm: { mascot: "w-10 h-10", text: "text-xl", gap: "gap-2.5" },
+  md: { mascot: "w-14 h-14", text: "text-2xl", gap: "gap-3" },
+  lg: { mascot: "w-20 h-20", text: "text-3xl", gap: "gap-4" },
 };
 
 export function Logo({ className, size = "md", showText = true, animated = true }: LogoProps) {
@@ -101,9 +102,9 @@ export function Logo({ className, size = "md", showText = true, animated = true 
 // Full logo with wordmark for hero/landing sections
 export function LogoFull({ className, size = "lg" }: { className?: string; size?: "md" | "lg" | "xl" }) {
   const sizeClasses = {
-    md: { mascot: "w-16 h-16", text: "text-4xl", subtext: "text-sm" },
-    lg: { mascot: "w-20 h-20", text: "text-5xl", subtext: "text-base" },
-    xl: { mascot: "w-28 h-28", text: "text-6xl", subtext: "text-lg" },
+    md: { mascot: "w-20 h-20", text: "text-4xl", subtext: "text-sm" },
+    lg: { mascot: "w-28 h-28", text: "text-5xl", subtext: "text-base" },
+    xl: { mascot: "w-36 h-36", text: "text-6xl", subtext: "text-lg" },
   }[size];
 
   return (

@@ -36,6 +36,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
+// Animated backgrounds
+import { 
+  HeroBackground, 
+  SectionBackground,
+  AnimatedBorder,
+  FloatingOrbs,
+  ParticleField 
+} from "@/components/ui/animated-background";
+
 // Brand components
 import { Logo } from "@/components/brand/Logo";
 import { HeroMascot, FeatureMascot, MascotGuide } from "@/components/brand/MascotGuide";
@@ -213,29 +222,10 @@ function HeroSection() {
   return (
     <section 
       ref={containerRef}
-      className="relative min-h-screen pt-24 lg:pt-32 pb-16 lg:pb-24 overflow-hidden gradient-mesh noise-bg"
+      className="relative min-h-screen pt-24 lg:pt-32 pb-16 lg:pb-24 overflow-hidden"
     >
-      {/* Floating decorative shapes */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-20 left-10 w-64 h-64 bg-[var(--brand-primary)]/10 rounded-full blur-3xl"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1 }}
-        />
-        <motion.div
-          className="absolute top-40 right-20 w-48 h-48 bg-[var(--brand-secondary)]/10 rounded-full blur-3xl"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.2 }}
-        />
-        <motion.div
-          className="absolute bottom-20 left-1/3 w-56 h-56 bg-[var(--brand-primary)]/5 rounded-full blur-3xl"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 1, delay: 0.4 }}
-        />
-      </div>
+      {/* Animated Background */}
+      <HeroBackground />
 
       <motion.div 
         className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8"
@@ -506,7 +496,10 @@ function FeaturesSection() {
   ];
 
   return (
-    <section id="features" className="section-padding bg-[var(--surface-dark)] noise-bg relative" ref={ref}>
+    <section id="features" className="section-padding relative" ref={ref}>
+      {/* Animated Background */}
+      <SectionBackground variant="default" />
+      
       {/* Mascot decoration */}
       <div className="absolute top-20 right-10 opacity-30 pointer-events-none hidden lg:block">
         <FeatureMascot variant="thinking" />
@@ -600,9 +593,11 @@ function HowItWorksSection() {
   return (
     <section
       id="how-it-works"
-      className="section-padding bg-gradient-to-b from-[var(--surface-dark)] to-[var(--surface-darker)]"
+      className="section-padding relative"
       ref={ref}
     >
+      {/* Animated Background */}
+      <SectionBackground variant="gradient" />
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -692,14 +687,11 @@ function DemoSection() {
   return (
     <section
       id="demo"
-      className="section-padding bg-[var(--surface-darker)] relative overflow-hidden"
+      className="section-padding relative overflow-hidden"
       ref={ref}
     >
-      {/* Background decorations */}
-      <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-20 left-10 w-64 h-64 bg-[var(--brand-primary)] rounded-full blur-3xl" />
-        <div className="absolute bottom-20 right-10 w-48 h-48 bg-[var(--brand-secondary)] rounded-full blur-3xl" />
-      </div>
+      {/* Animated Background */}
+      <SectionBackground variant="mesh" />
 
       {/* Mascot peeking from corner */}
       <motion.div
@@ -1017,7 +1009,9 @@ function TestimonialsSection() {
   ];
 
   return (
-    <section id="testimonials" className="section-padding bg-[var(--surface-dark)]" ref={ref}>
+    <section id="testimonials" className="section-padding relative" ref={ref}>
+      {/* Animated Background */}
+      <SectionBackground variant="default" />
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1119,7 +1113,9 @@ function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="section-padding bg-[var(--surface-darker)]" ref={ref}>
+    <section id="pricing" className="section-padding relative" ref={ref}>
+      {/* Animated Background */}
+      <SectionBackground variant="mesh" />
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1281,7 +1277,9 @@ function FAQSection() {
   ];
 
   return (
-    <section className="section-padding bg-[var(--surface-dark)]" ref={ref}>
+    <section className="section-padding relative" ref={ref}>
+      {/* Animated Background */}
+      <SectionBackground variant="default" />
       <div className="mx-auto max-w-[800px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -1355,14 +1353,8 @@ function FinalCTASection() {
       className="section-padding relative overflow-hidden"
       ref={ref}
     >
-      {/* Gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[var(--brand-primary)]/10 via-[var(--surface-dark)] to-[var(--brand-secondary)]/10" />
-
-      {/* Floating shapes */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-10 left-10 w-32 h-32 bg-[var(--brand-primary)]/10 rounded-full blur-2xl float-slow" />
-        <div className="absolute bottom-10 right-10 w-40 h-40 bg-[var(--brand-secondary)]/10 rounded-full blur-2xl float-medium" />
-      </div>
+      {/* Animated Background */}
+      <SectionBackground variant="gradient" />
 
       {/* Mascot in corner */}
       <motion.div
