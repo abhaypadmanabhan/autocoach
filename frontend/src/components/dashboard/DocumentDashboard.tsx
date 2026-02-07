@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSWRConfig } from "swr";
+import { mutate } from "swr";
 
 import { useDocument } from "@/hooks/useDocuments";
 import { useDocumentConcepts } from "@/hooks/useConcepts";
@@ -23,11 +25,16 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const { document, loading: documentLoading, error: documentError } = useDocument(documentId);
     const { concepts, loading: conceptsLoading, error: conceptsError, refetch } = useDocumentConcepts(documentId);
 
-    // Auto-refresh concepts when document becomes ready
+    // Auto-refresh concepts AND sidebar list when document becomes ready
     useEffect(() => {
-        if (document?.status === "ready" && concepts.length === 0) {
-            console.log("Document ready but no concepts, triggering refetch...");
-            refetch();
+        if (document?.status === "ready") {
+            // Refresh sidebar list to show specific AI title
+            mutate("/documents/");
+
+            if (concepts.length === 0) {
+                console.log("Document ready but no concepts, triggering refetch...");
+                refetch();
+            }
         }
     }, [document?.status, concepts.length, refetch]);
 

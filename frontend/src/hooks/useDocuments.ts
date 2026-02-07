@@ -18,6 +18,14 @@ export function useDocuments() {
       dedupingInterval: 5000,
       shouldRetryOnError: false,
       errorRetryCount: 1,
+      // Poll if any document is processing so titles update automatically
+      refreshInterval: (data) => {
+        if (!data?.documents) return 0;
+        const hasProcessing = data.documents.some(
+          (d) => d.status === "processing" || d.status === "pending"
+        );
+        return hasProcessing ? 2000 : 0;
+      },
     }
   );
 
