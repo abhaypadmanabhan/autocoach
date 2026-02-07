@@ -55,7 +55,11 @@ def get_document_concepts(document_id: str, user_id: str) -> list[dict]:
         logger.info(f"[concepts] No concepts found for document_id={document_id}, returning empty list")
         return []
     
-    concept_ids = [c["id"] for c in concepts]
+    # Debug: Log keys in first row to verify column names
+    if concepts:
+        logger.info(f"[concepts] Keys in first row: {list(concepts[0].keys())}")
+    
+    concept_ids = [c.get("id") for c in concepts if c.get("id")]
     logger.info(f"[concepts] Concept IDs found: {concept_ids}")
     
     # Step 2: Fetch user mastery for these concepts (join simulation)
@@ -90,18 +94,18 @@ def get_document_concepts(document_id: str, user_id: str) -> list[dict]:
     logger.info(f"[concepts] Step 3: Merging {len(concepts)} concepts with {len(mastery_map)} mastery records")
     result = []
     for c in concepts:
-        m = mastery_map.get(c["id"], {})
+        m = mastery_map.get(c.get("id"), {})
         imp_score = c.get("importance_score", 0.0)
         is_core = imp_score >= 0.6
         
         result.append({
-            "id": c["id"],
-            "concept_name": c["name"],
-            "concept_description": c.get("description"),
+            "id": c.get("id"),
+            "concept_name": c.get("concept_name", "Unnamed Concept"),
+            "concept_description": c.get("concept_description"),
             "importance_score": imp_score,
             "is_core": is_core,
             "parent_concept_id": c.get("parent_concept_id"),
-            "created_at": c["created_at"],
+            "created_at": c.get("created_at"),
             "mastery_score": m.get("mastery_score", 0.0) if m else 0.0,
             "times_tested": m.get("times_tested", 0) if m else 0,
             "times_correct": m.get("times_correct", 0) if m else 0,

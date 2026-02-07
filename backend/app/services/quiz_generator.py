@@ -74,7 +74,7 @@ def generate_quiz_questions(
         query = "Generate quiz questions covering key concepts"
         target_names = []
         if target_concepts:
-            target_names = [c["name"] for c in target_concepts]
+            target_names = [c.get("concept_name", "Unnamed") for c in target_concepts]
             concepts_str = ", ".join(target_names)
             query = f"Generate quiz questions about: {concepts_str}"
             
@@ -103,11 +103,12 @@ def generate_quiz_questions(
         if target_concepts:
             focus_details = []
             for c in target_concepts:
-                desc = c.get("description", "")
+                name = c.get("concept_name", "Unnamed")
+                desc = c.get("concept_description", "")
                 if desc:
-                    focus_details.append(f"- {c['name']}: {desc}")
+                    focus_details.append(f"- {name}: {desc}")
                 else:
-                    focus_details.append(f"- {c['name']}")
+                    focus_details.append(f"- {name}")
             
             focus_block = "\n".join(focus_details)
             focus_instruction = f"\nFOCUS: Create questions specifically testing these concepts:\n{focus_block}"

@@ -448,6 +448,7 @@ async def get_document_concepts_endpoint(
         logger.info(f"[documents/concepts] Document verified, calling service: document_id={document_id}, user_id={user_id}")
         concepts = get_document_concepts(str(document_id), str(user_id))
         logger.info(f"[documents/concepts] Service returned {len(concepts)} concepts for document {document_id}")
+        logger.info(f"[documents/concepts] First concept keys={list(concepts[0].keys()) if concepts else 'EMPTY'}")
         
         return DocumentConceptsResponse(
             document_id=document_id,

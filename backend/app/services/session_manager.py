@@ -194,7 +194,7 @@ def create_session(
                     raise ValueError(f"Concept ID {cid} not found in this document")
 
             logger.info(
-                f"Targeting requested concepts: {[c['name'] for c in target_concepts_list]}"
+                f"Targeting requested concepts: {[c.get('name') or c.get('concept_name') or 'Unnamed' for c in target_concepts_list]}"
             )
 
         else:
@@ -221,7 +221,7 @@ def create_session(
                 for c in selected_candidates
             ]
             logger.info(
-                f"Auto-selected target concepts: {[c['name'] for c in target_concepts_list]}"
+                f"Auto-selected target concepts: {[c.get('name') or c.get('concept_name') or 'Unnamed' for c in target_concepts_list]}"
             )
 
         # Target Concept IDs are derived from the same source, but we need to map names back if we want to
