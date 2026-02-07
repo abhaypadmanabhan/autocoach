@@ -76,6 +76,20 @@ export interface QuizSessionCreateRequest {
   num_questions: number;
   difficulty: Difficulty;
   question_types: QuestionType[];
+  focus_concept_ids?: string[];
+}
+
+export interface Concept {
+  id: string;
+  concept_name: string;
+  concept_description: string;
+  importance_score: number;
+  mastery_score: number | null;
+  is_core: boolean;
+}
+
+export interface DocumentConceptsResponse {
+  concepts: Concept[];
 }
 
 export interface AnswerResult {
