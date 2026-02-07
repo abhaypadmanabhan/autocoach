@@ -12,6 +12,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
 import { ErrorBanner, Skeleton } from "@/components/ui/Skeleton";
+import { ErrorCard } from "@/components/ui/ErrorCard";
 import { SetupStepper, StepContent } from "@/components/quiz/SetupStepper";
 import { OptionPill, DifficultyCard, OptionPillGrid } from "@/components/ui/OptionPill";
 import { DiamondButton } from "@/components/ui/DiamondButton";
@@ -46,7 +47,7 @@ function ConfigContent() {
   const searchParams = useSearchParams();
   const documentId = searchParams.get("document_id");
   const { document, loading: docLoading, error: docError } = useDocument(documentId);
-  const { concepts, loading: conceptsLoading } = useDocumentConcepts(documentId);
+  const { concepts, isLoading: conceptsLoading, error: conceptsError, refetch: refetchConcepts } = useDocumentConcepts(documentId);
   const { createSession, creating, error: sessionError } = useCreateSession();
   const { showToast } = useToast();
 
@@ -338,6 +339,12 @@ function ConfigContent() {
                                   <Skeleton className="h-14 w-full rounded-lg" />
                                   <Skeleton className="h-14 w-full rounded-lg" />
                                 </div>
+                              ) : conceptsError ? (
+                                <ErrorCard 
+                                  error={conceptsError}
+                                  onRetry={() => refetchConcepts()}
+                                  className="my-4"
+                                />
                               ) : concepts.length === 0 ? (
                                 <div className="text-center py-8 text-text-muted bg-surface-tertiary/30 rounded-lg border border-dashed border-surface-border">
                                   No concepts found for this document.

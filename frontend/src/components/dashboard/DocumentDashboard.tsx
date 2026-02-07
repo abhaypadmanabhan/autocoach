@@ -23,7 +23,7 @@ interface DocumentDashboardProps {
 
 export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const { document, loading: documentLoading, error: documentError } = useDocument(documentId);
-    const { concepts, loading: conceptsLoading, error: conceptsError, refetch } = useDocumentConcepts(documentId);
+    const { concepts, isLoading: conceptsLoading, error: conceptsError, refetch } = useDocumentConcepts(documentId);
 
     // Auto-refresh concepts AND sidebar list when document becomes ready
     useEffect(() => {

@@ -426,11 +426,13 @@ async def get_document_concepts_endpoint(
         
     Raises:
         HTTPException: 404 if document not found.
+        HTTPException: 500 if query fails.
     """
+    logger.info(f"[documents/concepts] Route called: document_id={document_id}, resolved user_id={user_id}")
+    
     try:
-        logger.info(f"Fetching concepts for document {document_id}, user {user_id}")
-        
         # Verify document existence/ownership (light check)
+        logger.info(f"[documents/concepts] Verifying document ownership: document_id={document_id}, user_id={user_id}")
         doc_response = (
             supabase_admin.table("documents")
             .select("id")
@@ -440,20 +442,22 @@ async def get_document_concepts_endpoint(
         )
         
         if not doc_response.data:
-            logger.warning(f"Document {document_id} not found for user {user_id}")
+            logger.warning(f"[documents/concepts] Document {document_id} not found for user {user_id}")
             raise HTTPException(status_code=404, detail="Document not found")
-            
+        
+        logger.info(f"[documents/concepts] Document verified, calling service: document_id={document_id}, user_id={user_id}")
         concepts = get_document_concepts(str(document_id), str(user_id))
-        logger.info(f"Found {len(concepts)} concepts for document {document_id}")
+        logger.info(f"[documents/concepts] Service returned {len(concepts)} concepts for document {document_id}")
         
         return DocumentConceptsResponse(
             document_id=document_id,
             concepts=[ConceptSchema(**c) for c in concepts]
         )
     except HTTPException:
+        # Re-raise HTTP exceptions (404, 500 from service, etc.)
         raise
     except Exception as e:
-        logger.error(f"Failed to get document concepts: {e}")
+        logger.error(f"[documents/concepts] Unexpected error: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get document concepts: {str(e)}"
         )

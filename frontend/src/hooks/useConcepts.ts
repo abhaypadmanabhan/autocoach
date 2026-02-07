@@ -8,9 +8,7 @@ export function useDocumentConcepts(documentId: string | null) {
     const { data, error, isLoading, mutate } = useSWR<DocumentConceptsResponse>(
         documentId ? `/documents/${documentId}/concepts` : null,
         async () => {
-            console.log(`[useConcepts] Fetching concepts for document: ${documentId}`);
             const response = await apiFetch<DocumentConceptsResponse>(`/documents/${documentId}/concepts`, { cache: "no-store" });
-            console.log(`[useConcepts] Received ${response.concepts?.length ?? 0} concepts`, response);
             return response;
         },
         {
@@ -21,12 +19,15 @@ export function useDocumentConcepts(documentId: string | null) {
         }
     );
 
+    // Log error once when it occurs
+    if (error) {
+        console.error("[useDocumentConcepts] Failed to fetch concepts:", error);
+    }
+
     return {
         concepts: data?.concepts ?? [],
         isLoading,
-        error: error?.message ?? null,
-        mutate,
-        loading: isLoading,
+        error: error ?? null,
         refetch: mutate,
     };
 }
