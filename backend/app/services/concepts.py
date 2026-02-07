@@ -17,6 +17,8 @@ def get_document_concepts(document_id: str, user_id: str) -> list[dict]:
         List of concept dictionaries with mastery data.
     """
     try:
+        logger.info(f"[concepts] Querying concepts for document_id={document_id}")
+        
         # 1. Fetch all concepts for this document
         concepts_response = (
             supabase_admin.table("concepts")
@@ -27,6 +29,8 @@ def get_document_concepts(document_id: str, user_id: str) -> list[dict]:
         )
         
         concepts = concepts_response.data or []
+        logger.info(f"[concepts] Found {len(concepts)} raw concepts in DB for document_id={document_id}")
+        
         if not concepts:
             return []
             

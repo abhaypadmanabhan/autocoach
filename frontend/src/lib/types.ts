@@ -84,9 +84,9 @@ export interface QuizSessionCreateRequest {
 export interface Concept {
   id: string;
   concept_name: string;
-  concept_description: string;
+  concept_description: string | null;
   importance_score: number;
-  mastery_score: number | null;
+  mastery_score: number;
   is_core: boolean;
 }
 

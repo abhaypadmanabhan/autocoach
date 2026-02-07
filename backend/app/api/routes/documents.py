@@ -428,6 +428,8 @@ async def get_document_concepts_endpoint(
         HTTPException: 404 if document not found.
     """
     try:
+        logger.info(f"Fetching concepts for document {document_id}, user {user_id}")
+        
         # Verify document existence/ownership (light check)
         doc_response = (
             supabase_admin.table("documents")
@@ -438,9 +440,11 @@ async def get_document_concepts_endpoint(
         )
         
         if not doc_response.data:
+            logger.warning(f"Document {document_id} not found for user {user_id}")
             raise HTTPException(status_code=404, detail="Document not found")
             
         concepts = get_document_concepts(str(document_id), str(user_id))
+        logger.info(f"Found {len(concepts)} concepts for document {document_id}")
         
         return DocumentConceptsResponse(
             document_id=document_id,

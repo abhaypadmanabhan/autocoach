@@ -62,14 +62,10 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const masteredConcepts = concepts.filter(c => (c.mastery_score || 0) >= 80);
     const totalMastery = document.progress || 0;
 
-    // Debugging
-    console.log("DocumentDashboard render:", {
-        docId: documentId,
-        conceptsCount: concepts.length,
-        conceptsLoading,
-        conceptsError,
-        mappedConcepts: concepts
-    });
+    // Debug logging for concept loading issues
+    if (conceptsError) {
+        console.error("[DocumentDashboard] Concepts error:", conceptsError);
+    }
 
     return (
         <div className="p-6 md:p-8 space-y-8 max-w-5xl mx-auto pb-20">
