@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { overlayVariants, slideUpItem } from "@/lib/motions";
-import { SentinelMascot } from "@/components/brand/SentinelMascot";
+import { MascotStage } from "@/components/brand/MascotStage";
 
 const STUDY_TIPS = [
   "Taking breaks improves retention",
@@ -44,9 +44,9 @@ function LoadingOverlayContent({ message }: { message?: string }) {
       exit="exit"
       className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-surface-dark/95 backdrop-blur-sm"
     >
-      {/* Sentinel Mascot */}
-      <div className="mb-6">
-        <SentinelMascot variant="thinking" className="w-16 h-16" />
+      {/* Sentinel Mascot Stage */}
+      <div className="mb-4">
+        <MascotStage mode="loading" isLoading />
       </div>
 
       {/* Message or Rotating Tips */}

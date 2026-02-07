@@ -32,3 +32,25 @@ interface SentinelMascotProps {
 2. Set appropriate variant based on UI state
 3. Use standard sizes from ui-lock.md
 4. Let component handle all animations internally
+
+## MascotStage Component (Preferred)
+For consistent mascot + guidance copy, use MascotStage:
+```tsx
+import { MascotStage } from "@/components/brand/MascotStage";
+
+<MascotStage mode="dashboard" />
+<MascotStage mode="loading" isLoading />
+<MascotStage mode="quiz" answerState="idle" />
+<MascotStage mode="results" scorePercent={85} />
+```
+
+## useMascotManager Hook
+For custom implementations, use the hook directly:
+```tsx
+import { useMascotManager } from "@/hooks/useMascotManager";
+
+const { variant, message, sizeClass } = useMascotManager({
+  mode: "quiz",
+  answerState: "correct"
+});
+```

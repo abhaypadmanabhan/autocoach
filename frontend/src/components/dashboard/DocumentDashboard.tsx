@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { ConceptList } from "@/components/dashboard/ConceptList";
 import { DashboardSkeleton } from "@/components/features/dashboard/DashboardSkeleton";
 import { ErrorCard } from "@/components/ui/ErrorCard";
-import { SentinelMascot } from "@/components/brand/SentinelMascot";
+import { MascotStage } from "@/components/brand/MascotStage";
 
 interface DocumentDashboardProps {
     documentId: string;
@@ -90,7 +90,7 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                         <h1 className="text-3xl md:text-4xl font-serif text-text-primary font-medium">
                             {document.ai_title || document.filename}
                         </h1>
-                        <SentinelMascot variant="neutral" className="w-10 h-10" />
+                        <MascotStage mode="dashboard" />
                     </div>
                     <div className="flex items-center gap-4 text-text-secondary text-sm">
                         <span>{concepts.length} Concepts Found</span>

@@ -43,9 +43,20 @@ import { SentinelMascot } from "@/components/brand/SentinelMascot";
 - **Copy**: One short line next to mascot, minimal and friendly
 
 ## Standard Sizes
-- `sm`: w-8 h-8 (subtle, inline)
-- `md`: w-12 h-12 (standard)
-- `lg`: w-16 h-16 (loading/hero)
+- `sm`: w-16 h-16 (subtle)
+- `md`: w-24 h-24 (standard)
+- `lg`: w-32 h-32 (hero/loading)
+
+## Default Placements by Mode
+- **dashboard header**: md (w-24 h-24)
+- **loading overlay**: lg (w-32 h-32)
+- **quiz coach strip**: md (w-24 h-24)
+- **results header**: md (w-24 h-24)
+
+## Copy Rule
+- Maximum 1 short line of guidance text
+- Calm, premium tone
+- Examples: "Ready when you are.", "Nice. Locking that in."
 
 ## Theming
 - Head fill uses muted `var(--brand-secondary)` at 85% opacity
