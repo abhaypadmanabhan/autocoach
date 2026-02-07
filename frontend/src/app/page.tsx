@@ -37,18 +37,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 // Animated backgrounds
-import { 
-  HeroBackground, 
-  SectionBackground,
-  AnimatedBorder,
-  FloatingOrbs,
-  ParticleField 
-} from "@/components/ui/animated-background";
+import { HeroBackground, SectionBackground } from "@/components/ui/animated-background";
 
 // Brand components
-import { Logo } from "@/components/brand/Logo";
-import { HeroMascot, FeatureMascot, MascotGuide } from "@/components/brand/MascotGuide";
-import { SentinelMascot } from "@/components/brand/SentinelMascot";
+import { Logo, LogoFull } from "@/components/brand/Logo";
+import { HeroMascot, MascotGuide } from "@/components/brand/MascotGuide";
 import { cn } from "@/lib/utils";
 
 // ============================================
@@ -453,42 +446,36 @@ function FeaturesSection() {
   const features = [
     {
       icon: Brain,
-      mascotVariant: "thinking" as const,
       title: "AI-Powered Quiz Generation",
       description:
         "Advanced AI analyzes your documents and creates relevant, challenging questions tailored to the content.",
     },
     {
       icon: FileText,
-      mascotVariant: "neutral" as const,
       title: "Multiple Question Types",
       description:
         "Support for MCQ, True/False, and Free Text questions to test different levels of understanding.",
     },
     {
       icon: CheckCircle,
-      mascotVariant: "success" as const,
       title: "Smart Answer Evaluation",
       description:
         "AI evaluates free-text responses for semantic correctness, not just exact matches.",
     },
     {
       icon: BarChart3,
-      mascotVariant: "neutral" as const,
       title: "Progress Tracking",
       description:
         "Track your learning journey with detailed analytics on performance and areas for improvement.",
     },
     {
       icon: FileUp,
-      mascotVariant: "thinking" as const,
       title: "Document Processing",
       description:
         "Upload PDFs and PowerPoint files. Our system extracts and processes content automatically.",
     },
     {
       icon: Zap,
-      mascotVariant: "success" as const,
       title: "Adaptive Learning",
       description:
         "The system adapts to your performance, focusing on areas where you need more practice.",
@@ -499,11 +486,6 @@ function FeaturesSection() {
     <section id="features" className="section-padding relative" ref={ref}>
       {/* Animated Background */}
       <SectionBackground variant="default" />
-      
-      {/* Mascot decoration */}
-      <div className="absolute top-20 right-10 opacity-30 pointer-events-none hidden lg:block">
-        <FeatureMascot variant="thinking" />
-      </div>
 
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
         <motion.div
@@ -531,15 +513,10 @@ function FeaturesSection() {
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.5, delay: i * 0.1 }}
             >
-              <Card className="h-full bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--brand-primary)]/5 group">
+              <Card className="h-full bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--brand-primary)]/5">
                 <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="feature-icon">
-                      <feature.icon size={24} className="text-[var(--brand-primary)]" />
-                    </div>
-                    <div className="w-10 h-10 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <SentinelMascot variant={feature.mascotVariant} className="w-full h-full" />
-                    </div>
+                  <div className="feature-icon">
+                    <feature.icon size={24} className="text-[var(--brand-primary)]" />
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -667,11 +644,11 @@ function DemoSection() {
   const [stage, setStage] = useState(0);
 
   const stages = [
-    { name: "Upload", duration: 3000, mascotVariant: "neutral" as const },
-    { name: "Processing", duration: 2000, mascotVariant: "thinking" as const },
-    { name: "Quiz", duration: 4000, mascotVariant: "thinking" as const },
-    { name: "Answer", duration: 2000, mascotVariant: "neutral" as const },
-    { name: "Feedback", duration: 2000, mascotVariant: "success" as const },
+    { name: "Upload", duration: 3000 },
+    { name: "Processing", duration: 2000 },
+    { name: "Quiz", duration: 4000 },
+    { name: "Answer", duration: 2000 },
+    { name: "Feedback", duration: 2000 },
   ];
 
   useEffect(() => {
@@ -692,15 +669,6 @@ function DemoSection() {
     >
       {/* Animated Background */}
       <SectionBackground variant="mesh" />
-
-      {/* Mascot peeking from corner */}
-      <motion.div
-        className="absolute bottom-0 right-0 w-32 h-32 opacity-50 hidden lg:block"
-        animate={{ y: stage === 4 ? [0, -10, 0] : 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <SentinelMascot variant={stages[stage].mascotVariant} className="w-full h-full" />
-      </motion.div>
 
       <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
@@ -878,9 +846,9 @@ function DemoSection() {
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: "spring", damping: 10 }}
-                      className="w-20 h-20 mx-auto mb-4"
+                      className="w-20 h-20 mx-auto mb-4 rounded-full bg-[var(--success)]/10 flex items-center justify-center"
                     >
-                      <SentinelMascot variant="success" className="w-full h-full" />
+                      <Check size={40} className="text-[var(--success)]" />
                     </motion.div>
                     <p className="text-xl font-bold text-[var(--success)] mb-2">Correct!</p>
                     <p className="text-[var(--text-secondary)] text-sm mb-4">
@@ -939,15 +907,7 @@ function DemoSection() {
                     {i === 4 && "Get instant feedback and explanations"}
                   </p>
                 </div>
-                {stage === i && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="w-10 h-10 hidden sm:block"
-                  >
-                    <SentinelMascot variant={s.mascotVariant} className="w-full h-full" />
-                  </motion.div>
-                )}
+
               </motion.div>
             ))}
 
@@ -1356,16 +1316,6 @@ function FinalCTASection() {
       {/* Animated Background */}
       <SectionBackground variant="gradient" />
 
-      {/* Mascot in corner */}
-      <motion.div
-        className="absolute bottom-0 left-0 w-40 h-40 opacity-40 hidden lg:block"
-        initial={{ y: 100, opacity: 0 }}
-        animate={isInView ? { y: 0, opacity: 0.4 } : {}}
-        transition={{ duration: 0.8, delay: 0.3 }}
-      >
-        <SentinelMascot variant="success" className="w-full h-full" />
-      </motion.div>
-
       <div className="relative z-10 mx-auto max-w-[800px] px-6 lg:px-8 text-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -1373,15 +1323,6 @@ function FinalCTASection() {
           transition={{ duration: 0.6 }}
           className="flex flex-col items-center"
         >
-          {/* CTA Mascot */}
-          <motion.div
-            className="w-24 h-24 mb-6"
-            animate={{ y: [-4, 4, -4] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-          >
-            <SentinelMascot variant="success" className="w-full h-full" />
-          </motion.div>
-
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-[var(--text-primary)] mb-6 font-heading">
             Start Learning Smarter Today
           </h2>
@@ -1440,7 +1381,7 @@ function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 lg:gap-12 mb-12">
           {/* Brand Column */}
           <div className="col-span-2 md:col-span-3 lg:col-span-1">
-            <Logo size="md" animated={false} className="mb-4" />
+            <LogoFull size="md" className="mb-4" />
             <p className="text-[var(--text-muted)] text-sm mb-6 max-w-xs">
               Transform your documents into interactive learning experiences with
               AI-powered quizzes.
