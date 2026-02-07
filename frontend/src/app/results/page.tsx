@@ -13,6 +13,10 @@ import {
   Target,
   BarChart3,
   ChevronRight,
+  Trophy,
+  Sparkles,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { useSession } from "@/hooks/useQuiz";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -22,7 +26,11 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ScoreCircle, ScoreBreakdown, StatSatellite } from "@/components/results/ScoreCircle";
 import { ReviewList } from "@/components/results/ReviewRow";
 import { MascotStage } from "@/components/brand/MascotStage";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { staggerContainer, slideUpItem, cardLiftVariants } from "@/lib/motions";
+import { cn } from "@/lib/utils";
 
 function ResultsContent() {
   const router = useRouter();
@@ -52,13 +60,10 @@ function ResultsContent() {
     return (
       <PageContainer size="xl">
         <div className="py-8">
-          {/* Skeleton Hero */}
           <Section spacing="sm">
-            <div className="rounded-3xl bg-surface-card border border-surface-border p-8 md:p-12">
+            <div className="rounded-3xl bg-[var(--surface-card)] border border-[var(--surface-border)] p-8 md:p-12">
               <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
-                {/* Score Circle Skeleton */}
                 <Skeleton className="w-40 h-40 rounded-full shrink-0" />
-                {/* Details Skeleton */}
                 <div className="flex-1 text-center md:text-left w-full">
                   <Skeleton className="h-10 w-48 mb-4 mx-auto md:mx-0" />
                   <Skeleton className="h-8 w-32 rounded-full mb-6 mx-auto md:mx-0" />
@@ -71,7 +76,6 @@ function ResultsContent() {
               </div>
             </div>
           </Section>
-          {/* Skeleton Review */}
           <Section>
             <Skeleton className="h-8 w-40 mb-6" />
             <div className="space-y-4">
@@ -92,19 +96,16 @@ function ResultsContent() {
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-4 p-4 rounded-xl bg-semantic-error/10 border border-semantic-error/30 text-semantic-error max-w-md text-center"
+            className="mb-4 p-4 rounded-xl bg-[var(--semantic-error)]/10 border border-[var(--semantic-error)]/30 text-[var(--semantic-error)] max-w-md text-center"
           >
             <AlertCircle className="inline-block mr-2" size={20} />
             {displayError}
           </motion.div>
         )}
-        <p className="text-text-muted">Session not found</p>
-        <Link
-          href="/dashboard"
-          className="mt-4 px-6 py-3 rounded-xl bg-brand-primary text-surface-dark font-semibold hover:bg-brand-primary/90 transition-colors"
-        >
-          Back to Dashboard
-        </Link>
+        <p className="text-[var(--text-muted)]">Session not found</p>
+        <Button asChild className="mt-4">
+          <Link href="/dashboard">Back to Dashboard</Link>
+        </Button>
       </div>
     );
   }
@@ -135,13 +136,14 @@ function ResultsContent() {
   const hasAnyAnswers = total > 0;
 
   const getPerformanceMessage = () => {
-    if (scorePercent >= 80) return { message: "Outstanding! 🎉", color: "#22c55e" };
-    if (scorePercent >= 60) return { message: "Great job! 👏", color: "#c18c5d" };
-    if (scorePercent >= 40) return { message: "Good effort! 💪", color: "#eab308" };
-    return { message: "Keep practicing! 📚", color: "#ef4444" };
+    if (scorePercent >= 80) return { message: "Outstanding! 🎉", color: "#22c55e", icon: Trophy };
+    if (scorePercent >= 60) return { message: "Great job! 👏", color: "#c18c5d", icon: Sparkles };
+    if (scorePercent >= 40) return { message: "Good effort! 💪", color: "#eab308", icon: Target };
+    return { message: "Keep practicing! 📚", color: "#ef4444", icon: BarChart3 };
   };
 
   const performance = getPerformanceMessage();
+  const PerformanceIcon = performance.icon;
 
   return (
     <PageContainer size="xl">
@@ -155,11 +157,11 @@ function ResultsContent() {
         <Section spacing="sm">
           <motion.div
             variants={slideUpItem}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-surface-card to-surface-dark border border-surface-border p-8 md:p-12"
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-darker)] border border-[var(--surface-border)] p-8 md:p-12"
           >
             {/* Background decoration */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-brand-secondary/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--brand-primary)]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[var(--brand-secondary)]/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
             <div className="relative flex flex-col md:flex-row items-center gap-8 md:gap-12">
               {/* Score Circle */}
@@ -171,8 +173,8 @@ function ResultsContent() {
                     size="lg"
                   />
                 ) : (
-                  <div className="relative w-64 h-64 flex items-center justify-center rounded-full bg-surface-card border border-surface-border">
-                    <span className="text-sm text-text-muted uppercase tracking-wider text-center px-6">
+                  <div className="relative w-64 h-64 flex items-center justify-center rounded-full bg-[var(--surface-card)] border border-[var(--surface-border)]">
+                    <span className="text-sm text-[var(--text-muted)] uppercase tracking-wider text-center px-6">
                       No answers recorded
                     </span>
                   </div>
@@ -186,16 +188,17 @@ function ResultsContent() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.5 }}
                 >
-                  <div className="mb-2">
+                  <div className="mb-4">
                     <MascotStage mode="results" scorePercent={scorePercent} />
                   </div>
                   <div
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-6"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
                     style={{
                       backgroundColor: `${performance.color}20`,
                       color: performance.color,
                     }}
                   >
+                    <PerformanceIcon size={18} />
                     {performance.message}
                   </div>
                 </motion.div>
@@ -241,26 +244,31 @@ function ResultsContent() {
         {/* Question Review */}
         <Section>
           <motion.div variants={slideUpItem}>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-surface-card border border-surface-border flex items-center justify-center">
-                <BarChart3 size={20} className="text-brand-primary" />
-              </div>
-              <div>
-                <h2 className="text-h2 font-serif text-text-primary">Question Review</h2>
-                <p className="text-sm text-text-muted">Review your answers</p>
-              </div>
-            </div>
-
-            <ReviewList items={session.questions.map((q, index) => ({
-              question_id: q.question_id,
-              question_number: index + 1,
-              question_text: q.question_text,
-              question_type: q.question_type,
-              user_answer: q.user_answer || "",
-              correct_answer: q.correct_answer,
-              is_correct: q.is_correct ?? false,
-              explanation: q.explanation || undefined,
-            }))} />
+            <Card className="bg-[var(--surface-card)] border-[var(--surface-border)]">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--surface-darker)] border border-[var(--surface-border)] flex items-center justify-center">
+                    <BarChart3 size={20} className="text-[var(--brand-primary)]" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-heading">Question Review</CardTitle>
+                    <p className="text-sm text-[var(--text-muted)]">Review your answers and learn from mistakes</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <ReviewList items={session.questions.map((q, index) => ({
+                  question_id: q.question_id,
+                  question_number: index + 1,
+                  question_text: q.question_text,
+                  question_type: q.question_type,
+                  user_answer: q.user_answer || "",
+                  correct_answer: q.correct_answer,
+                  is_correct: q.is_correct ?? false,
+                  explanation: q.explanation || undefined,
+                }))} />
+              </CardContent>
+            </Card>
           </motion.div>
         </Section>
 
@@ -268,51 +276,28 @@ function ResultsContent() {
         <Section spacing="sm">
           <motion.div
             variants={slideUpItem}
-            className="flex flex-col sm:flex-row gap-4 sticky bottom-6"
+            className="flex flex-col sm:flex-row gap-4"
           >
-            <Link
-              href="/dashboard"
-              className="
-                flex-1 sm:flex-none flex items-center justify-center gap-2
-                px-8 py-4 rounded-xl
-                border-2 border-surface-border text-text-primary
-                font-semibold hover:bg-surface-card transition-colors
-              "
+            <Button
+              variant="outline"
+              asChild
+              className="flex-1"
             >
-              <Home size={20} />
-              Dashboard
-            </Link>
-
-            <Link
-              href={`/config?document_id=${session.document_id}`}
-              className="
-                flex-1 sm:flex-auto flex items-center justify-center gap-2
-                px-8 py-4 rounded-xl
-                bg-brand-primary text-surface-dark
-                font-bold shadow-lg shadow-brand-primary/20
-                hover:bg-brand-primary/90 hover:shadow-brand-primary/30
-                transition-all
-              "
-            >
-              <RotateCcw size={20} />
-              Try Again
-            </Link>
-
-            {scorePercent < 100 && (
-              <Link
-                href={`/session?session_id=${sessionId}`}
-                className="
-                  flex-1 sm:flex-none flex items-center justify-center gap-2
-                  px-8 py-4 rounded-xl
-                  bg-surface-card text-text-primary
-                  font-semibold hover:bg-surface-border/50
-                  transition-colors
-                "
-              >
-                Review
-                <ChevronRight size={20} />
+              <Link href="/dashboard">
+                <Home size={20} className="mr-2" />
+                Dashboard
               </Link>
-            )}
+            </Button>
+
+            <Button
+              asChild
+              className="flex-1 shadow-lg shadow-[var(--brand-primary)]/20"
+            >
+              <Link href={`/config?document_id=${session.document_id}`}>
+                <RotateCcw size={20} className="mr-2" />
+                Try Again
+              </Link>
+            </Button>
           </motion.div>
         </Section>
       </motion.div>

@@ -6,6 +6,8 @@ import { groupDocumentsByDate } from "@/lib/date";
 import { FileText, Loader2, Plus, AlertCircle, CheckCircle2, Clock, XCircle, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
+import { Logo } from "@/components/brand/Logo";
 
 export function DocumentSidebar() {
     const { documents, isLoading, error } = useDocuments();
@@ -35,14 +37,25 @@ export function DocumentSidebar() {
     };
 
     return (
-        <div className="flex flex-col h-full bg-surface-darker text-text-primary">
+        <div className="flex flex-col h-full bg-[var(--surface-darker)] text-[var(--text-primary)]">
+            {/* Logo Section - Pushes content down */}
+            <div className="p-4 border-b border-[var(--surface-border)]/50">
+                <Link href="/dashboard" className="flex items-center justify-center">
+                    <Logo size="lg" animated />
+                </Link>
+            </div>
+
             {/* Action Area */}
-            <div className="p-4 border-b border-surface-border/50 space-y-3">
+            <div className="p-4 border-b border-[var(--surface-border)]/50 space-y-3">
                 <Link href="/upload">
-                    <button className="w-full flex items-center justify-center gap-2 bg-brand-primary text-surface-dark py-2.5 rounded-lg font-medium hover:bg-brand-primary/90 transition-colors shadow-lg shadow-brand-primary/20">
+                    <motion.button 
+                        className="w-full flex items-center justify-center gap-2 bg-brand-primary text-surface-dark py-2.5 rounded-lg font-semibold hover:bg-brand-primary/90 transition-colors shadow-lg shadow-brand-primary/20"
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                    >
                         <Plus size={18} />
                         New Document
-                    </button>
+                    </motion.button>
                 </Link>
 
                 {activeDocId && (
@@ -83,7 +96,7 @@ export function DocumentSidebar() {
                             <p className="text-text-muted text-sm mb-4">No documents yet.</p>
                         </div>
                     ) : (
-                        <div className="space-y-6">
+                        <div className="space-y-6 pt-2">
                             {groups.map((group) => {
                                 const groupDocs = groupedDocuments[group];
                                 if (!groupDocs || groupDocs.length === 0) return null;
@@ -102,9 +115,9 @@ export function DocumentSidebar() {
                                                         key={doc.id}
                                                         href={`/dashboard?docId=${doc.id}`}
                                                         className={cn(
-                                                            "group flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm",
+                                                            "group flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-sm",
                                                             isActive
-                                                                ? "bg-surface-card text-text-primary"
+                                                                ? "bg-surface-card text-text-primary border border-brand-primary/20"
                                                                 : "text-text-muted hover:bg-surface-card/50 hover:text-text-secondary"
                                                         )}
                                                         title={doc.ai_title || doc.filename}
@@ -136,7 +149,7 @@ export function DocumentSidebar() {
             )}
 
             {/* Footer */}
-            <div className="p-4 border-t border-surface-border/30">
+            <div className="p-4 border-t border-[var(--surface-border)]/30">
                 <div className="flex items-center gap-3 px-2 py-2 text-xs text-text-muted">
                     {/* User profile or settings link could go here */}
                 </div>

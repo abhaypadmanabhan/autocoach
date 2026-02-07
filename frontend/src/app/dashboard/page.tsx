@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Plus, Loader2, AlertTriangle } from "lucide-react";
+import { Plus, Loader2, AlertTriangle, Sparkles, FileText, TrendingUp, Clock } from "lucide-react";
 import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
 import { useToast } from "@/hooks/useToast";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -24,11 +24,11 @@ import {
 } from "@/components/primitives/Modal";
 import { cn } from "@/lib/utils";
 import { staggerContainer, slideUpItem } from "@/lib/motions";
-import { StatsGrid } from "@/components/features/dashboard/StatsGrid";
-import { ContinueLearning } from "@/components/features/dashboard/ContinueLearning";
-import { DocumentsGrid } from "@/components/features/dashboard/DocumentsGrid";
 import { DashboardSkeleton } from "@/components/features/dashboard/DashboardSkeleton";
 import { ErrorBanner } from "@/components/features/dashboard/ErrorBanner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import type { User } from "@supabase/supabase-js";
 import type { Document } from "@/lib/types";
 
@@ -99,9 +99,9 @@ function DashboardContent() {
       {docId ? (
         <DocumentDashboard documentId={docId} />
       ) : (
-        <PageContainer>
+        <PageContainer size="xl">
           <div className={cn("space-y-8")}>
-            {/* Hero */}
+            {/* Hero Section */}
             <motion.div
               variants={staggerContainer}
               initial="hidden"
@@ -109,28 +109,25 @@ function DashboardContent() {
               className="flex flex-col md:flex-row md:items-end justify-between gap-6"
             >
               <motion.div variants={slideUpItem}>
-                <h1 className="text-h1 font-serif text-text-primary mb-2">
+                <Badge variant="outline" className="mb-4 px-3 py-1 border-[var(--brand-primary)]/30 text-[var(--brand-primary)]">
+                  <Sparkles className="w-3 h-3 mr-1" />
+                  Welcome Back
+                </Badge>
+                <h1 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-2 font-heading">
                   Ready to learn?
                 </h1>
-                <p className="text-text-secondary text-lg">
-                  Welcome back, {user?.email?.split("@")[0] || "Student"}
+                <p className="text-[var(--text-secondary)] text-lg">
+                  Welcome back, <span className="text-[var(--brand-primary)] font-medium">{user?.email?.split("@")[0] || "Student"}</span>
                 </p>
               </motion.div>
 
               <motion.div variants={slideUpItem}>
-                <Link
-                  href="/upload"
-                  className={cn(
-                    "inline-flex items-center gap-2 px-6 py-3 rounded-full",
-                    "bg-brand-primary text-surface-dark",
-                    "font-semibold",
-                    "hover:bg-brand-primary/90 transition-all",
-                    "hover:shadow-lg hover:shadow-brand-primary/20"
-                  )}
-                >
-                  <Plus size={20} />
-                  Study New
-                </Link>
+                <Button asChild size="lg" className="shadow-lg shadow-[var(--brand-primary)]/20">
+                  <Link href="/upload">
+                    <Plus size={20} className="mr-2" />
+                    Study New
+                  </Link>
+                </Button>
               </motion.div>
             </motion.div>
 
@@ -146,29 +143,166 @@ function DashboardContent() {
               </motion.div>
             </motion.div>
 
-            {/* Stats */}
-            <StatsGrid
-              totalDocuments={totalDocuments}
-              readyDocuments={readyDocuments}
-              processingDocuments={processingDocuments}
-            />
+            {/* Stats Grid */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 md:grid-cols-3 gap-4"
+            >
+              <motion.div variants={slideUpItem}>
+                <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/30 transition-all">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-[var(--text-secondary)]">
+                      Total Documents
+                    </CardTitle>
+                    <FileText className="w-4 h-4 text-[var(--brand-primary)]" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-[var(--text-primary)]">{totalDocuments}</div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div variants={slideUpItem}>
+                <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--semantic-success)]/30 transition-all">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-[var(--text-secondary)]">
+                      Ready to Study
+                    </CardTitle>
+                    <TrendingUp className="w-4 h-4 text-[var(--semantic-success)]" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-[var(--text-primary)]">{readyDocuments}</div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              <motion.div variants={slideUpItem}>
+                <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-secondary)]/30 transition-all">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-[var(--text-secondary)]">
+                      Processing
+                    </CardTitle>
+                    <Clock className="w-4 h-4 text-[var(--brand-secondary)]" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-[var(--text-primary)]">{processingDocuments}</div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </motion.div>
 
             {/* Continue Learning */}
             {recentDocument && (
-              <ContinueLearning
-                document={recentDocument}
-                onContinue={() => router.push(`/dashboard?docId=${recentDocument.id}`)}
-              />
+              <motion.div
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+              >
+                <motion.div variants={slideUpItem}>
+                  <Card className="bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-darker)] border-[var(--surface-border)]">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-heading">Continue Learning</CardTitle>
+                      <CardDescription>Pick up where you left off</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[var(--brand-primary)]/10 flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-[var(--brand-primary)]" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-[var(--text-primary)]">{recentDocument.ai_title || recentDocument.filename}</p>
+                          <p className="text-sm text-[var(--text-muted)]">Ready to quiz</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" asChild>
+                          <Link href={`/dashboard?docId=${recentDocument.id}`}>
+                            View
+                          </Link>
+                        </Button>
+                        <Button asChild>
+                          <Link href={`/config?document_id=${recentDocument.id}&mode=recommend`}>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Start Quiz
+                          </Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </motion.div>
             )}
 
-            {/* Documents */}
-            <DocumentsGrid
-              documents={documents}
-              onContinue={(id) => router.push(`/dashboard?docId=${id}`)}
-              onDelete={handleDeleteClick}
-              deletingId={deleting && documentToDelete ? documentToDelete.id : null}
-              onUpload={() => router.push("/upload")}
-            />
+            {/* Documents Grid */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+            >
+              <motion.div variants={slideUpItem}>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-[var(--text-primary)] font-heading">Your Documents</h2>
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href="/upload">View All</Link>
+                  </Button>
+                </div>
+                
+                {documents.length === 0 ? (
+                  <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <div className="w-16 h-16 rounded-full bg-[var(--surface-darker)] flex items-center justify-center mb-4">
+                        <FileText className="w-8 h-8 text-[var(--text-muted)]" />
+                      </div>
+                      <p className="text-[var(--text-muted)] mb-4">No documents yet</p>
+                      <Button asChild>
+                        <Link href="/upload">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Upload First Document
+                        </Link>
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {documents.slice(0, 6).map((doc, index) => (
+                      <motion.div
+                        key={doc.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/30 transition-all group cursor-pointer"
+                          onClick={() => router.push(`/dashboard?docId=${doc.id}`)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-[var(--brand-primary)]/10 flex items-center justify-center shrink-0">
+                                <FileText className="w-5 h-5 text-[var(--brand-primary)]" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--brand-primary)] transition-colors">
+                                  {doc.ai_title || doc.filename}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant={doc.status === "ready" ? "default" : "secondary"} className="text-xs">
+                                    {doc.status}
+                                  </Badge>
+                                  <span className="text-xs text-[var(--text-muted)]">
+                                    {new Date(doc.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
 
             {/* Error */}
             {error && (

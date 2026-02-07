@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
-import { School, ArrowLeft, Flame, Trophy, Loader2 } from "lucide-react";
+import { ArrowLeft, Flame, Trophy, Loader2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { pageVariants, pageTransition } from "@/lib/motions";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -12,6 +12,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { AvatarDropdown } from "@/components/ui/AvatarDropdown";
 import { useAvatar } from "@/hooks/useAvatar";
 import { useUserStats } from "@/hooks/useDailySprint";
+import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
@@ -29,6 +30,66 @@ interface AppShellProps {
   showStatsHUD?: boolean;
 }
 
+// Animated Background Component
+function AnimatedBackground() {
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      {/* Primary gradient orb - top */}
+      <motion.div
+        className="absolute w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full opacity-[0.08]"
+        style={{
+          background: "radial-gradient(circle, var(--brand-primary) 0%, transparent 70%)",
+          top: "-20%",
+          left: "50%",
+          x: "-50%",
+        }}
+        animate={{
+          scale: [1, 1.1, 1],
+          x: ["-50%", "-48%", "-52%", "-50%"],
+          y: [0, 20, -10, 0],
+        }}
+        transition={{
+          duration: 15,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+      
+      {/* Secondary gradient orb - bottom */}
+      <motion.div
+        className="absolute w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] rounded-full opacity-[0.05]"
+        style={{
+          background: "radial-gradient(circle, var(--brand-secondary) 0%, transparent 70%)",
+          bottom: "-10%",
+          right: "-5%",
+        }}
+        animate={{
+          scale: [1, 1.15, 1],
+          x: [0, -30, 20, 0],
+          y: [0, -20, 30, 0],
+        }}
+        transition={{
+          duration: 20,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+
+      {/* Subtle grid pattern */}
+      <div 
+        className="absolute inset-0 opacity-[0.02]"
+        style={{
+          backgroundImage: `
+            linear-gradient(var(--surface-border) 1px, transparent 1px),
+            linear-gradient(90deg, var(--surface-border) 1px, transparent 1px)
+          `,
+          backgroundSize: '60px 60px',
+        }}
+      />
+    </div>
+  );
+}
+
 // Stats HUD Component - Premium minimal design
 function StatsHUD({ className }: { className?: string }) {
   const { streak, totalXp, isLoading } = useUserStats();
@@ -42,18 +103,26 @@ function StatsHUD({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn("flex items-center gap-1 sm:gap-2", className)}>
+    <div className={cn("flex items-center gap-2", className)}>
       {/* Streak */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20">
+      <motion.div 
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20"
+        whileHover={{ scale: 1.05 }}
+        transition={{ type: "spring", stiffness: 400 }}
+      >
         <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />
-        <span className="text-sm font-semibold text-orange-500">{streak}</span>
-      </div>
+        <span className="text-sm font-bold text-orange-500">{streak}</span>
+      </motion.div>
 
       {/* XP */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+      <motion.div 
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20"
+        whileHover={{ scale: 1.05 }}
+        transition={{ type: "spring", stiffness: 400 }}
+      >
         <Trophy className="w-4 h-4 text-yellow-500" />
-        <span className="text-sm font-semibold text-yellow-500">{totalXp.toLocaleString()}</span>
-      </div>
+        <span className="text-sm font-bold text-yellow-500">{totalXp.toLocaleString()}</span>
+      </motion.div>
     </div>
   );
 }
@@ -109,13 +178,13 @@ export function AppShell({
 
   return (
     <ToastProvider>
-      <div className="flex h-screen w-full bg-surface-dark text-text-primary overflow-hidden">
-        {/* Decorative background circle - adjusted z-index to be behind everything */}
-        <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full bg-brand-primary/5 pointer-events-none -translate-y-1/2 z-0" />
+      <div className="flex h-screen w-full bg-[var(--surface-dark)] text-[var(--text-primary)] overflow-hidden relative">
+        {/* Animated Background */}
+        <AnimatedBackground />
 
         {/* Sidebar (Left, Full Height) */}
         {sidebar && (
-          <aside className="hidden lg:flex w-64 flex-col flex-shrink-0 border-r border-surface-border/50 bg-surface-darker/50 h-full z-20 relative">
+          <aside className="hidden lg:flex w-64 flex-col flex-shrink-0 border-r border-[var(--surface-border)]/50 bg-[var(--surface-darker)]/80 backdrop-blur-xl h-full z-20 relative">
             {sidebar}
           </aside>
         )}
@@ -129,7 +198,7 @@ export function AppShell({
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="h-16 shrink-0 w-full backdrop-blur-md bg-surface-dark/90 border-b border-surface-border/50 flex flex-col justify-center"
+              className="h-16 shrink-0 w-full backdrop-blur-xl bg-[var(--surface-dark)]/80 border-b border-[var(--surface-border)]/50 flex flex-col justify-center"
             >
               <div className="w-full px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between">
@@ -140,37 +209,27 @@ export function AppShell({
                         whileHover={{ x: -2 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleBack}
-                        className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-surface-border/50 transition-colors"
+                        className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-[var(--surface-card)] transition-colors"
                       >
-                        <ArrowLeft size={20} className="text-text-secondary" />
+                        <ArrowLeft size={20} className="text-[var(--text-secondary)]" />
                       </motion.button>
                     )}
 
-                    <Link
-                      href="/dashboard"
-                      className="flex items-center gap-3 group"
-                    >
-                      <motion.div
-                        whileHover={{ scale: 1.05, rotate: 5 }}
-                        className="w-10 h-10 rounded-xl bg-brand-primary/20 flex items-center justify-center"
-                      >
-                        <School size={22} className="text-brand-primary" />
-                      </motion.div>
-                      <span className="font-serif text-xl font-medium text-text-primary hidden sm:block">
-                        AutoCoach
-                      </span>
+                    {/* Logo with Mascot replacing A */}
+                    <Link href="/dashboard" className="flex items-center">
+                      <Logo size="md" animated />
                     </Link>
 
                     {title && (
                       <>
-                        <span className="text-surface-border hidden sm:inline">|</span>
-                        <span className="text-text-secondary font-medium">{title}</span>
+                        <span className="text-[var(--surface-border)] hidden sm:inline">|</span>
+                        <span className="text-[var(--text-secondary)] font-medium">{title}</span>
                       </>
                     )}
                   </div>
 
                   {/* Right section */}
-                  <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="flex items-center gap-3 sm:gap-4">
                     {/* Stats HUD - Always visible when logged in */}
                     {showStatsHUD && user && (
                       <StatsHUD className="hidden sm:flex" />
@@ -196,7 +255,7 @@ export function AppShell({
             animate="center"
             exit="exit"
             transition={pageTransition}
-            className={`flex-1 overflow-y-auto ${className}`}
+            className={`flex-1 overflow-y-auto relative ${className}`}
           >
             {children}
           </motion.main>
@@ -207,7 +266,7 @@ export function AppShell({
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.5 }}
-              className="mt-auto bg-surface-darker border-t border-surface-border/50 shrink-0"
+              className="mt-auto bg-[var(--surface-darker)] border-t border-[var(--surface-border)]/50 shrink-0"
             >
               <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 py-4">
                 {bottomNavContent}

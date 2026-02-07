@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface LogoProps {
   className?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   showText?: boolean;
   animated?: boolean;
 }
@@ -16,11 +16,12 @@ const MASCOT_HEAD_PATH = "M1006.98 666.764C1120.11 308.446 1605.94 269.517 1779.
 const LEFT_EYE = { cx: 1250, cy: 750, r: 40 };
 const RIGHT_EYE = { cx: 1566, cy: 750, r: 40 };
 
-// Mascot as the "A" - sized to match text height
+// Mascot as the "A" - mascot is BIGGER than text now
 const sizes = {
-  sm: { mascot: "w-7 h-7", text: "text-lg", gap: "gap-0.5" },
-  md: { mascot: "w-9 h-9", text: "text-xl", gap: "gap-1" },
-  lg: { mascot: "w-12 h-12", text: "text-2xl", gap: "gap-1" },
+  sm: { mascot: "w-9 h-9", text: "text-base", gap: "gap-0.5" },
+  md: { mascot: "w-11 h-11", text: "text-lg", gap: "gap-1" },
+  lg: { mascot: "w-14 h-14", text: "text-xl", gap: "gap-1.5" },
+  xl: { mascot: "w-20 h-20", text: "text-2xl", gap: "gap-2" },
 };
 
 export function Logo({ className, size = "md", showText = true, animated = true }: LogoProps) {
@@ -109,9 +110,9 @@ export function LogoFull({
   centered?: boolean;
 }) {
   const sizeClasses = {
-    md: { mascot: "w-12 h-12", text: "text-3xl", gap: "gap-1" },
-    lg: { mascot: "w-16 h-16", text: "text-4xl", gap: "gap-1.5" },
-    xl: { mascot: "w-20 h-20", text: "text-5xl", gap: "gap-2" },
+    md: { mascot: "w-16 h-16", text: "text-3xl", gap: "gap-1" },
+    lg: { mascot: "w-20 h-20", text: "text-4xl", gap: "gap-1.5" },
+    xl: { mascot: "w-28 h-28", text: "text-5xl", gap: "gap-2" },
   }[size];
 
   return (
@@ -126,7 +127,7 @@ export function LogoFull({
       transition={{ duration: 0.6 }}
     >
       <div className={cn("flex items-center", sizeClasses.gap)}>
-        {/* Mascot as "A" */}
+        {/* Mascot as "A" - bigger than text */}
         <motion.svg
           viewBox="0 0 2816 1536"
           fill="none"
