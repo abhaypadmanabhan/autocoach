@@ -3,7 +3,7 @@
 import { useDocuments } from "@/hooks/useDocuments";
 import { cn } from "@/lib/utils";
 import { groupDocumentsByDate } from "@/lib/date";
-import { FileText, Loader2, Plus, AlertCircle, CheckCircle2, Clock, XCircle, Sparkles } from "lucide-react";
+import { FileText, Loader2, Plus, AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
@@ -46,10 +46,10 @@ export function DocumentSidebar() {
             </div>
 
             {/* Action Area */}
-            <div className="p-4 border-b border-[var(--surface-border)]/50 space-y-3">
+            <div className="p-4 border-b border-[var(--surface-border)]/50">
                 <Link href="/upload">
-                    <motion.button 
-                        className="w-full flex items-center justify-center gap-2 bg-brand-primary text-surface-dark py-2.5 rounded-lg font-semibold hover:bg-brand-primary/90 transition-colors shadow-lg shadow-brand-primary/20"
+                    <motion.button
+                        className="w-full flex items-center justify-center gap-2 bg-[var(--brand-primary)] text-[var(--surface-dark)] py-2.5 rounded-lg font-semibold hover:brightness-110 transition-all shadow-lg shadow-[var(--brand-primary)]/20"
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                     >
@@ -57,23 +57,6 @@ export function DocumentSidebar() {
                         New Document
                     </motion.button>
                 </Link>
-
-                {activeDocId && (
-                    <div className="grid grid-cols-2 gap-2">
-                        <Link href={`/dashboard?docId=${activeDocId}`}>
-                            <button className="w-full h-full flex items-center justify-center gap-2 bg-surface-card text-text-secondary py-2 rounded-lg text-xs font-medium border border-surface-border hover:text-text-primary hover:border-text-secondary transition-all">
-                                <FileText size={14} />
-                                Dashboard
-                            </button>
-                        </Link>
-                        <Link href={`/config?document_id=${activeDocId}&mode=recommend`}>
-                            <button className="w-full h-full flex items-center justify-center gap-2 bg-surface-card text-brand-primary py-2 rounded-lg text-xs font-medium border border-brand-primary/20 hover:bg-brand-primary/10 transition-all">
-                                <Sparkles size={14} />
-                                Start Quiz
-                            </button>
-                        </Link>
-                    </div>
-                )}
             </div>
 
             {isLoading && (
@@ -148,12 +131,8 @@ export function DocumentSidebar() {
                 </div>
             )}
 
-            {/* Footer */}
-            <div className="p-4 border-t border-[var(--surface-border)]/30">
-                <div className="flex items-center gap-3 px-2 py-2 text-xs text-text-muted">
-                    {/* User profile or settings link could go here */}
-                </div>
-            </div>
+            {/* Footer spacer */}
+            <div className="shrink-0 h-2" />
         </div>
     );
 }

@@ -1,11 +1,10 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Settings, LogOut } from "lucide-react";
-import { modalVariants, overlayVariants } from "@/lib/motions";
 import type { User } from "@supabase/supabase-js";
 
 interface AvatarDropdownProps {
@@ -25,7 +24,9 @@ export function AvatarDropdown({
   onLogout,
 }: AvatarDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -64,6 +65,23 @@ export function AvatarDropdown({
     };
   }, [isOpen]);
 
+  const handleSettingsClick = useCallback(() => {
+    setIsOpen(false);
+    router.push("/settings");
+  }, [router]);
+
+  const handleLogoutClick = useCallback(async () => {
+    setIsLoggingOut(true);
+    setIsOpen(false);
+    try {
+      await onLogout();
+    } catch {
+      // Fallback handled by parent
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }, [onLogout]);
+
   return (
     <div ref={dropdownRef} className="relative">
       {/* Avatar Button */}
@@ -71,9 +89,11 @@ export function AvatarDropdown({
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setIsOpen(!isOpen)}
-        className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-surface-dark font-bold cursor-pointer overflow-hidden"
+        disabled={isLoggingOut}
+        className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--brand-primary)] to-[var(--brand-secondary)] flex items-center justify-center text-[var(--surface-dark)] font-bold cursor-pointer overflow-hidden ring-2 ring-transparent hover:ring-[var(--brand-primary)]/30 transition-all"
         aria-label="Open user menu"
         aria-expanded={isOpen}
+        aria-haspopup="true"
       >
         {avatarUrl ? (
           <Image
@@ -94,53 +114,52 @@ export function AvatarDropdown({
           <>
             {/* Backdrop for mobile */}
             <motion.div
-              variants={overlayVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              className="fixed inset-0 z-40 md:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-40 bg-black/20 md:hidden"
               onClick={() => setIsOpen(false)}
             />
 
             {/* Dropdown */}
             <motion.div
-              variants={modalVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
+              initial={{ opacity: 0, scale: 0.92, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 8 }}
+              transition={{ type: "spring", stiffness: 400, damping: 30 }}
               className="absolute right-0 top-full mt-2 w-64 z-50 origin-top-right"
             >
-              <div className="rounded-xl bg-surface-darker border border-surface-border shadow-xl overflow-hidden">
+              <div className="rounded-xl bg-[var(--surface-darker)] border border-[var(--surface-border)] shadow-2xl overflow-hidden">
                 {/* User Info */}
-                <div className="px-4 py-3 border-b border-surface-border">
-                  <p className="text-sm font-medium text-text-primary truncate">
+                <div className="px-4 py-3 border-b border-[var(--surface-border)]">
+                  <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                     {user?.email}
                   </p>
-                  <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-surface-border text-text-muted">
+                  <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full bg-[var(--surface-border)] text-[var(--text-muted)]">
                     Free Plan
                   </span>
                 </div>
 
                 {/* Menu Items */}
                 <div className="py-1">
-                  <Link
-                    href="/settings"
-                    onClick={() => setIsOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-border/50 hover:text-text-primary transition-colors"
+                  <button
+                    type="button"
+                    onClick={handleSettingsClick}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-border)]/50 hover:text-[var(--text-primary)] transition-colors cursor-pointer"
                   >
                     <Settings size={18} />
                     Settings
-                  </Link>
+                  </button>
 
                   <button
-                    onClick={() => {
-                      setIsOpen(false);
-                      onLogout();
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-semantic-error hover:bg-semantic-error/10 transition-colors"
+                    type="button"
+                    onClick={handleLogoutClick}
+                    disabled={isLoggingOut}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
                   >
                     <LogOut size={18} />
-                    Sign out
+                    {isLoggingOut ? "Signing out..." : "Sign out"}
                   </button>
                 </div>
               </div>

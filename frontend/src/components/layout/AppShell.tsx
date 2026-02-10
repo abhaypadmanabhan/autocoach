@@ -1,10 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { ArrowLeft, Flame, Trophy, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ArrowLeft, Flame, Trophy, Loader2, Zap, Calendar } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { pageVariants, pageTransition } from "@/lib/motions";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -12,7 +12,6 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { AvatarDropdown } from "@/components/ui/AvatarDropdown";
 import { useAvatar } from "@/hooks/useAvatar";
 import { useUserStats } from "@/hooks/useDailySprint";
-import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
@@ -90,14 +89,31 @@ function AnimatedBackground() {
   );
 }
 
-// Stats HUD Component - Premium minimal design
+// Stats HUD Component - Functional with tooltips
 function StatsHUD({ className }: { className?: string }) {
-  const { streak, totalXp, isLoading } = useUserStats();
+  const { streak, totalXp, xpEarnedToday, completedToday, isLoading } = useUserStats();
+  const [activeTooltip, setActiveTooltip] = useState<"streak" | "xp" | null>(null);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showTooltip = (type: "streak" | "xp") => {
+    if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    setActiveTooltip(type);
+  };
+
+  const hideTooltip = () => {
+    tooltipTimeoutRef.current = setTimeout(() => setActiveTooltip(null), 200);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) clearTimeout(tooltipTimeoutRef.current);
+    };
+  }, []);
 
   if (isLoading) {
     return (
       <div className={cn("flex items-center gap-3", className)}>
-        <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+        <Loader2 className="w-4 h-4 text-[var(--text-muted)] animate-spin" />
       </div>
     );
   }
@@ -105,24 +121,99 @@ function StatsHUD({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
       {/* Streak */}
-      <motion.div 
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20"
-        whileHover={{ scale: 1.05 }}
-        transition={{ type: "spring", stiffness: 400 }}
-      >
-        <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />
-        <span className="text-sm font-bold text-orange-500">{streak}</span>
-      </motion.div>
+      <div className="relative">
+        <motion.div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/20 cursor-default select-none"
+          whileHover={{ scale: 1.05 }}
+          transition={{ type: "spring", stiffness: 400 }}
+          onMouseEnter={() => showTooltip("streak")}
+          onMouseLeave={hideTooltip}
+          onClick={() => setActiveTooltip(activeTooltip === "streak" ? null : "streak")}
+        >
+          <Flame className="w-4 h-4 text-orange-500 fill-orange-500" />
+          <span className="text-sm font-bold text-orange-500">{streak}</span>
+          <span className="text-[10px] font-medium text-orange-400/70 uppercase tracking-wide hidden md:inline">day{streak !== 1 ? "s" : ""}</span>
+        </motion.div>
+
+        <AnimatePresence>
+          {activeTooltip === "streak" && (
+            <motion.div
+              initial={{ opacity: 0, y: 4, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute top-full mt-2 left-1/2 -translate-x-1/2 z-50 w-52"
+              onMouseEnter={() => showTooltip("streak")}
+              onMouseLeave={hideTooltip}
+            >
+              <div className="bg-[var(--surface-darker)] border border-[var(--surface-border)] rounded-xl p-3 shadow-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <Calendar className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">Daily Streak</span>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)] leading-relaxed">
+                  {streak === 0
+                    ? "Complete a daily sprint to start your streak!"
+                    : `You've studied ${streak} day${streak !== 1 ? "s" : ""} in a row. ${completedToday ? "Today's sprint is done!" : "Complete today's sprint to keep it going!"}`
+                  }
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* XP */}
-      <motion.div 
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20"
-        whileHover={{ scale: 1.05 }}
-        transition={{ type: "spring", stiffness: 400 }}
-      >
-        <Trophy className="w-4 h-4 text-yellow-500" />
-        <span className="text-sm font-bold text-yellow-500">{totalXp.toLocaleString()}</span>
-      </motion.div>
+      <div className="relative">
+        <motion.div
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 cursor-default select-none"
+          whileHover={{ scale: 1.05 }}
+          transition={{ type: "spring", stiffness: 400 }}
+          onMouseEnter={() => showTooltip("xp")}
+          onMouseLeave={hideTooltip}
+          onClick={() => setActiveTooltip(activeTooltip === "xp" ? null : "xp")}
+        >
+          <Trophy className="w-4 h-4 text-yellow-500" />
+          <span className="text-sm font-bold text-yellow-500">{totalXp.toLocaleString()}</span>
+          <span className="text-[10px] font-medium text-yellow-400/70 uppercase tracking-wide hidden md:inline">XP</span>
+        </motion.div>
+
+        <AnimatePresence>
+          {activeTooltip === "xp" && (
+            <motion.div
+              initial={{ opacity: 0, y: 4, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="absolute top-full mt-2 right-0 z-50 w-52"
+              onMouseEnter={() => showTooltip("xp")}
+              onMouseLeave={hideTooltip}
+            >
+              <div className="bg-[var(--surface-darker)] border border-[var(--surface-border)] rounded-xl p-3 shadow-xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">Experience Points</span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-[var(--text-muted)]">Total XP</span>
+                    <span className="text-yellow-400 font-semibold">{totalXp.toLocaleString()}</span>
+                  </div>
+                  {xpEarnedToday > 0 && (
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-[var(--text-muted)]">Earned today</span>
+                      <span className="text-emerald-400 font-semibold">+{xpEarnedToday}</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)] mt-2 leading-relaxed">
+                  Earn XP by completing quizzes and daily sprints.
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -171,9 +262,16 @@ export function AppShell({
   };
 
   const handleLogout = async () => {
-    const supabase = createBrowserClient();
-    await supabase.auth.signOut();
-    router.push("/login");
+    try {
+      const supabase = createBrowserClient();
+      await supabase.auth.signOut();
+      setUser(null);
+      router.replace("/login");
+      router.refresh();
+    } catch {
+      // Force redirect even on error
+      window.location.href = "/login";
+    }
   };
 
   return (
@@ -203,28 +301,25 @@ export function AppShell({
               <div className="w-full px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between">
                   {/* Left section */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     {showBack && (
                       <motion.button
                         whileHover={{ x: -2 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleBack}
-                        className="flex items-center justify-center w-10 h-10 rounded-full hover:bg-[var(--surface-card)] transition-colors"
+                        className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-[var(--surface-card)] transition-colors"
                       >
-                        <ArrowLeft size={20} className="text-[var(--text-secondary)]" />
+                        <ArrowLeft size={18} className="text-[var(--text-secondary)]" />
                       </motion.button>
                     )}
 
-                    {/* Logo with Mascot replacing A */}
-                    <Link href="/dashboard" className="flex items-center">
-                      <Logo size="md" animated />
-                    </Link>
-
                     {title && (
-                      <>
-                        <span className="text-[var(--surface-border)] hidden sm:inline">|</span>
-                        <span className="text-[var(--text-secondary)] font-medium">{title}</span>
-                      </>
+                      <span className="text-[var(--text-primary)] font-semibold text-sm tracking-wide">{title}</span>
+                    )}
+
+                    {/* Stats HUD on mobile - visible only on small screens */}
+                    {showStatsHUD && user && (
+                      <StatsHUD className="flex sm:hidden" />
                     )}
                   </div>
 
