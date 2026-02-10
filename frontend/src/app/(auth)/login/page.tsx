@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -14,7 +14,7 @@ import { Input, Label } from "@/components/primitives/Input";
 import { SocialButtons } from "@/components/auth/SocialButtons";
 
 const inputClassName =
-  "h-auto pl-12 pr-4 py-3 border-slate-border rounded-xl bg-white shadow-none transition-all focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus-visible:ring-0 text-indigo-space placeholder:text-slate-text/60";
+  "h-auto pl-12 pr-4 py-3 border-slate-border rounded-xl bg-white shadow-none transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus-visible:ring-0 text-indigo-space placeholder:text-slate-text/60";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -116,10 +116,10 @@ export default function LoginPage() {
         className="relative mb-6"
       >
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-border"></div>
+          <div className="w-full border-t border-slate-border/70"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-background-light text-slate-text">
+          <span className="px-4 bg-background-light text-slate-text/80 text-xs uppercase tracking-wider font-medium">
             or continue with email
           </span>
         </div>
@@ -128,11 +128,12 @@ export default function LoginPage() {
       {/* Error Message */}
       {serverError && (
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-5 bg-error-light border border-error/20 text-error px-4 py-3 rounded-xl text-sm"
+          initial={{ opacity: 0, y: -10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="mb-5 bg-error-light border border-error/20 text-error px-4 py-3 rounded-xl text-sm flex items-start gap-2.5"
         >
-          {serverError}
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{serverError}</span>
         </motion.div>
       )}
 
@@ -143,23 +144,27 @@ export default function LoginPage() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.35 }}
         >
-          <Label htmlFor="email" className="block text-indigo-space mb-2">
+          <Label htmlFor="email" className="block text-indigo-space mb-2 text-sm font-medium">
             Email address
           </Label>
-          <div className="relative">
+          <div className="relative group/input">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-slate-text" />
+              <Mail className="h-5 w-5 text-slate-text/70 transition-colors duration-200 group-focus-within/input:text-primary" />
             </div>
             <Input
               id="email"
               type="email"
+              autoFocus
               placeholder="you@example.com"
               {...register("email")}
               className={inputClassName}
             />
           </div>
           {errors.email && (
-            <p className="mt-1.5 text-xs text-error">{errors.email.message}</p>
+            <p className="mt-1.5 text-xs text-error flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {errors.email.message}
+            </p>
           )}
         </motion.div>
 
@@ -169,19 +174,19 @@ export default function LoginPage() {
           transition={{ delay: 0.4 }}
         >
           <div className="flex items-center justify-between mb-2">
-            <Label htmlFor="password" className="text-indigo-space">
+            <Label htmlFor="password" className="text-indigo-space text-sm font-medium">
               Password
             </Label>
             <Link
               href="#"
-              className="text-sm text-primary hover:text-primary-dark transition-colors font-medium"
+              className="text-xs text-primary hover:text-primary-dark transition-colors font-medium"
             >
               Forgot password?
             </Link>
           </div>
-          <div className="relative">
+          <div className="relative group/input">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-slate-text" />
+              <Lock className="h-5 w-5 text-slate-text/70 transition-colors duration-200 group-focus-within/input:text-primary" />
             </div>
             <Input
               id="password"
@@ -193,13 +198,16 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-text hover:text-indigo-space transition-colors"
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-text/70 hover:text-indigo-space transition-colors duration-200"
             >
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
             </button>
           </div>
           {errors.password && (
-            <p className="mt-1.5 text-xs text-error">{errors.password.message}</p>
+            <p className="mt-1.5 text-xs text-error flex items-center gap-1">
+              <AlertCircle className="h-3 w-3" />
+              {errors.password.message}
+            </p>
           )}
         </motion.div>
 
@@ -207,13 +215,12 @@ export default function LoginPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
+          className="pt-1"
         >
           <Button
             type="submit"
             disabled={loading || socialLoading !== null}
-            className="w-full gap-2 h-auto py-3.5 rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 hover:bg-primary-dark"
+            className="w-full gap-2 h-auto py-3.5 rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 hover:bg-primary-dark transition-all duration-200"
           >
             {loading ? (
               <>

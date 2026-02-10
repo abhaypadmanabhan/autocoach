@@ -1,47 +1,28 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-// Subtle gradient mesh - follows ui-lock.md theming
+// Subtle gradient mesh - CSS-animated for performance
 export function GradientMesh({ className }: { className?: string }) {
   return (
     <div className={cn("absolute inset-0 overflow-hidden pointer-events-none", className)}>
-      {/* Primary gradient orb - very subtle */}
-      <motion.div
-        className="absolute w-[800px] h-[800px] rounded-full opacity-[0.03]"
+      {/* Primary gradient orb - CSS animated */}
+      <div
+        className="absolute w-[800px] h-[800px] rounded-full opacity-[0.03] animate-mesh-orb-1"
         style={{
           background: "radial-gradient(circle, var(--brand-primary) 0%, transparent 70%)",
           top: "-20%",
           left: "-10%",
         }}
-        animate={{
-          x: [0, 30, 0],
-          y: [0, 20, 0],
-        }}
-        transition={{
-          duration: 20,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
       />
-      
-      {/* Secondary gradient orb - very subtle */}
-      <motion.div
-        className="absolute w-[600px] h-[600px] rounded-full opacity-[0.03]"
+
+      {/* Secondary gradient orb - CSS animated */}
+      <div
+        className="absolute w-[600px] h-[600px] rounded-full opacity-[0.03] animate-mesh-orb-2"
         style={{
           background: "radial-gradient(circle, var(--brand-secondary) 0%, transparent 70%)",
           bottom: "-10%",
           right: "-5%",
-        }}
-        animate={{
-          x: [0, -20, 0],
-          y: [0, -30, 0],
-        }}
-        transition={{
-          duration: 25,
-          repeat: Infinity,
-          ease: "easeInOut",
         }}
       />
     </div>
@@ -53,7 +34,7 @@ export function HeroBackground({ className }: { className?: string }) {
   return (
     <div className={cn("absolute inset-0 overflow-hidden", className)}>
       {/* Base gradient */}
-      <div 
+      <div
         className="absolute inset-0"
         style={{
           background: `
@@ -64,7 +45,7 @@ export function HeroBackground({ className }: { className?: string }) {
           `,
         }}
       />
-      
+
       {/* Subtle animated mesh */}
       <GradientMesh />
     </div>
@@ -72,11 +53,11 @@ export function HeroBackground({ className }: { className?: string }) {
 }
 
 // Section background - minimal, follows design system
-export function SectionBackground({ 
-  className, 
-  variant = "default" 
-}: { 
-  className?: string; 
+export function SectionBackground({
+  className,
+  variant = "default"
+}: {
+  className?: string;
   variant?: "default" | "gradient" | "mesh";
 }) {
   const backgrounds = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, useInView, useScroll, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import Link from "next/link";
 import {
   PlayCircle,
@@ -55,7 +55,7 @@ function Navigation() {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
@@ -83,7 +83,7 @@ function Navigation() {
           <div className="flex h-16 lg:h-20 items-center justify-between">
             {/* Logo with Mascot */}
             <Link href="/" className="flex items-center">
-              <Logo size="md" animated />
+              <Logo size="lg" animated />
             </Link>
 
             {/* Desktop Navigation */}
@@ -440,9 +440,6 @@ function HeroSection() {
 // FEATURES SECTION
 // ============================================
 function FeaturesSection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
   const features = [
     {
       icon: Brain,
@@ -483,14 +480,15 @@ function FeaturesSection() {
   ];
 
   return (
-    <section id="features" className="section-padding relative" ref={ref}>
+    <section id="features" className="section-padding relative">
       {/* Animated Background */}
       <SectionBackground variant="default" />
 
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
@@ -510,7 +508,8 @@ function FeaturesSection() {
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 30 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
             >
               <Card className="h-full bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--brand-primary)]/5">
@@ -540,9 +539,6 @@ function FeaturesSection() {
 // HOW IT WORKS SECTION
 // ============================================
 function HowItWorksSection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
   const steps = [
     {
       number: "01",
@@ -571,14 +567,14 @@ function HowItWorksSection() {
     <section
       id="how-it-works"
       className="section-padding relative"
-      ref={ref}
     >
       {/* Animated Background */}
       <SectionBackground variant="gradient" />
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
+      <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
@@ -598,7 +594,8 @@ function HowItWorksSection() {
           <div className="hidden lg:block absolute top-24 left-[16.67%] right-[16.67%] h-0.5">
             <motion.div
               initial={{ scaleX: 0 }}
-              animate={isInView ? { scaleX: 1 } : {}}
+              whileInView={{ scaleX: 1 }}
+              viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 1, delay: 0.5 }}
               className="h-full bg-gradient-to-r from-[var(--brand-primary)] via-[var(--brand-secondary)] to-[var(--brand-primary)]/30 origin-left"
             />
@@ -609,7 +606,8 @@ function HowItWorksSection() {
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 30 }}
-                animate={isInView ? { opacity: 1, y: 0 } : {}}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-100px" }}
                 transition={{ duration: 0.5, delay: 0.3 + i * 0.2 }}
                 className="relative text-center"
               >
@@ -639,8 +637,7 @@ function HowItWorksSection() {
 // INTERACTIVE DEMO SECTION
 // ============================================
 function DemoSection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [isInView, setIsInView] = useState(false);
   const [stage, setStage] = useState(0);
 
   const stages = [
@@ -665,7 +662,6 @@ function DemoSection() {
     <section
       id="demo"
       className="section-padding relative overflow-hidden"
-      ref={ref}
     >
       {/* Animated Background */}
       <SectionBackground variant="mesh" />
@@ -673,7 +669,9 @@ function DemoSection() {
       <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          onViewportEnter={() => setIsInView(true)}
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
@@ -692,7 +690,8 @@ function DemoSection() {
           {/* Demo Window */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
-            animate={isInView ? { opacity: 1, x: 0 } : {}}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.6, delay: 0.2 }}
             className="demo-window"
           >
@@ -867,7 +866,8 @@ function DemoSection() {
           {/* Stage Descriptions */}
           <motion.div
             initial={{ opacity: 0, x: 30 }}
-            animate={isInView ? { opacity: 1, x: 0 } : {}}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.6, delay: 0.4 }}
             className="space-y-6"
           >
@@ -934,9 +934,6 @@ function DemoSection() {
 // TESTIMONIALS SECTION
 // ============================================
 function TestimonialsSection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
   const testimonials = [
     {
       name: "Sarah Chen",
@@ -969,13 +966,14 @@ function TestimonialsSection() {
   ];
 
   return (
-    <section id="testimonials" className="section-padding relative" ref={ref}>
+    <section id="testimonials" className="section-padding relative">
       {/* Animated Background */}
       <SectionBackground variant="default" />
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
+      <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
@@ -995,7 +993,8 @@ function TestimonialsSection() {
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 30 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
             >
               <Card className="h-full bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/30 transition-all hover:-translate-y-1">
@@ -1037,8 +1036,6 @@ function TestimonialsSection() {
 // PRICING SECTION
 // ============================================
 function PricingSection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
   const [isYearly, setIsYearly] = useState(false);
 
   const plans = [
@@ -1073,13 +1070,14 @@ function PricingSection() {
   ];
 
   return (
-    <section id="pricing" className="section-padding relative" ref={ref}>
+    <section id="pricing" className="section-padding relative">
       {/* Animated Background */}
       <SectionBackground variant="mesh" />
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
+      <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
@@ -1130,7 +1128,8 @@ function PricingSection() {
             <motion.div
               key={plan.name}
               initial={{ opacity: 0, y: 30 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
             >
               <Card className={cn(
@@ -1199,8 +1198,6 @@ function PricingSection() {
 // FAQ SECTION
 // ============================================
 function FAQSection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const faqs = [
@@ -1237,13 +1234,14 @@ function FAQSection() {
   ];
 
   return (
-    <section className="section-padding relative" ref={ref}>
+    <section className="section-padding relative">
       {/* Animated Background */}
       <SectionBackground variant="default" />
-      <div className="mx-auto max-w-[800px] px-6 lg:px-8">
+      <div className="mx-auto max-w-[800px] px-6 lg:px-8 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
@@ -1263,7 +1261,8 @@ function FAQSection() {
             <motion.div
               key={i}
               initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.5, delay: i * 0.05 }}
             >
               <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] overflow-hidden">
@@ -1305,13 +1304,9 @@ function FAQSection() {
 // FINAL CTA SECTION
 // ============================================
 function FinalCTASection() {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
-
   return (
     <section
       className="section-padding relative overflow-hidden"
-      ref={ref}
     >
       {/* Animated Background */}
       <SectionBackground variant="gradient" />
@@ -1319,7 +1314,8 @@ function FinalCTASection() {
       <div className="relative z-10 mx-auto max-w-[800px] px-6 lg:px-8 text-center">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.6 }}
           className="flex flex-col items-center"
         >

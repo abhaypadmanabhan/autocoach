@@ -48,7 +48,7 @@ export function SocialButtons({ onSocialLogin, loading, disabled }: SocialButton
         variant="outline"
         onClick={() => onSocialLogin("google")}
         disabled={loading !== null || disabled}
-        className="w-full gap-3 h-auto py-3 rounded-xl border-slate-border bg-white shadow-none hover:bg-gray-50 text-indigo-space"
+        className="w-full gap-3 h-auto py-3 rounded-xl border-slate-border bg-white shadow-none hover:bg-[#f8faff] hover:border-[#4285F4]/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 text-indigo-space"
       >
         {loading === "google" ? (
           <Loader2 className="h-5 w-5 animate-spin text-slate-text" />
@@ -63,7 +63,7 @@ export function SocialButtons({ onSocialLogin, loading, disabled }: SocialButton
         variant="outline"
         onClick={() => onSocialLogin("apple")}
         disabled={loading !== null || disabled}
-        className="w-full gap-3 h-auto py-3 rounded-xl border-slate-border bg-white shadow-none hover:bg-gray-50 text-indigo-space"
+        className="w-full gap-3 h-auto py-3 rounded-xl border-slate-border bg-white shadow-none hover:bg-gray-50 hover:border-gray-900/30 hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 text-indigo-space"
       >
         {loading === "apple" ? (
           <Loader2 className="h-5 w-5 animate-spin text-slate-text" />

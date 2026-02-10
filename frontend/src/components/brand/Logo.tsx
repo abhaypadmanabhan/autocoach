@@ -18,10 +18,10 @@ const RIGHT_EYE = { cx: 1566, cy: 750, r: 40 };
 
 // Mascot as the "A" - mascot is BIGGER than text now
 const sizes = {
-  sm: { mascot: "w-9 h-9", text: "text-base", gap: "gap-0.5" },
-  md: { mascot: "w-11 h-11", text: "text-lg", gap: "gap-1" },
-  lg: { mascot: "w-14 h-14", text: "text-xl", gap: "gap-1.5" },
-  xl: { mascot: "w-20 h-20", text: "text-2xl", gap: "gap-2" },
+  sm: { mascot: "w-9 h-9", text: "text-base", gap: "" },
+  md: { mascot: "w-11 h-11", text: "text-lg", gap: "" },
+  lg: { mascot: "w-14 h-14", text: "text-xl", gap: "" },
+  xl: { mascot: "w-20 h-20", text: "text-2xl", gap: "" },
 };
 
 export function Logo({ className, size = "md", showText = true, animated = true }: LogoProps) {
@@ -75,7 +75,7 @@ export function Logo({ className, size = "md", showText = true, animated = true 
       {MascotSvg}
       <span
         className={cn(
-          "font-bold tracking-tight text-[var(--text-primary)] font-heading",
+          "font-bold tracking-tight text-[var(--text-primary)] font-heading -ml-1.5",
           sizeClasses.text
         )}
       >
@@ -110,9 +110,9 @@ export function LogoFull({
   centered?: boolean;
 }) {
   const sizeClasses = {
-    md: { mascot: "w-16 h-16", text: "text-3xl", gap: "gap-1" },
-    lg: { mascot: "w-20 h-20", text: "text-4xl", gap: "gap-1.5" },
-    xl: { mascot: "w-28 h-28", text: "text-5xl", gap: "gap-2" },
+    md: { mascot: "w-16 h-16", text: "text-3xl", gap: "" },
+    lg: { mascot: "w-20 h-20", text: "text-4xl", gap: "" },
+    xl: { mascot: "w-28 h-28", text: "text-5xl", gap: "" },
   }[size];
 
   return (
@@ -159,7 +159,7 @@ export function LogoFull({
         {/* Wordmark */}
         <span
           className={cn(
-            "font-extrabold tracking-tight text-[var(--text-primary)] font-heading",
+            "font-extrabold tracking-tight text-[var(--text-primary)] font-heading -ml-2",
             sizeClasses.text
           )}
         >

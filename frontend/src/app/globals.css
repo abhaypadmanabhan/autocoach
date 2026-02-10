@@ -369,6 +369,34 @@ body {
   }
 }
 
+/* Mascot float - replaces framer-motion y: [-8, 8, -8] */
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(-8px); }
+  50% { transform: translateY(8px); }
+}
+
+/* Glow pulse animations - replaces HeroMascot glow rings */
+@keyframes glow-pulse-primary {
+  0%, 100% { transform: scale(1.5); opacity: 0.1; }
+  50% { transform: scale(1.7); opacity: 0.2; }
+}
+
+@keyframes glow-pulse-secondary {
+  0%, 100% { transform: scale(1.3); opacity: 0.08; }
+  50% { transform: scale(1.5); opacity: 0.15; }
+}
+
+/* Mesh orb animations - replaces GradientMesh motion.divs */
+@keyframes mesh-orb-1 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(30px, 20px); }
+}
+
+@keyframes mesh-orb-2 {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-20px, -30px); }
+}
+
 /* Float variations */
 @keyframes float-slow {
   0%, 100% { transform: translateY(0) rotate(0deg); }
@@ -456,6 +484,12 @@ body {
   stroke-dashoffset: 100;
   animation: stroke-draw 1s ease-out forwards;
 }
+
+.animate-mascot-float { animation: mascot-float 4s ease-in-out infinite; }
+.animate-glow-pulse-primary { animation: glow-pulse-primary 4s ease-in-out infinite; }
+.animate-glow-pulse-secondary { animation: glow-pulse-secondary 5s ease-in-out infinite 0.5s; }
+.animate-mesh-orb-1 { animation: mesh-orb-1 20s ease-in-out infinite; }
+.animate-mesh-orb-2 { animation: mesh-orb-2 25s ease-in-out infinite; }
 
 .float-slow { animation: float-slow 6s ease-in-out infinite; }
 .float-medium { animation: float-medium 4s ease-in-out infinite; }

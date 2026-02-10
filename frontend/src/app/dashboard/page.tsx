@@ -12,6 +12,7 @@ import { AppShell, PageContainer } from "@/components/layout/AppShell";
 import { DocumentSidebar } from "@/components/sidebar/DocumentSidebar";
 import { DocumentDashboard } from "@/components/dashboard/DocumentDashboard";
 import { DailySprintCard } from "@/components/dashboard/DailySprintCard";
+import { WeakConceptsWidget } from "@/components/dashboard/WeakConceptsWidget";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -143,6 +144,16 @@ function DashboardContent() {
               </motion.div>
             </motion.div>
 
+            {/* Weak Concepts Loop */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="w-full"
+            >
+              <WeakConceptsWidget />
+            </motion.div>
+
             {/* Stats Grid */}
             <motion.div
               variants={staggerContainer}
@@ -248,7 +259,7 @@ function DashboardContent() {
                     <Link href="/upload">View All</Link>
                   </Button>
                 </div>
-                
+
                 {documents.length === 0 ? (
                   <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-12">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { motion, useSpring } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -11,17 +11,24 @@ interface SentinelMascotProps {
   className?: string;
 }
 
-// Mouse position hook for sentient eye tracking
+// Mouse position hook for sentient eye tracking (throttled with rAF)
 function useMousePosition() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const rafId = useRef<number>(0);
 
   useEffect(() => {
     const updateMousePosition = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY });
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+      rafId.current = requestAnimationFrame(() => {
+        setMousePosition({ x: e.clientX, y: e.clientY });
+      });
     };
 
-    window.addEventListener("mousemove", updateMousePosition);
-    return () => window.removeEventListener("mousemove", updateMousePosition);
+    window.addEventListener("mousemove", updateMousePosition, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", updateMousePosition);
+      if (rafId.current) cancelAnimationFrame(rafId.current);
+    };
   }, []);
 
   return mousePosition;
@@ -256,17 +263,8 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
   };
 
   return (
-    <motion.div
-      className={cn("relative", className)}
-      animate={{
-        y: [-8, 8, -8],
-      }}
-      transition={{
-        duration: 4,
-        ease: "easeInOut",
-        repeat: Infinity,
-        repeatType: "loop",
-      }}
+    <div
+      className={cn("relative animate-mascot-float", className)}
     >
       <svg
         viewBox="0 0 2816 1536"
@@ -327,6 +325,6 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
           </motion.g>
         )}
       </svg>
-    </motion.div>
+    </div>
   );
 }

@@ -14,6 +14,7 @@ from app.api.routes import (
     voice,
     daily_sprint,
     sprints,
+    concepts,
 )
 from app.config import get_settings
 
@@ -79,6 +80,7 @@ app.include_router(sessions.router, prefix="/quiz/sessions", tags=["quiz-session
 app.include_router(voice.router, prefix="/voice", tags=["voice"])
 app.include_router(daily_sprint.router, prefix="/daily-sprint", tags=["daily-sprint"])
 app.include_router(sprints.router, prefix="/sprint", tags=["sprint"])
+app.include_router(concepts.router, prefix="/concepts", tags=["concepts"])
 
 
 @app.get("/")

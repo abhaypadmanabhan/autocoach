@@ -9,7 +9,6 @@ type GuideMessage = {
   id: string;
   message: string;
   variant: "neutral" | "thinking" | "success" | "wrong" | "timeout";
-  position: "top-right" | "bottom-right" | "bottom-left" | "center";
   showFor: number; // scroll percentage range
 };
 
@@ -18,36 +17,31 @@ const guideMessages: GuideMessage[] = [
     id: "welcome",
     message: "Hey there! Ready to learn smarter?",
     variant: "success",
-    position: "center",
-    showFor: 0, // Hero section
+    showFor: 0,
   },
   {
     id: "features",
     message: "Check out what I can do for you!",
     variant: "thinking",
-    position: "bottom-right",
-    showFor: 25, // Features section
+    showFor: 25,
   },
   {
     id: "how-it-works",
     message: "It's super simple. Three steps!",
     variant: "neutral",
-    position: "bottom-left",
-    showFor: 50, // How it works
+    showFor: 50,
   },
   {
     id: "demo",
     message: "Watch me in action...",
     variant: "thinking",
-    position: "bottom-right",
-    showFor: 70, // Demo section
+    showFor: 70,
   },
   {
     id: "cta",
     message: "Let's start your journey!",
     variant: "success",
-    position: "center",
-    showFor: 90, // CTA/Footer
+    showFor: 90,
   },
 ];
 
@@ -94,7 +88,7 @@ export function MascotGuide({ className, enabled = true }: MascotGuideProps) {
 
     const timer = setTimeout(() => {
       setIsVisible(true);
-    }, 1500);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [enabled]);
@@ -108,20 +102,12 @@ export function MascotGuide({ className, enabled = true }: MascotGuideProps) {
 
   if (!enabled || !isVisible) return null;
 
-  const positionClasses = {
-    "top-right": "top-24 right-6 lg:right-12",
-    "bottom-right": "bottom-24 right-6 lg:right-12",
-    "bottom-left": "bottom-24 left-6 lg:left-12",
-    "center": "top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2",
-  };
-
   return (
     <AnimatePresence>
       {!hasInteracted && (
         <motion.div
           className={cn(
-            "fixed z-40 flex items-center gap-3 pointer-events-auto",
-            positionClasses[currentMessage.position],
+            "fixed z-40 bottom-4 right-4 lg:bottom-6 lg:right-6 flex items-end gap-3 pointer-events-auto",
             className
           )}
           initial={{ opacity: 0, scale: 0.8, y: 20 }}
@@ -131,42 +117,31 @@ export function MascotGuide({ className, enabled = true }: MascotGuideProps) {
           onClick={handleInteraction}
         >
           {/* Message Bubble */}
-          <motion.div
-            key={currentMessage.id}
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            className={cn(
-              "relative bg-[var(--surface-card)] border border-[var(--surface-border)] rounded-2xl px-4 py-3 shadow-xl",
-              "max-w-[200px] lg:max-w-[240px]",
-              currentMessage.position === "bottom-left" ? "order-2" : "order-1"
-            )}
-          >
-            <p className="text-sm text-[var(--text-primary)] font-medium leading-relaxed">
-              {currentMessage.message}
-            </p>
-            {/* Triangle pointer */}
-            <div
-              className={cn(
-                "absolute top-1/2 -translate-y-1/2 w-0 h-0",
-                currentMessage.position === "bottom-left"
-                  ? "-right-2 border-l-8 border-l-[var(--surface-card)] border-y-8 border-y-transparent"
-                  : "-left-2 border-r-8 border-r-[var(--surface-card)] border-y-8 border-y-transparent"
-              )}
-            />
-          </motion.div>
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentMessage.id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.3 }}
+              className="relative bg-[var(--surface-card)] border border-[var(--surface-border)] rounded-2xl px-5 py-4 shadow-xl max-w-[220px] lg:max-w-[260px] mb-4"
+            >
+              <p className="text-base text-[var(--text-primary)] font-medium leading-relaxed">
+                {currentMessage.message}
+              </p>
+              {/* Triangle pointer - always points right toward mascot */}
+              <div className="absolute top-1/2 -translate-y-1/2 -right-2 w-0 h-0 border-l-8 border-l-[var(--surface-card)] border-y-8 border-y-transparent" />
+            </motion.div>
+          </AnimatePresence>
 
-          {/* Mascot */}
+          {/* Mascot - hero-sized */}
           <motion.div
-            className={cn(
-              "relative w-16 h-16 lg:w-20 lg:h-20 shrink-0 cursor-pointer",
-              currentMessage.position === "bottom-left" ? "order-1" : "order-2"
-            )}
-            whileHover={{ scale: 1.1 }}
+            className="relative w-36 h-36 lg:w-48 lg:h-48 shrink-0 cursor-pointer"
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
             {/* Glow effect */}
-            <div className="absolute inset-0 bg-[var(--brand-primary)] opacity-20 blur-xl rounded-full" />
+            <div className="absolute inset-0 bg-[var(--brand-primary)] opacity-20 blur-2xl rounded-full" />
             <SentinelMascot variant={currentMessage.variant} className="w-full h-full" />
           </motion.div>
         </motion.div>
@@ -177,26 +152,22 @@ export function MascotGuide({ className, enabled = true }: MascotGuideProps) {
 
 // Hero-specific mascot with larger presence and dynamic emotions
 export function HeroMascot({ className }: { className?: string }) {
-  // Cycle through emotions
-  const emotions: Array<"neutral" | "thinking" | "success" | "wrong"> = [
+  const emotions: Array<"neutral" | "thinking" | "success"> = [
     "success",
-    "thinking", 
-    "neutral",
-    "success",
-    "wrong",
     "thinking",
+    "neutral",
   ];
-  
+
   const [currentEmotion, setCurrentEmotion] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
 
-  // Auto-cycle emotions every 3 seconds
+  // Auto-cycle emotions every 5 seconds
   useEffect(() => {
-    if (isHovering) return; // Pause on hover
-    
+    if (isHovering) return;
+
     const interval = setInterval(() => {
       setCurrentEmotion((prev) => (prev + 1) % emotions.length);
-    }, 3000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [isHovering, emotions.length]);
@@ -210,26 +181,10 @@ export function HeroMascot({ className }: { className?: string }) {
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
     >
-      {/* Glow rings */}
-      <motion.div
-        className="absolute inset-0 bg-[var(--brand-primary)] opacity-10 blur-3xl rounded-full scale-150"
-        animate={{ 
-          scale: [1.5, 1.7, 1.5], 
-          opacity: [0.1, 0.2, 0.1],
-        }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-      />
-      
-      {/* Secondary glow */}
-      <motion.div
-        className="absolute inset-0 bg-[var(--brand-secondary)] opacity-10 blur-2xl rounded-full"
-        animate={{ 
-          scale: [1.3, 1.5, 1.3], 
-          opacity: [0.08, 0.15, 0.08],
-        }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-      />
-      
+      {/* Glow rings - CSS animated */}
+      <div className="absolute inset-0 bg-[var(--brand-primary)] blur-3xl rounded-full animate-glow-pulse-primary" />
+      <div className="absolute inset-0 bg-[var(--brand-secondary)] blur-2xl rounded-full animate-glow-pulse-secondary" />
+
       {/* Main mascot container */}
       <div className="relative w-36 h-36 lg:w-48 lg:h-48 xl:w-56 xl:h-56">
         <AnimatePresence mode="wait">
@@ -258,13 +213,13 @@ export function HeroMascot({ className }: { className?: string }) {
         )}
       </div>
 
-      {/* Floating particles */}
-      {[...Array(5)].map((_, i) => (
+      {/* Floating particles - reduced from 5 to 2 */}
+      {[0, 1].map((i) => (
         <motion.div
           key={i}
           className="absolute w-2 h-2 rounded-full bg-[var(--brand-primary)]"
           style={{
-            top: `${15 + i * 18}%`,
+            top: `${20 + i * 40}%`,
             left: i % 2 === 0 ? "-15%" : "115%",
           }}
           animate={{
@@ -273,30 +228,13 @@ export function HeroMascot({ className }: { className?: string }) {
             scale: [0.8, 1.2, 0.8],
           }}
           transition={{
-            duration: 2 + i * 0.4,
+            duration: 3 + i * 0.5,
             repeat: Infinity,
-            delay: i * 0.3,
+            delay: i * 0.5,
             ease: "easeInOut",
           }}
         />
       ))}
-
-      {/* Emotion indicator dots */}
-      <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 flex gap-1.5">
-        {emotions.map((_, i) => (
-          <motion.div
-            key={i}
-            className="w-1.5 h-1.5 rounded-full bg-[var(--surface-border)]"
-            animate={{
-              backgroundColor: i === currentEmotion 
-                ? "var(--brand-primary)" 
-                : "var(--surface-border)",
-              scale: i === currentEmotion ? 1.3 : 1,
-            }}
-            transition={{ duration: 0.3 }}
-          />
-        ))}
-      </div>
     </motion.div>
   );
 }
