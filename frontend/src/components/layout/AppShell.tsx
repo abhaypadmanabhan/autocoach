@@ -53,7 +53,7 @@ function AnimatedBackground() {
           ease: "easeInOut",
         }}
       />
-      
+
       {/* Secondary gradient orb - bottom */}
       <motion.div
         className="absolute w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] rounded-full opacity-[0.05]"
@@ -75,7 +75,7 @@ function AnimatedBackground() {
       />
 
       {/* Subtle grid pattern */}
-      <div 
+      <div
         className="absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage: `
@@ -296,7 +296,7 @@ export function AppShell({
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="h-16 shrink-0 w-full backdrop-blur-xl bg-[var(--surface-dark)]/80 border-b border-[var(--surface-border)]/50 flex flex-col justify-center"
+              className="h-16 shrink-0 w-full backdrop-blur-xl bg-[var(--surface-dark)]/80 border-b border-[var(--surface-border)]/50 flex flex-col justify-center z-30 relative"
             >
               <div className="w-full px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between">
