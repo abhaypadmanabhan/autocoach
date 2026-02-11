@@ -87,9 +87,11 @@ export function AvatarDropdown({
               <button
                 type="button"
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
-                  setIsOpen(false);
+                  // Navigate first, then close dropdown to prevent unmounting issues
                   router.push("/settings");
+                  setIsOpen(false);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-border)]/50 hover:text-[var(--text-primary)] transition-colors cursor-pointer text-left"
               >
@@ -101,13 +103,12 @@ export function AvatarDropdown({
                 type="button"
                 disabled={isLoggingOut}
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
                   setIsLoggingOut(true);
+                  // Call logout first, then close dropdown
+                  Promise.resolve(onLogout()).finally(() => setIsLoggingOut(false));
                   setIsOpen(false);
-                  // Small delay to ensure dropdown closes before logout navigation
-                  setTimeout(() => {
-                    Promise.resolve(onLogout()).finally(() => setIsLoggingOut(false));
-                  }, 10);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50 text-left"
               >
