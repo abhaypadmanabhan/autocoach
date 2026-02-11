@@ -86,7 +86,8 @@ export function AvatarDropdown({
             <div className="py-1">
               <button
                 type="button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setIsOpen(false);
                   router.push("/settings");
                 }}
@@ -99,10 +100,14 @@ export function AvatarDropdown({
               <button
                 type="button"
                 disabled={isLoggingOut}
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setIsLoggingOut(true);
                   setIsOpen(false);
-                  Promise.resolve(onLogout()).finally(() => setIsLoggingOut(false));
+                  // Small delay to ensure dropdown closes before logout navigation
+                  setTimeout(() => {
+                    Promise.resolve(onLogout()).finally(() => setIsLoggingOut(false));
+                  }, 10);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50 text-left"
               >
