@@ -21,10 +21,10 @@ const MASCOT_VIEWBOX = "940 230 920 960";
 
 // Mascot as the "A" - mascot is BIGGER than text now
 const sizes = {
-  sm: { mascot: "w-7 h-7", text: "text-base", gap: "" },
-  md: { mascot: "w-9 h-9", text: "text-lg", gap: "" },
-  lg: { mascot: "w-11 h-11", text: "text-xl", gap: "" },
-  xl: { mascot: "w-16 h-16", text: "text-2xl", gap: "" },
+  sm: { mascot: "w-6 h-6", text: "text-base", gap: "" },
+  md: { mascot: "w-8 h-8", text: "text-lg", gap: "" },
+  lg: { mascot: "w-9 h-9", text: "text-xl", gap: "" },
+  xl: { mascot: "w-14 h-14", text: "text-2xl", gap: "" },
 };
 
 export function Logo({ className, size = "md", showText = true, animated = true }: LogoProps) {
@@ -78,7 +78,7 @@ export function Logo({ className, size = "md", showText = true, animated = true 
       {MascotSvg}
       <span
         className={cn(
-          "font-bold tracking-tight text-[var(--text-primary)] font-heading -ml-2",
+          "font-bold tracking-tight text-[var(--text-primary)] font-heading -ml-2.5",
           sizeClasses.text
         )}
       >
@@ -103,19 +103,19 @@ export function Logo({ className, size = "md", showText = true, animated = true 
 }
 
 // Full logo for hero/footer - mascot as "A" with wordmark
-export function LogoFull({ 
-  className, 
+export function LogoFull({
+  className,
   size = "lg",
-  centered = false 
-}: { 
-  className?: string; 
+  centered = false
+}: {
+  className?: string;
   size?: "md" | "lg" | "xl";
   centered?: boolean;
 }) {
   const sizeClasses = {
-    md: { mascot: "w-12 h-12", text: "text-3xl", gap: "" },
-    lg: { mascot: "w-16 h-16", text: "text-4xl", gap: "" },
-    xl: { mascot: "w-22 h-22", text: "text-5xl", gap: "" },
+    md: { mascot: "w-10 h-10", text: "text-3xl", gap: "" },
+    lg: { mascot: "w-14 h-14", text: "text-4xl", gap: "" },
+    xl: { mascot: "w-20 h-20", text: "text-5xl", gap: "" },
   }[size];
 
   return (
@@ -158,11 +158,11 @@ export function LogoFull({
             className="fill-[var(--surface-dark)]"
           />
         </motion.svg>
-        
+
         {/* Wordmark */}
         <span
           className={cn(
-            "font-extrabold tracking-tight text-[var(--text-primary)] font-heading -ml-3",
+            "font-extrabold tracking-tight text-[var(--text-primary)] font-heading -ml-3.5",
             sizeClasses.text
           )}
         >
