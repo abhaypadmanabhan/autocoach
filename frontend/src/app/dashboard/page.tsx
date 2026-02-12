@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Plus, Loader2, AlertTriangle, Sparkles, FileText, TrendingUp, Clock } from "lucide-react";
+import { Plus, Loader2, AlertTriangle, Sparkles, FileText, TrendingUp, Clock, Trash2 } from "lucide-react";
 import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
 import { useToast } from "@/hooks/useToast";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -284,9 +284,16 @@ function DashboardContent() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/30 transition-all group cursor-pointer"
+                        <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/30 transition-all group cursor-pointer relative"
                           onClick={() => router.push(`/dashboard?docId=${doc.id}`)}
                         >
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(doc); }}
+                            className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-semantic-error/10 text-text-muted hover:text-semantic-error z-10"
+                            title="Delete document"
+                          >
+                            <Trash2 size={14} />
+                          </button>
                           <CardContent className="p-4">
                             <div className="flex items-start gap-3">
                               <div className="w-10 h-10 rounded-lg bg-[var(--brand-primary)]/10 flex items-center justify-center shrink-0">

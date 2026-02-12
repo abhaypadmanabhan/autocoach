@@ -16,12 +16,15 @@ const MASCOT_HEAD_PATH = "M1006.98 666.764C1120.11 308.446 1605.94 269.517 1779.
 const LEFT_EYE = { cx: 1250, cy: 750, r: 40 };
 const RIGHT_EYE = { cx: 1566, cy: 750, r: 40 };
 
+// Tightly crop to the mascot head
+const MASCOT_VIEWBOX = "940 230 920 960";
+
 // Mascot as the "A" - mascot is BIGGER than text now
 const sizes = {
-  sm: { mascot: "w-9 h-9", text: "text-base", gap: "" },
-  md: { mascot: "w-11 h-11", text: "text-lg", gap: "" },
-  lg: { mascot: "w-14 h-14", text: "text-xl", gap: "" },
-  xl: { mascot: "w-20 h-20", text: "text-2xl", gap: "" },
+  sm: { mascot: "w-8 h-8", text: "text-base", gap: "" },
+  md: { mascot: "w-10 h-10", text: "text-lg", gap: "" },
+  lg: { mascot: "w-12 h-12", text: "text-xl", gap: "" },
+  xl: { mascot: "w-18 h-18", text: "text-2xl", gap: "" },
 };
 
 export function Logo({ className, size = "md", showText = true, animated = true }: LogoProps) {
@@ -29,7 +32,7 @@ export function Logo({ className, size = "md", showText = true, animated = true 
 
   const MascotSvg = (
     <motion.svg
-      viewBox="0 0 2816 1536"
+      viewBox={MASCOT_VIEWBOX}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={cn("shrink-0", sizeClasses.mascot)}
@@ -75,7 +78,7 @@ export function Logo({ className, size = "md", showText = true, animated = true 
       {MascotSvg}
       <span
         className={cn(
-          "font-bold tracking-tight text-[var(--text-primary)] font-heading -ml-1.5",
+          "font-bold tracking-tight text-[var(--text-primary)] font-heading -ml-2.5",
           sizeClasses.text
         )}
       >
@@ -110,9 +113,9 @@ export function LogoFull({
   centered?: boolean;
 }) {
   const sizeClasses = {
-    md: { mascot: "w-16 h-16", text: "text-3xl", gap: "" },
-    lg: { mascot: "w-20 h-20", text: "text-4xl", gap: "" },
-    xl: { mascot: "w-28 h-28", text: "text-5xl", gap: "" },
+    md: { mascot: "w-14 h-14", text: "text-3xl", gap: "" },
+    lg: { mascot: "w-18 h-18", text: "text-4xl", gap: "" },
+    xl: { mascot: "w-24 h-24", text: "text-5xl", gap: "" },
   }[size];
 
   return (
@@ -129,7 +132,7 @@ export function LogoFull({
       <div className={cn("flex items-center", sizeClasses.gap)}>
         {/* Mascot as "A" - bigger than text */}
         <motion.svg
-          viewBox="0 0 2816 1536"
+          viewBox={MASCOT_VIEWBOX}
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className={sizeClasses.mascot}
@@ -159,7 +162,7 @@ export function LogoFull({
         {/* Wordmark */}
         <span
           className={cn(
-            "font-extrabold tracking-tight text-[var(--text-primary)] font-heading -ml-2",
+            "font-extrabold tracking-tight text-[var(--text-primary)] font-heading -ml-3.5",
             sizeClasses.text
           )}
         >

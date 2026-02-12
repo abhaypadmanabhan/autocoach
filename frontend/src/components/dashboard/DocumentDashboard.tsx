@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
 import { mutate } from "swr";
 
-import { useDocument } from "@/hooks/useDocuments";
+import { useDocument, useDeleteDocument } from "@/hooks/useDocuments";
 import { useDocumentConcepts } from "@/hooks/useConcepts";
-import { PlayCircle, Star, GraduationCap, CheckCircle2 } from "lucide-react";
+import { useToast } from "@/hooks/useToast";
+import { PlayCircle, Star, GraduationCap, CheckCircle2, Trash2, AlertTriangle, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,14 +18,39 @@ import { ConceptList } from "@/components/dashboard/ConceptList";
 import { DashboardSkeleton } from "@/components/features/dashboard/DashboardSkeleton";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { MascotStage } from "@/components/brand/MascotStage";
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogFooter,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogAction,
+    AlertDialogCancel,
+} from "@/components/primitives/Modal";
 
 interface DocumentDashboardProps {
     documentId: string;
 }
 
 export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
+    const router = useRouter();
     const { document, loading: documentLoading, error: documentError } = useDocument(documentId);
     const { concepts, isLoading: conceptsLoading, error: conceptsError, refetch } = useDocumentConcepts(documentId);
+    const { deleteDocument, deleting } = useDeleteDocument();
+    const { showToast } = useToast();
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+    const handleDeleteConfirm = async () => {
+        try {
+            await deleteDocument(documentId);
+            showToast("Document deleted successfully", "success");
+            setDeleteModalOpen(false);
+            router.push("/dashboard");
+        } catch {
+            showToast("Failed to delete document", "error");
+        }
+    };
 
     // Auto-refresh concepts AND sidebar list when document becomes ready
     useEffect(() => {
@@ -99,6 +126,16 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                     <Button
                         variant="outline"
                         size="lg"
+                        onClick={() => setDeleteModalOpen(true)}
+                        className="rounded-full border-semantic-error/30 text-semantic-error hover:bg-semantic-error/10 hover:text-semantic-error"
+                    >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                    </Button>
+
+                    <Button
+                        variant="outline"
+                        size="lg"
                         onClick={() => window.location.reload()}
                         className="rounded-full"
                     >
@@ -169,6 +206,38 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
 
             {/* Concept List */}
             <ConceptList documentId={document.id} concepts={concepts} />
+
+            {/* Delete Confirmation Modal */}
+            <AlertDialog open={deleteModalOpen} onOpenChange={(open) => { if (!open) setDeleteModalOpen(false); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <div className="w-12 h-12 rounded-full bg-semantic-error/10 flex items-center justify-center mx-auto mb-2">
+                            <AlertTriangle size={24} className="text-semantic-error" />
+                        </div>
+                        <AlertDialogTitle className="text-center">Delete Document</AlertDialogTitle>
+                        <AlertDialogDescription className="text-center">
+                            Are you sure you want to delete &quot;{document.ai_title || document.filename}&quot;? This will also delete all associated quiz sessions and cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={deleting}
+                            onClick={(e) => { e.preventDefault(); handleDeleteConfirm(); }}
+                            className="bg-semantic-error text-white hover:bg-semantic-error/90"
+                        >
+                            {deleting ? (
+                                <>
+                                    <Loader2 size={18} className="animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                "Delete"
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

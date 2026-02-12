@@ -1,18 +1,59 @@
 "use client";
 
-import { useDocuments } from "@/hooks/useDocuments";
+import { useState } from "react";
+import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
+import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
 import { groupDocumentsByDate } from "@/lib/date";
-import { FileText, Loader2, Plus, AlertCircle, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { FileText, Loader2, Plus, AlertCircle, CheckCircle2, Clock, XCircle, Trash2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Logo } from "@/components/brand/Logo";
+import {
+    AlertDialog,
+    AlertDialogContent,
+    AlertDialogHeader,
+    AlertDialogFooter,
+    AlertDialogTitle,
+    AlertDialogDescription,
+    AlertDialogAction,
+    AlertDialogCancel,
+} from "@/components/primitives/Modal";
+import type { Document } from "@/lib/types";
 
 export function DocumentSidebar() {
     const { documents, isLoading, error } = useDocuments();
+    const { deleteDocument, deleting } = useDeleteDocument();
+    const { showToast } = useToast();
     const searchParams = useSearchParams();
     const activeDocId = searchParams.get("docId");
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+
+    const handleDeleteClick = (e: React.MouseEvent, doc: Document) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDocumentToDelete(doc);
+        setDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!documentToDelete) return;
+        try {
+            await deleteDocument(documentToDelete.id);
+            showToast("Document deleted successfully", "success");
+            setDeleteModalOpen(false);
+            setDocumentToDelete(null);
+        } catch {
+            showToast("Failed to delete document", "error");
+        }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteModalOpen(false);
+        setDocumentToDelete(null);
+    };
 
     // Sort documents by date first
     const sortedDocuments = [...documents].sort((a, b) =>
@@ -38,8 +79,8 @@ export function DocumentSidebar() {
 
     return (
         <div className="flex flex-col h-full bg-[var(--surface-darker)] text-[var(--text-primary)]">
-            {/* Logo Section - Pushes content down */}
-            <div className="p-4 border-b border-[var(--surface-border)]/50">
+            {/* Logo Section - matches navbar h-16 */}
+            <div className="h-16 flex items-center justify-center px-4 border-b border-[var(--surface-border)]/50">
                 <Link href="/dashboard" className="flex items-center justify-center">
                     <Logo size="lg" animated />
                 </Link>
@@ -119,6 +160,14 @@ export function DocumentSidebar() {
                                                                 <StatusIcon status={doc.status} />
                                                             </div>
                                                         )}
+
+                                                        <button
+                                                            onClick={(e) => handleDeleteClick(e, doc)}
+                                                            className="shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-semantic-error/10 text-text-muted hover:text-semantic-error"
+                                                            title="Delete document"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
                                                     </Link>
                                                 );
                                             })}
@@ -133,6 +182,38 @@ export function DocumentSidebar() {
 
             {/* Footer spacer */}
             <div className="shrink-0 h-2" />
+
+            {/* Delete Confirmation Modal */}
+            <AlertDialog open={deleteModalOpen} onOpenChange={(open) => { if (!open) handleDeleteCancel(); }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <div className="w-12 h-12 rounded-full bg-semantic-error/10 flex items-center justify-center mx-auto mb-2">
+                            <AlertTriangle size={24} className="text-semantic-error" />
+                        </div>
+                        <AlertDialogTitle className="text-center">Delete Document</AlertDialogTitle>
+                        <AlertDialogDescription className="text-center">
+                            Are you sure you want to delete &quot;{documentToDelete?.ai_title || documentToDelete?.filename}&quot;? This will also delete all associated quiz sessions and cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            disabled={deleting}
+                            onClick={(e) => { e.preventDefault(); handleDeleteConfirm(); }}
+                            className="bg-semantic-error text-white hover:bg-semantic-error/90"
+                        >
+                            {deleting ? (
+                                <>
+                                    <Loader2 size={18} className="animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                "Delete"
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
