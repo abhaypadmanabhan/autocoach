@@ -52,6 +52,7 @@ class User(Base):
         nullable=False,
     )
 
+
 class Document(Base):
     __tablename__ = "documents"
     __table_args__ = (
@@ -87,6 +88,12 @@ class Document(Base):
         server_default=text("0"),
     )
     ai_title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    summary_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    summary_generated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    summary_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    summary_concepts_hash: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     progress_core: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

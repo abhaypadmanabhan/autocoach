@@ -28,11 +28,16 @@ from app.models.documents import (
     ConceptSchema,
     DocumentProgressResponse,
     DocumentProgressSummaryResponse,
+    DocumentSummaryResponse,
 )
 from app.services.abuse_controls import enforce_max_documents
 from app.services.ingestion import process_document
 from app.services.retrieval import retrieve_relevant_chunks
 from app.services.concepts import get_document_concepts
+from app.services.summary_generator import (
+    generate_document_summary,
+    compute_concepts_hash,
+)
 
 router = APIRouter()
 
@@ -866,3 +871,74 @@ async def get_document_progress(
         raise HTTPException(
             status_code=500, detail=f"Failed to get document progress: {str(e)}"
         )
+
+
+@router.get("/{document_id}/summary", response_model=DocumentSummaryResponse)
+async def get_document_summary(
+    document_id: UUID, user_id: UUID = Depends(get_user_id_from_token)
+):
+    """Get document summary and regenerate if concept set changed."""
+    try:
+        doc_response = (
+            supabase_admin.table("documents")
+            .select(
+                "id, summary_json, summary_generated_at, summary_version, summary_concepts_hash"
+            )
+            .eq("id", str(document_id))
+            .eq("user_id", str(user_id))
+            .execute()
+        )
+        if not doc_response.data:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        doc = doc_response.data[0]
+
+        concepts_response = (
+            supabase_admin.table("concepts")
+            .select("concept_name, concept_description, importance_score")
+            .eq("document_id", str(document_id))
+            .execute()
+        )
+        concepts = concepts_response.data or []
+        if not concepts:
+            raise HTTPException(status_code=409, detail="Concepts not ready")
+
+        current_hash = compute_concepts_hash(concepts)
+        summary_json = doc.get("summary_json")
+        summary_hash = doc.get("summary_concepts_hash")
+
+        if isinstance(summary_json, dict) and summary_hash == current_hash:
+            return DocumentSummaryResponse(
+                document_id=document_id,
+                summary=summary_json,
+                generated_at=doc.get("summary_generated_at"),
+                version=doc.get("summary_version"),
+            )
+
+        regenerated_summary = await generate_document_summary(
+            str(document_id), concepts, force=True
+        )
+
+        refreshed_doc = (
+            supabase_admin.table("documents")
+            .select("summary_generated_at, summary_version")
+            .eq("id", str(document_id))
+            .single()
+            .execute()
+        )
+        refreshed_data = (
+            refreshed_doc.data if isinstance(refreshed_doc.data, dict) else {}
+        )
+
+        return DocumentSummaryResponse(
+            document_id=document_id,
+            summary=regenerated_summary,
+            generated_at=refreshed_data.get("summary_generated_at"),
+            version=refreshed_data.get("summary_version"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[documents/summary] Failed to get summary: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}")

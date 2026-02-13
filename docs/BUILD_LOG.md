@@ -64,3 +64,61 @@
 1. `DocumentDashboard.tsx`: Added 0% mastery guidance message; Added Tooltip for CTA when no weak concepts exist
 2. `ConceptList.tsx`: Added retry button to empty state; Updated copy to "No concepts yet"
 3. `DocumentCard.tsx`: Milestone now uses Badge component with consistent styling; Added helper text for 0% mastery; Improved spacing around progress section
+
+## Sprint 3 – Document Summary Component (sync + robustness)
+- Added concept-sync hash support for document summaries.
+- Added summary regeneration guard based on concept hash.
+- Added `GET /documents/{id}/summary` endpoint behavior checks and robustness fixes.
+
+### Sprint 3 Backend QA Pass – Notes
+**Date:** 2026-02-12
+
+**Checked:**
+- ✅ Added `documents.summary_concepts_hash` migration and model field.
+- ✅ Summary generation stores `summary_concepts_hash` and reuses summary when hash matches.
+- ✅ Summary endpoint returns `404` for missing/non-owned document and `409` when concepts are not ready.
+- ✅ Added strict JSON-key validation for summary payload with parse retry.
+- ✅ Added deterministic fallback summary when LLM output is invalid after retry.
+- ✅ Bullet-like fields are clamped to max 12 words.
+
+**Backend improvements applied:**
+1. Implemented concept hash computation with stable ordering.
+2. Added retry prompt enforcing JSON-only response.
+3. Added fallback summary path to prevent empty/error summary states.
+4. Added summary endpoint tests for `404`, `409`, hash-match reuse, and hash-mismatch regeneration.
+
+### Sprint 3 UI QA Pass – Notes
+**Date:** 2026-02-12
+
+**Checked:**
+- ✅ Loading state: Skeleton UI with proper structure (header + content lines)
+- ✅ 409 concepts not ready: Shows "Summary coming soon" with clear messaging
+- ✅ 404 doc missing: Shows "Document not found" with helpful context
+- ✅ Empty/malformed summary: Detects empty arrays and shows fallback with refresh option
+- ✅ Collapsed default: Component defaults to collapsed state ✓
+- ✅ Accessibility: Added proper ARIA attributes (aria-expanded, aria-controls)
+
+**Readability & Premium Feel:**
+- ✅ Improved spacing: `space-y-4` and `gap-6` for better visual rhythm
+- ✅ Bullet formatting: Larger bullets (w-1.5 h-1.5) with better alignment
+- ✅ Badge styling: Added padding (`py-1 px-2.5`) for key concept badges
+- ✅ Typography: Consistent leading-relaxed for better readability
+- ✅ Button converted to `<button>` element for proper accessibility
+
+**Regenerate/Refresh:**
+- ✅ Backend auto-regenerates on GET when concept hash mismatches (no explicit POST needed)
+- ✅ Added refresh button in footer for manual re-fetch
+- ✅ Loading state with spin animation on refresh button
+- ✅ Refresh also available in error states for retry
+
+**UI improvements applied:**
+1. `DocumentSummary.tsx`: 
+   - Added specific 404 error handling with FileX icon
+   - Enhanced 409 state with better messaging and icon
+   - Added empty/malformed summary detection (all fields empty)
+   - Improved spacing throughout (gap-6, space-y-4, p-5)
+   - Added ARIA attributes (aria-expanded, aria-controls)
+   - Added footer with AI disclaimer and refresh button
+   - Conditional rendering for each section based on data availability
+   - Removed unused `ApiError` import (error is string from SWR)
+2. `useDocumentSummary.ts`: Already exposes `mutate` for refresh functionality

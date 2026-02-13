@@ -167,6 +167,12 @@ async def extract_concepts(document_id: str, chunks: List[dict]) -> None:
         # Step 3: Generate AI Title
         await generate_ai_title(document_id, concepts, chunks)
 
+        # Step 4: Generate Document Summary
+        from app.services.summary_generator import generate_document_summary
+        # Convert Pydantic models to dicts for the service
+        concept_dicts = [c.dict() for c in concepts]
+        await generate_document_summary(document_id, concept_dicts)
+
     except Exception as e:
         logger.exception(f"Unexpected error in concept extraction: {e}")
 
