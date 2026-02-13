@@ -1,4 +1,3 @@
-
 import logging
 from uuid import UUID
 from app.core.supabase import supabase_admin
@@ -10,21 +9,25 @@ logger = logging.getLogger(__name__)
 def get_document_concepts(document_id: str, user_id: str) -> list[dict]:
     """
     Get all concepts for a document with user mastery data.
-    
+
     Args:
         document_id: The document ID.
         user_id: The user ID.
-        
+
     Returns:
         List of concept dictionaries with mastery data.
-        
+
     Raises:
         HTTPException: If Supabase returns an error or unexpected shape.
     """
-    logger.info(f"[concepts] Starting fetch: document_id={document_id}, user_id={user_id}")
-    
+    logger.info(
+        f"[concepts] Starting fetch: document_id={document_id}, user_id={user_id}"
+    )
+
     # Step 1: Fetch concepts by document_id only (no-join fallback baseline)
-    logger.info(f"[concepts] Step 1: Fetching concepts from 'concepts' table where document_id={document_id}")
+    logger.info(
+        f"[concepts] Step 1: Fetching concepts from 'concepts' table where document_id={document_id}"
+    )
     try:
         concepts_response = (
             supabase_admin.table("concepts")
@@ -34,38 +37,47 @@ def get_document_concepts(document_id: str, user_id: str) -> list[dict]:
             .execute()
         )
     except Exception as e:
-        logger.error(f"[concepts] Supabase query failed for concepts table: {type(e).__name__}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to query concepts table: {str(e)}"
+        logger.error(
+            f"[concepts] Supabase query failed for concepts table: {type(e).__name__}: {e}"
         )
-    
+        raise HTTPException(
+            status_code=500, detail=f"Failed to query concepts table: {str(e)}"
+        )
+
     # Validate response shape
-    if not hasattr(concepts_response, 'data'):
-        logger.error(f"[concepts] Unexpected response shape from concepts query: {type(concepts_response)}")
+    if not hasattr(concepts_response, "data"):
+        logger.error(
+            f"[concepts] Unexpected response shape from concepts query: {type(concepts_response)}"
+        )
         raise HTTPException(
             status_code=500,
-            detail=f"Unexpected response from concepts query: no 'data' attribute"
+            detail=f"Unexpected response from concepts query: no 'data' attribute",
         )
-    
+
     concepts = concepts_response.data or []
-    logger.info(f"[concepts] Step 1 result: Found {len(concepts)} raw concepts in DB for document_id={document_id}")
-    
+    logger.info(
+        f"[concepts] Step 1 result: Found {len(concepts)} raw concepts in DB for document_id={document_id}"
+    )
+
     if not concepts:
-        logger.info(f"[concepts] No concepts found for document_id={document_id}, returning empty list")
+        logger.info(
+            f"[concepts] No concepts found for document_id={document_id}, returning empty list"
+        )
         return []
-    
+
     # Debug: Log keys in first row to verify column names
     if concepts:
         logger.info(f"[concepts] Keys in first row: {list(concepts[0].keys())}")
-    
+
     concept_ids = [c.get("id") for c in concepts if c.get("id")]
     logger.info(f"[concepts] Concept IDs found: {concept_ids}")
-    
+
     # Step 2: Fetch user mastery for these concepts (join simulation)
-    logger.info(f"[concepts] Step 2: Fetching mastery from 'user_concept_mastery' where user_id={user_id} and concept_id in {concept_ids}")
+    logger.info(
+        f"[concepts] Step 2: Fetching mastery from 'user_concept_mastery' where user_id={user_id} and concept_id in {concept_ids}"
+    )
     mastery_map = {}
-    
+
     try:
         mastery_response = (
             supabase_admin.table("user_concept_mastery")
@@ -74,49 +86,63 @@ def get_document_concepts(document_id: str, user_id: str) -> list[dict]:
             .in_("concept_id", concept_ids)
             .execute()
         )
-        
+
         # Validate response shape
-        if not hasattr(mastery_response, 'data'):
-            logger.error(f"[concepts] Unexpected response shape from mastery query: {type(mastery_response)}")
+        if not hasattr(mastery_response, "data"):
+            logger.error(
+                f"[concepts] Unexpected response shape from mastery query: {type(mastery_response)}"
+            )
             # Continue with empty mastery - don't fail the whole request
-            logger.warning(f"[concepts] Mastery query returned unexpected shape, proceeding with empty mastery")
+            logger.warning(
+                f"[concepts] Mastery query returned unexpected shape, proceeding with empty mastery"
+            )
         else:
             mastery_data = mastery_response.data or []
-            logger.info(f"[concepts] Step 2 result: Found {len(mastery_data)} mastery records for user {user_id}")
+            logger.info(
+                f"[concepts] Step 2 result: Found {len(mastery_data)} mastery records for user {user_id}"
+            )
             mastery_map = {m["concept_id"]: m for m in mastery_data}
-            
+
     except Exception as e:
         # Log but don't fail - we can return concepts without mastery
-        logger.warning(f"[concepts] Mastery query failed (proceeding without mastery): {type(e).__name__}: {e}")
+        logger.warning(
+            f"[concepts] Mastery query failed (proceeding without mastery): {type(e).__name__}: {e}"
+        )
         mastery_map = {}
-    
+
     # Step 3: Merge data
-    logger.info(f"[concepts] Step 3: Merging {len(concepts)} concepts with {len(mastery_map)} mastery records")
+    logger.info(
+        f"[concepts] Step 3: Merging {len(concepts)} concepts with {len(mastery_map)} mastery records"
+    )
     result = []
     for c in concepts:
         m = mastery_map.get(c.get("id"), {})
         imp_score = c.get("importance_score", 0.0)
         is_core = c.get("importance") == "core"
-        
-        result.append({
-            "id": c.get("id"),
-            "concept_name": c.get("concept_name", "Unnamed Concept"),
-            "concept_description": c.get("concept_description"),
-            "importance_score": imp_score,
-            "is_core": is_core,
-            "parent_concept_id": c.get("parent_concept_id"),
-            "created_at": c.get("created_at"),
-            "mastery_score": m.get("mastery_score", 0.0) if m else 0.0,
-            "times_tested": m.get("times_tested", 0) if m else 0,
-            "times_correct": m.get("times_correct", 0) if m else 0,
-            "last_tested_at": m.get("last_tested_at") if m else None,
-            "mastered_at": m.get("mastered_at") if m else None,
-        })
-    
+
+        result.append(
+            {
+                "id": c.get("id"),
+                "concept_name": c.get("concept_name", "Unnamed Concept"),
+                "concept_description": c.get("concept_description"),
+                "importance_score": imp_score,
+                "is_core": is_core,
+                "parent_concept_id": c.get("parent_concept_id"),
+                "created_at": c.get("created_at"),
+                "mastery_score": m.get("mastery_score", 0.0) if m else 0.0,
+                "times_tested": m.get("times_tested", 0) if m else 0,
+                "times_correct": m.get("times_correct", 0) if m else 0,
+                "last_tested_at": m.get("last_tested_at") if m else None,
+                "mastered_at": m.get("mastered_at") if m else None,
+            }
+        )
+
     # Sort: Core first, then by importance desc
     result.sort(key=lambda x: (not x["is_core"], -x["importance_score"]))
-    
-    logger.info(f"[concepts] Final result: Returning {len(result)} merged concepts for document_id={document_id}")
+
+    logger.info(
+        f"[concepts] Final result: Returning {len(result)} merged concepts for document_id={document_id}"
+    )
     return result
 
 
@@ -124,17 +150,17 @@ def get_weakest_concepts(user_id: str, limit: int = 3) -> list[dict]:
     """
     Get the user's weakest concepts (lowest mastery score).
     Only includes concepts that have been tested at least once.
-    
+
     Args:
         user_id: The user ID.
         limit: Max number of concepts to return.
-        
+
     Returns:
         List of concept dictionaries with mastery data.
         Returns empty list if no data found.
     """
     logger.info(f"[concepts] Fetching {limit} weakest concepts for user_id={user_id}")
-    
+
     try:
         # Step 1: Fetch lowest mastery scores for user
         # We only want concepts that have been tested (times_tested > 0)
@@ -148,17 +174,17 @@ def get_weakest_concepts(user_id: str, limit: int = 3) -> list[dict]:
             .limit(limit)
             .execute()
         )
-        
+
         if not mastery_response.data:
             logger.info("[concepts] No mastery data found for user")
             return []
-            
+
         mastery_data = mastery_response.data
         concept_ids = [m["concept_id"] for m in mastery_data]
-        
+
         if not concept_ids:
             return []
-            
+
         # Step 2: Fetch concept details
         concepts_response = (
             supabase_admin.table("concepts")
@@ -166,31 +192,172 @@ def get_weakest_concepts(user_id: str, limit: int = 3) -> list[dict]:
             .in_("id", concept_ids)
             .execute()
         )
-        
+
         if not concepts_response.data:
             logger.warning("[concepts] Mastery records exist but concepts not found")
             return []
-            
+
         concepts_map = {c["id"]: c for c in concepts_response.data}
-        
+
         # Step 3: Merge and format
         result = []
         for m in mastery_data:
             c = concepts_map.get(m["concept_id"])
             if c:
                 score = float(m.get("mastery_score", 0))
-                result.append({
-                    "id": c["id"],
-                    "concept_name": c["concept_name"],
-                    "document_id": c["document_id"],
-                    "mastery_score": score,
-                    "mastery_percent": int(score * 100),
-                    "times_tested": m.get("times_tested", 0)
-                })
-                
+                result.append(
+                    {
+                        "id": c["id"],
+                        "concept_name": c["concept_name"],
+                        "document_id": c["document_id"],
+                        "mastery_score": score,
+                        "mastery_percent": int(score * 100),
+                        "times_tested": m.get("times_tested", 0),
+                    }
+                )
+
         return result
-        
+
     except Exception as e:
         logger.error(f"[concepts] Failed to fetch weakest concepts: {e}")
         # Return empty list on error for safe fallbacks
+        return []
+
+
+def get_due_concepts(user_id: str, limit: int = 20) -> list[dict]:
+    """
+    Get concepts due for review.
+    Criteria:
+    1. Mastery score < 75.0 (weak)
+    2. OR Last tested > 2 days ago (stale)
+
+    Ordered by:
+    1. Mastery score ASC (weakest first)
+    2. Last tested ASC (oldest first)
+
+    Args:
+        user_id: The user ID.
+        limit: Max number of concepts to return.
+
+    Returns:
+        List of concept dictionaries with mastery data.
+    """
+    # Safety cap: API contract for review/today is max 20
+    limit = max(1, min(limit, 20))
+    logger.info(
+        f"[concepts] Fetching due concepts for user_id={user_id}, limit={limit}"
+    )
+
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        # Calculate stale threshold (2 days ago)
+        stale_threshold = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+
+        # We support schemas that might use either last_practiced_at or last_tested_at.
+        # Try last_practiced_at first, then gracefully fallback.
+        practice_columns = ["last_practiced_at", "last_tested_at"]
+        mastery_response = None
+        selected_practice_col = "last_tested_at"
+
+        for practice_col in practice_columns:
+            or_filter = f"mastery_score.lt.75,and({practice_col}.lt.{stale_threshold},times_tested.gt.0)"
+            try:
+                mastery_response = (
+                    supabase_admin.table("user_concept_mastery")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .or_(or_filter)
+                    .order("mastery_score", desc=False)
+                    .order(practice_col, desc=False)
+                    .limit(limit)
+                    .execute()
+                )
+                selected_practice_col = practice_col
+                break
+            except Exception as col_err:
+                logger.warning(
+                    "[concepts] Due concept query failed using %s for user %s: %s",
+                    practice_col,
+                    user_id,
+                    col_err,
+                )
+
+        # Final fallback: return weak concepts only if both practice columns are unavailable
+        if mastery_response is None:
+            logger.warning(
+                "[concepts] Falling back to mastery-only due concept query for user %s",
+                user_id,
+            )
+            mastery_response = (
+                supabase_admin.table("user_concept_mastery")
+                .select("*")
+                .eq("user_id", user_id)
+                .lt("mastery_score", 75)
+                .order("mastery_score", desc=False)
+                .limit(limit)
+                .execute()
+            )
+
+        if not mastery_response.data:
+            logger.info("[concepts] No due concepts found for user")
+            # If OR filter is tricky, we can try a broader fetch and filter in memory if the dataset isn't huge?
+            # Or make two queries?
+            # The .or_ syntax above is standard PostgREST.
+            return []
+
+        mastery_data = mastery_response.data
+        concept_ids = [m["concept_id"] for m in mastery_data]
+
+        if not concept_ids:
+            return []
+
+        # Step 2: Fetch concept details
+        concepts_response = (
+            supabase_admin.table("concepts")
+            .select("id, concept_name, document_id")
+            .in_("id", concept_ids)
+            .execute()
+        )
+
+        if not concepts_response.data:
+            logger.warning("[concepts] Mastery records exist but concepts not found")
+            return []
+
+        concepts_map = {c["id"]: c for c in concepts_response.data}
+
+        # Step 3: Merge and format
+        result = []
+        for m in mastery_data:
+            c = concepts_map.get(m["concept_id"])
+            if c:
+                score = float(m.get("mastery_score", 0))
+                result.append(
+                    {
+                        "id": c["id"],
+                        "name": c["concept_name"],
+                        "document_id": c["document_id"],
+                        "mastery_score": score,
+                        "mastery_percent": int(score * 100)
+                        if score <= 1.0
+                        else int(score),  # Handle potential scale mix safely
+                        "last_tested_at": m.get(selected_practice_col)
+                        or m.get("last_tested_at"),
+                    }
+                )
+
+        # Primary: low mastery first. Secondary: oldest practiced first when available.
+        # Null practice timestamps should come last.
+        result.sort(
+            key=lambda x: (
+                x["mastery_score"],
+                x["last_tested_at"] is None,
+                x["last_tested_at"] or "9999-12-31T23:59:59+00:00",
+            )
+        )
+
+        return result[:limit]
+
+    except Exception as e:
+        logger.error(f"[concepts] Failed to fetch due concepts: {e}")
         return []

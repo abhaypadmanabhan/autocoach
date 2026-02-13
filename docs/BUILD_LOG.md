@@ -127,3 +127,74 @@
 - **Problem:** `DocumentSummary` component existed but was never imported or used in `DocumentDashboard.tsx`
 - **Solution:** Added import and mounted `<DocumentSummary documentId={documentId} />` unconditionally between Stats Grid and Concept List
 - **Files changed:** `frontend/src/components/dashboard/DocumentDashboard.tsx`
+
+## Sprint 4 – Smart Review (Spaced Reinforcement v1)
+- Implemented `GET /review/today` endpoint returning due concepts (mastery < 75% or stale > 2 days).
+- Added `get_due_concepts` service logic with consolidated mastery/staleness filtering.
+- Created `ReviewTodayWidget` on Dashboard to surface due concepts.
+- Implemented "Review Now" CTA that launches a focused quiz session.
+- Added backend tests for review endpoint logic.
+- Verified frontend build and component integration.
+
+### Sprint 4 QA Pass – Notes
+**Date:** 2026-02-13
+
+**Checked:**
+- ✅ Backend: `GET /review/today` correctly returns due concepts based on mastery and staleness.
+- ✅ Backend: Service handles empty states and gracefully returns empty lists.
+- ✅ Frontend: Widget displays correct count and concept previews.
+- ✅ Frontend: "Review Now" button creates a session with the correct target concepts.
+- ✅ Frontend: Empty state ("All caught up") is handled visually.
+- ✅ Tests: Backend unit tests pass for valid and empty data scenarios.
+
+### Sprint 4 QA Pass – Review Today (Backend correctness + performance)
+**Date:** 2026-02-13
+
+**Checked:**
+- ✅ `last_practiced_at`/`last_tested_at` compatibility: due-concepts query now gracefully falls back across column variants.
+- ✅ Ordering: returns lowest `mastery_score` first, then oldest practice timestamp when available (null timestamps sorted last).
+- ✅ Response contract: `/review/today` returns `mastery_score`, `mastery_percent`, and `rules` metadata.
+- ✅ Auth/ownership: only rows filtered by authenticated `user_id` are considered from `user_concept_mastery`.
+- ✅ Query efficiency: two batched queries (mastery + concepts), no N+1 pattern.
+- ✅ Limit enforcement: API and service now enforce max `20`.
+- ✅ Empty state: contract preserved (`count=0`, `due_concepts=[]`).
+
+**Minimal safe fixes applied:**
+1. `backend/app/services/concepts.py`: added robust practice-date column fallback and deterministic secondary ordering with nulls last.
+2. `backend/app/services/concepts.py`: added service-side hard cap for `limit` at `20`.
+3. `backend/app/api/routes/review.py`: tightened query param validation from `le=50` to `le=20`.
+4. `backend/tests/test_review.py`: added tests for endpoint limit validation and service fallback/ordering behavior.
+
+### Sprint 4 UI QA Pass – ReviewTodayWidget
+**Date:** 2026-02-13
+
+**Checked:**
+- ✅ **Loading state:** Skeleton properly animates with matching header + content structure
+- ✅ **Error state:** New `ReviewTodayError` component shows user-friendly message with Retry button (was returning null)
+- ✅ **Count > 0 state:** Displays count badge with concept preview chips (+N more indicator)
+- ✅ **All caught up state:** Shows success message with "Check back tomorrow" guidance
+
+**CTA Behavior:**
+- ✅ Uses up to 5 due concept ids (`slice(0, 5)`)
+- ✅ `num_questions=5` (fixed from incorrect `Math.min(conceptIds.length * 2, 5)`)
+- ✅ Redirects to `/session?session_id={id}` route
+- ✅ Filters concepts to primary document (handles multi-doc constraint)
+
+**Premium Polish:**
+- ✅ **Spacing:** Removed hardcoded `mb-8`, now relies on parent `space-y-8` (matches DailySprintCard rhythm)
+- ✅ **Copy:** "Check back tomorrow" added to caught-up state for clear guidance
+- ✅ **Badges:** Count now renders as styled badge (bg-brand/10 text-brand) instead of plain text
+- ✅ **Visual hierarchy:** Decorative blur gradient, proper text colors (text-secondary for labels)
+- ✅ **No visual competition:** Secondary styling (clock icon, subdued colors) vs Daily Sprint's gradient + mascot
+
+**UI Improvements Applied:**
+1. `ReviewTodayWidget.tsx`:
+   - Fixed `num_questions` to always be 5 as per spec
+   - Added `ReviewTodayError` component with AlertCircle icon and Retry button
+   - Updated "All caught up" copy to include "Check back tomorrow"
+   - Converted count display to badge style (rounded-full bg)
+   - Removed `mb-8` class to let parent container control spacing
+   - Added AlertCircle and RefreshCw icon imports
+
+**Files changed:**
+- `frontend/src/components/dashboard/ReviewTodayWidget.tsx`

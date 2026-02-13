@@ -14,6 +14,7 @@ import { DocumentSidebar } from "@/components/sidebar/DocumentSidebar";
 import { DocumentDashboard } from "@/components/dashboard/DocumentDashboard";
 import { DailySprintCard } from "@/components/dashboard/DailySprintCard";
 import { WeakConceptsWidget } from "@/components/dashboard/WeakConceptsWidget";
+import { ReviewTodayWidget } from "@/components/dashboard/ReviewTodayWidget";
 import { DocumentCard } from "@/components/features/dashboard/DocumentCard";
 import {
   AlertDialog,
@@ -150,6 +151,16 @@ function DashboardContent() {
               <motion.div variants={slideUpItem}>
                 <DailySprintCard />
               </motion.div>
+            </motion.div>
+
+            {/* Smart Review */}
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="show"
+              className="w-full"
+            >
+              <ReviewTodayWidget />
             </motion.div>
 
             {/* Weak Concepts Loop */}

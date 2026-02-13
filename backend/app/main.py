@@ -15,6 +15,7 @@ from app.api.routes import (
     daily_sprint,
     sprints,
     concepts,
+    review,
 )
 from app.config import get_settings
 
@@ -81,6 +82,7 @@ app.include_router(voice.router, prefix="/voice", tags=["voice"])
 app.include_router(daily_sprint.router, prefix="/daily-sprint", tags=["daily-sprint"])
 app.include_router(sprints.router, prefix="/sprint", tags=["sprint"])
 app.include_router(concepts.router, prefix="/concepts", tags=["concepts"])
+app.include_router(review.router, prefix="/review", tags=["review"])
 
 
 @app.get("/")
