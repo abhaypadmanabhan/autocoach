@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DocumentResponse(BaseModel):
@@ -64,7 +64,7 @@ class ConceptSchema(BaseModel):
     is_core: bool
     parent_concept_id: UUID | None = None
     created_at: datetime
-    
+
     # User mastery fields (zeroed if not present)
     mastery_score: float = 0.0
     times_tested: int = 0
@@ -75,6 +75,25 @@ class ConceptSchema(BaseModel):
 
 class DocumentConceptsResponse(BaseModel):
     """Response model for a document's concepts."""
-    
+
     document_id: UUID
     concepts: list[ConceptSchema]
+
+
+class DocumentProgressResponse(BaseModel):
+    """Response model for document learning progress."""
+
+    document_id: UUID
+    document_title: str | None = None
+    mastery_percent: int = Field(ge=0, le=100)
+    concepts_total: int
+    concepts_practiced: int
+    weak_concepts_count: int
+    mastered_concepts_count: int
+    milestone: str  # "none" | "25" | "50" | "75" | "100"
+
+
+class DocumentProgressSummaryResponse(BaseModel):
+    """Response model for a list of document progress summaries."""
+
+    documents: list[DocumentProgressResponse]

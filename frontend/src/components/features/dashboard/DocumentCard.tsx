@@ -19,6 +19,7 @@ import {
   buttonHoverVariants,
 } from "@/lib/motions";
 import type { Document } from "@/lib/types";
+import type { DocumentProgress } from "@/hooks/useDocumentProgress";
 
 // ── DocumentStatusBadge ─────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ function DocumentStatusBadge({
 
 export interface DocumentCardProps {
   document: Document;
+  progress?: DocumentProgress;
   onContinue?: () => void;
   onDelete?: () => void;
   isDeleting?: boolean;
@@ -106,11 +108,19 @@ function getStatusConfig(status: string) {
 
 export function DocumentCard({
   document,
+  progress,
   onContinue,
   onDelete,
   isDeleting,
 }: DocumentCardProps) {
   const config = getStatusConfig(document.status);
+
+  // Use passed progress or fallback to document property
+  const masteryPercent = progress?.mastery_percent ?? document.progress ?? 0;
+
+  // Milestone badge extraction (simplified for card)
+  const milestone = progress?.milestone;
+  const showMilestone = milestone && milestone !== "none";
 
   return (
     <motion.div
@@ -182,6 +192,30 @@ export function DocumentCard({
           {(document.file_size / 1024 / 1024).toFixed(2)} MB &bull;{" "}
           {document.chunk_count || 0} chunks
         </p>
+
+        {/* Progress Section */}
+        {document.status === "ready" && (
+          <div className="mb-5 space-y-2.5">
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-text-secondary font-medium">Mastery</span>
+              <span className="text-brand-primary font-bold">{Math.round(masteryPercent)}%</span>
+            </div>
+            <Progress value={masteryPercent} className="h-1.5" />
+            {showMilestone && (
+              <Badge 
+                variant="secondary" 
+                className="text-[10px] bg-brand-primary/10 text-brand-primary border-brand-primary/20 px-2 py-0.5"
+              >
+                {milestone === "100" ? "🏆 Mastered!" : `🎯 ${milestone}% Milestone`}
+              </Badge>
+            )}
+            {!showMilestone && masteryPercent === 0 && (
+              <p className="text-[10px] text-text-muted">
+                Start learning to track progress
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Processing state */}
         {document.status === "processing" && (

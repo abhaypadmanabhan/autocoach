@@ -30,12 +30,19 @@ export function ConceptList({ documentId, concepts }: ConceptListProps) {
                     <Lightbulb size={28} className="text-brand-primary" />
                 </div>
                 <h3 className="text-lg font-medium text-text-primary mb-2">
-                    No concepts found
+                    No concepts yet
                 </h3>
-                <p className="text-text-muted text-sm max-w-md mx-auto">
+                <p className="text-text-muted text-sm max-w-md mx-auto mb-4">
                     This document is still being processed or no concepts were detected. 
                     Check back soon or try uploading a different document.
                 </p>
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => window.location.reload()}
+                >
+                    Retry Loading
+                </Button>
             </div>
         );
     }

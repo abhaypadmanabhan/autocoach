@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Plus, Loader2, AlertTriangle, Sparkles, FileText, TrendingUp, Clock, Trash2 } from "lucide-react";
 import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
+import { useDocumentProgressSummary } from "@/hooks/useDocumentProgress";
 import { useToast } from "@/hooks/useToast";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
@@ -13,6 +14,7 @@ import { DocumentSidebar } from "@/components/sidebar/DocumentSidebar";
 import { DocumentDashboard } from "@/components/dashboard/DocumentDashboard";
 import { DailySprintCard } from "@/components/dashboard/DailySprintCard";
 import { WeakConceptsWidget } from "@/components/dashboard/WeakConceptsWidget";
+import { DocumentCard } from "@/components/features/dashboard/DocumentCard";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -38,6 +40,7 @@ import { Suspense } from "react";
 function DashboardContent() {
   const router = useRouter();
   const { documents, loading, error, refetch } = useDocuments();
+  const { summary: progressSummary } = useDocumentProgressSummary();
   const { deleteDocument, deleting } = useDeleteDocument();
   const { showToast } = useToast();
   const [user, setUser] = useState<User | null>(null);
@@ -65,6 +68,11 @@ function DashboardContent() {
   const handleDeleteCancel = () => {
     setDeleteModalOpen(false);
     setDocumentToDelete(null);
+  };
+
+  // Helper to get progress for a doc
+  const getProgress = (docId: string) => {
+    return progressSummary?.documents.find(p => p.document_id === docId);
   };
 
   // Auth check
@@ -276,7 +284,7 @@ function DashboardContent() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {documents.slice(0, 6).map((doc, index) => (
                       <motion.div
                         key={doc.id}
@@ -284,37 +292,12 @@ function DashboardContent() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/30 transition-all group cursor-pointer relative"
-                          onClick={() => router.push(`/dashboard?docId=${doc.id}`)}
-                        >
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteClick(doc); }}
-                            className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-semantic-error/10 text-text-muted hover:text-semantic-error z-10"
-                            title="Delete document"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                          <CardContent className="p-4">
-                            <div className="flex items-start gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-[var(--brand-primary)]/10 flex items-center justify-center shrink-0">
-                                <FileText className="w-5 h-5 text-[var(--brand-primary)]" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-[var(--text-primary)] truncate group-hover:text-[var(--brand-primary)] transition-colors">
-                                  {doc.ai_title || doc.filename}
-                                </p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Badge variant={doc.status === "ready" ? "default" : "secondary"} className="text-xs">
-                                    {doc.status}
-                                  </Badge>
-                                  <span className="text-xs text-[var(--text-muted)]">
-                                    {new Date(doc.created_at).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                        <DocumentCard
+                          document={doc}
+                          progress={getProgress(doc.id)}
+                          onContinue={() => router.push(`/dashboard?docId=${doc.id}`)}
+                          onDelete={() => handleDeleteClick(doc)}
+                        />
                       </motion.div>
                     ))}
                   </div>

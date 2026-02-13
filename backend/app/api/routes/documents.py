@@ -1,4 +1,5 @@
 from uuid import UUID, uuid4
+import math
 
 from fastapi import (
     APIRouter,
@@ -25,6 +26,8 @@ from app.models.documents import (
     ChunkResult,
     DocumentConceptsResponse,
     ConceptSchema,
+    DocumentProgressResponse,
+    DocumentProgressSummaryResponse,
 )
 from app.services.abuse_controls import enforce_max_documents
 from app.services.ingestion import process_document
@@ -416,23 +419,27 @@ async def get_document_concepts_endpoint(
 ):
     """
     Get concepts for a document with user mastery data.
-    
+
     Args:
         document_id: The ID of the document.
         user_id: The authenticated user's ID.
-        
+
     Returns:
         DocumentConceptsResponse with list of concepts.
-        
+
     Raises:
         HTTPException: 404 if document not found.
         HTTPException: 500 if query fails.
     """
-    logger.info(f"[documents/concepts] Route called: document_id={document_id}, resolved user_id={user_id}")
-    
+    logger.info(
+        f"[documents/concepts] Route called: document_id={document_id}, resolved user_id={user_id}"
+    )
+
     try:
         # Verify document existence/ownership (light check)
-        logger.info(f"[documents/concepts] Verifying document ownership: document_id={document_id}, user_id={user_id}")
+        logger.info(
+            f"[documents/concepts] Verifying document ownership: document_id={document_id}, user_id={user_id}"
+        )
         doc_response = (
             supabase_admin.table("documents")
             .select("id")
@@ -440,19 +447,26 @@ async def get_document_concepts_endpoint(
             .eq("user_id", str(user_id))
             .execute()
         )
-        
+
         if not doc_response.data:
-            logger.warning(f"[documents/concepts] Document {document_id} not found for user {user_id}")
+            logger.warning(
+                f"[documents/concepts] Document {document_id} not found for user {user_id}"
+            )
             raise HTTPException(status_code=404, detail="Document not found")
-        
-        logger.info(f"[documents/concepts] Document verified, calling service: document_id={document_id}, user_id={user_id}")
+
+        logger.info(
+            f"[documents/concepts] Document verified, calling service: document_id={document_id}, user_id={user_id}"
+        )
         concepts = get_document_concepts(str(document_id), str(user_id))
-        logger.info(f"[documents/concepts] Service returned {len(concepts)} concepts for document {document_id}")
-        logger.info(f"[documents/concepts] First concept keys={list(concepts[0].keys()) if concepts else 'EMPTY'}")
-        
+        logger.info(
+            f"[documents/concepts] Service returned {len(concepts)} concepts for document {document_id}"
+        )
+        logger.info(
+            f"[documents/concepts] First concept keys={list(concepts[0].keys()) if concepts else 'EMPTY'}"
+        )
+
         return DocumentConceptsResponse(
-            document_id=document_id,
-            concepts=[ConceptSchema(**c) for c in concepts]
+            document_id=document_id, concepts=[ConceptSchema(**c) for c in concepts]
         )
     except HTTPException:
         # Re-raise HTTP exceptions (404, 500 from service, etc.)
@@ -541,6 +555,67 @@ async def search_document(
 logger = logging.getLogger(__name__)
 
 
+def _normalize_mastery_percent(value: object) -> float:
+    """Normalize mastery value to 0..100 float and guard invalid values."""
+    try:
+        score = float(value if value is not None else 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+    if not math.isfinite(score):
+        return 0.0
+
+    # Backward compatibility: accept either ratio (0..1) or percent (0..100)
+    if 0.0 <= score <= 1.0:
+        score *= 100.0
+
+    return min(100.0, max(0.0, score))
+
+
+def _milestone_from_percent(mastery_percent: int) -> str:
+    if mastery_percent >= 100:
+        return "100"
+    if mastery_percent >= 75:
+        return "75"
+    if mastery_percent >= 50:
+        return "50"
+    if mastery_percent >= 25:
+        return "25"
+    return "none"
+
+
+def _calculate_progress(concepts: list[dict]) -> tuple[int, int, int, int, int, str]:
+    total_concepts = len(concepts)
+    practiced_concepts = sum(
+        1 for c in concepts if int(c.get("times_tested", 0) or 0) > 0
+    )
+    normalized_scores = [
+        _normalize_mastery_percent(c.get("mastery_score", 0)) for c in concepts
+    ]
+
+    # Weak concepts should be concepts the user has practiced and is still weak at.
+    weak_concepts = sum(
+        1
+        for c, score in zip(concepts, normalized_scores)
+        if int(c.get("times_tested", 0) or 0) > 0 and score < 60.0
+    )
+    mastered_concepts = sum(1 for score in normalized_scores if score >= 85.0)
+
+    mastery_percent = 0
+    if total_concepts > 0:
+        mastery_percent = int(sum(normalized_scores) / total_concepts)
+
+    milestone = _milestone_from_percent(mastery_percent)
+    return (
+        total_concepts,
+        practiced_concepts,
+        weak_concepts,
+        mastered_concepts,
+        mastery_percent,
+        milestone,
+    )
+
+
 @router.delete("/{document_id}", status_code=204)
 async def delete_document(
     document_id: UUID,
@@ -612,9 +687,7 @@ async def delete_document(
         ).execute()
 
         # Delete document record
-        supabase_admin.table("documents").delete().eq(
-            "id", str(document_id)
-        ).execute()
+        supabase_admin.table("documents").delete().eq("id", str(document_id)).execute()
 
         # Delete vectors from Qdrant (best-effort)
         try:
@@ -636,4 +709,160 @@ async def delete_document(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to delete document: {str(e)}"
+        )
+
+
+@router.get("/progress/summary", response_model=DocumentProgressSummaryResponse)
+async def get_progress_summary(user_id: UUID = Depends(get_user_id_from_token)):
+    """
+    Get progress summary for all documents.
+
+    Args:
+        user_id: The authenticated user's ID.
+
+    Returns:
+        DocumentProgressSummaryResponse with list of progress summaries.
+    """
+    try:
+        # Get all documents for user
+        docs_response = (
+            supabase_admin.table("documents")
+            .select("id, ai_title, filename")
+            .eq("user_id", str(user_id))
+            .order("created_at", desc=True)
+            .execute()
+        )
+
+        if not docs_response.data:
+            return DocumentProgressSummaryResponse(documents=[])
+
+        doc_ids = [doc["id"] for doc in docs_response.data]
+        concepts_by_doc: dict[str, list[dict]] = {doc_id: [] for doc_id in doc_ids}
+
+        concepts_response = (
+            supabase_admin.table("concepts")
+            .select("id, document_id")
+            .in_("document_id", doc_ids)
+            .execute()
+        )
+        concept_rows = concepts_response.data or []
+
+        concept_to_doc = {row["id"]: row["document_id"] for row in concept_rows}
+        concept_ids = [row["id"] for row in concept_rows]
+
+        mastery_map: dict[str, dict] = {}
+        if concept_ids:
+            mastery_response = (
+                supabase_admin.table("user_concept_mastery")
+                .select("concept_id, mastery_score, times_tested")
+                .eq("user_id", str(user_id))
+                .in_("concept_id", concept_ids)
+                .execute()
+            )
+            mastery_map = {
+                row["concept_id"]: row
+                for row in (mastery_response.data or [])
+                if row.get("concept_id")
+            }
+
+        for concept_id, document_id in concept_to_doc.items():
+            mastery = mastery_map.get(concept_id, {})
+            concepts_by_doc[document_id].append(
+                {
+                    "mastery_score": mastery.get("mastery_score", 0),
+                    "times_tested": mastery.get("times_tested", 0),
+                }
+            )
+
+        progress_list = []
+        for doc in docs_response.data:
+            doc_id = doc["id"]
+            (
+                total_concepts,
+                practiced_concepts,
+                weak_concepts,
+                mastered_concepts,
+                mastery_percent,
+                milestone,
+            ) = _calculate_progress(concepts_by_doc.get(doc_id, []))
+
+            progress_list.append(
+                DocumentProgressResponse(
+                    document_id=UUID(doc_id),
+                    document_title=doc.get("ai_title") or doc.get("filename"),
+                    mastery_percent=mastery_percent,
+                    concepts_total=total_concepts,
+                    concepts_practiced=practiced_concepts,
+                    weak_concepts_count=weak_concepts,
+                    mastered_concepts_count=mastered_concepts,
+                    milestone=milestone,
+                )
+            )
+
+        return DocumentProgressSummaryResponse(documents=progress_list)
+
+    except Exception as e:
+        logger.error(f"[documents/progress] Failed to get summary: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get progress summary: {str(e)}"
+        )
+
+
+@router.get("/{document_id}/progress", response_model=DocumentProgressResponse)
+async def get_document_progress(
+    document_id: UUID, user_id: UUID = Depends(get_user_id_from_token)
+):
+    """
+    Get progress stats for a specific document.
+
+    Args:
+        document_id: The ID of the document.
+        user_id: The authenticated user's ID.
+
+    Returns:
+        DocumentProgressResponse with detailed stats.
+    """
+    try:
+        # Verify document exists
+        doc_response = (
+            supabase_admin.table("documents")
+            .select("id, ai_title, filename")
+            .eq("id", str(document_id))
+            .eq("user_id", str(user_id))
+            .execute()
+        )
+
+        if not doc_response.data:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        doc = doc_response.data[0]
+
+        concepts = get_document_concepts(str(document_id), str(user_id))
+
+        (
+            total_concepts,
+            practiced_concepts,
+            weak_concepts,
+            mastered_concepts,
+            mastery_percent,
+            milestone,
+        ) = _calculate_progress(concepts)
+
+        return DocumentProgressResponse(
+            document_id=document_id,
+            document_title=doc.get("ai_title") or doc.get("filename"),
+            mastery_percent=mastery_percent,
+            concepts_total=total_concepts,
+            concepts_practiced=practiced_concepts,
+            weak_concepts_count=weak_concepts,
+            mastered_concepts_count=mastered_concepts,
+            milestone=milestone,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[documents/progress] Failed to get progress: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get document progress: {str(e)}"
         )

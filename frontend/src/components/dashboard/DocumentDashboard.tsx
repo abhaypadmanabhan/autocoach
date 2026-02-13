@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSWRConfig } from "swr";
 import { mutate } from "swr";
 
 import { useDocument, useDeleteDocument } from "@/hooks/useDocuments";
 import { useDocumentConcepts } from "@/hooks/useConcepts";
+import { useDocumentProgress } from "@/hooks/useDocumentProgress";
 import { useToast } from "@/hooks/useToast";
-import { PlayCircle, Star, GraduationCap, CheckCircle2, Trash2, AlertTriangle, Loader2 } from "lucide-react";
+import { PlayCircle, Star, GraduationCap, CheckCircle2, Trash2, AlertTriangle, Loader2, Trophy, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Progress } from "@/components/ui/progress";
@@ -28,6 +28,12 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
 } from "@/components/primitives/Modal";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface DocumentDashboardProps {
     documentId: string;
@@ -37,6 +43,7 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const router = useRouter();
     const { document, loading: documentLoading, error: documentError } = useDocument(documentId);
     const { concepts, isLoading: conceptsLoading, error: conceptsError, refetch } = useDocumentConcepts(documentId);
+    const { progress, isLoading: progressLoading } = useDocumentProgress(documentId);
     const { deleteDocument, deleting } = useDeleteDocument();
     const { showToast } = useToast();
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -65,7 +72,7 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
         }
     }, [document?.status, concepts.length, refetch]);
 
-    if (documentLoading || conceptsLoading) {
+    if (documentLoading || conceptsLoading || progressLoading) {
         return <DashboardSkeleton />;
     }
 
@@ -87,12 +94,26 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
 
     const coreConcepts = concepts.filter(c => c.is_core);
     const masteredConcepts = concepts.filter(c => (c.mastery_score || 0) >= 80);
-    const totalMastery = document.progress || 0;
 
-    // Debug logging for concept loading issues
-    if (conceptsError) {
-        console.error("[DocumentDashboard] Concepts error:", conceptsError);
-    }
+    // Use progress data if available, fallback to manual calculation
+    const totalMastery = progress?.mastery_percent ?? document.progress ?? 0;
+    const milestone = progress?.milestone;
+
+    // Milestone config
+    const getMilestoneConfig = (m: string) => {
+        switch (m) {
+            case "25": return { label: "Apprentice", color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/20" };
+            case "50": return { label: "Scholar", color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" };
+            case "75": return { label: "Expert", color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20" };
+            case "100": return { label: "Master", color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" };
+            default: return null;
+        }
+    };
+
+    const milestoneConfig = milestone && milestone !== "none" ? getMilestoneConfig(milestone) : null;
+
+    // CTA for weak concepts
+    const hasWeakConcepts = (progress?.weak_concepts_count ?? 0) > 0;
 
     return (
         <div className="p-6 md:p-8 space-y-8 max-w-5xl mx-auto pb-20">
@@ -106,6 +127,12 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                         {document.status === "processing" && (
                             <Badge variant="secondary" className="bg-brand-primary/10 text-brand-primary">
                                 Processing
+                            </Badge>
+                        )}
+                        {milestoneConfig && (
+                            <Badge variant="secondary" className={cn(milestoneConfig.bg, milestoneConfig.color, "border", milestoneConfig.border)}>
+                                <Trophy className="w-3 h-3 mr-1" />
+                                {milestoneConfig.label}
                             </Badge>
                         )}
                     </div>
@@ -142,12 +169,30 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                         Refresh Data
                     </Button>
 
-                    <Link href={`/config?document_id=${document.id}&mode=recommend`}>
-                        <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
-                            <PlayCircle className="mr-2 h-5 w-5" />
-                            Continue Learning
-                        </Button>
-                    </Link>
+                    {hasWeakConcepts ? (
+                        <Link href={`/sprint/start?document_id=${document.id}&type=weak`}>
+                            <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
+                                <PlayCircle className="mr-2 h-5 w-5" />
+                                Train Weak Concepts
+                            </Button>
+                        </Link>
+                    ) : (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Link href={`/config?document_id=${document.id}&mode=recommend`}>
+                                        <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
+                                            <PlayCircle className="mr-2 h-5 w-5" />
+                                            Continue Learning
+                                        </Button>
+                                    </Link>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs">
+                                    <p>No weak concepts yet. Start learning to identify focus areas.</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
                 </div>
             </div>
 
@@ -163,6 +208,11 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                         <span className="text-sm text-text-muted mb-1">core mastery</span>
                     </div>
                     <Progress value={totalMastery} className="h-2 mt-2" />
+                    {totalMastery === 0 && (
+                        <p className="text-xs text-text-secondary mt-2">
+                            Start your first sprint to begin tracking mastery
+                        </p>
+                    )}
                 </div>
 
                 <div className="bg-surface-card border border-surface-border/50 rounded-xl p-6 flex flex-col gap-2">
@@ -171,8 +221,8 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                         <GraduationCap className="text-semantic-success opacity-50" size={20} />
                     </div>
                     <div className="flex items-end gap-2">
-                        <span className="text-4xl font-serif text-text-primary">{masteredConcepts.length}</span>
-                        <span className="text-sm text-text-muted mb-1">/ {concepts.length} concepts</span>
+                        <span className="text-4xl font-serif text-text-primary">{progress?.mastered_concepts_count ?? masteredConcepts.length}</span>
+                        <span className="text-sm text-text-muted mb-1">/ {progress?.concepts_total ?? concepts.length} concepts</span>
                     </div>
                     <div className="flex gap-1 mt-3">
                         {/* Mini concept dots visualization */}
@@ -195,11 +245,13 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                         <Star className="text-semantic-warning opacity-50" size={20} />
                     </div>
                     <div className="flex items-end gap-2">
-                        <span className="text-4xl font-serif text-text-primary">{coreConcepts.length}</span>
-                        <span className="text-sm text-text-muted mb-1">core concepts detected</span>
+                        <span className="text-4xl font-serif text-text-primary">{progress?.weak_concepts_count ?? 0}</span>
+                        <span className="text-sm text-text-muted mb-1">weak concepts</span>
                     </div>
                     <p className="text-xs text-text-secondary mt-2 line-clamp-2">
-                        Focus on core concepts like {coreConcepts.slice(0, 2).map(c => c.concept_name).join(", ")}...
+                        {hasWeakConcepts
+                            ? "Prioritize practicing these concepts to improve mastery."
+                            : `Focus on core concepts like ${coreConcepts.slice(0, 2).map(c => c.concept_name).join(", ")}...`}
                     </p>
                 </div>
             </div>
