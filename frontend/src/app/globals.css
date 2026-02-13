@@ -486,6 +486,8 @@ body {
 }
 
 .animate-mascot-float { animation: mascot-float 4s ease-in-out infinite; }
+.animate-mascot-float-fast { animation: mascot-float 0.5s ease-in-out infinite; }
+.animate-mascot-float-slow { animation: mascot-float 6s ease-in-out infinite; }
 .animate-glow-pulse-primary { animation: glow-pulse-primary 4s ease-in-out infinite; }
 .animate-glow-pulse-secondary { animation: glow-pulse-secondary 5s ease-in-out infinite 0.5s; }
 .animate-mesh-orb-1 { animation: mesh-orb-1 20s ease-in-out infinite; }

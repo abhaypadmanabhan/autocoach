@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 type GuideMessage = {
   id: string;
   message: string;
-  variant: "neutral" | "thinking" | "success" | "wrong" | "timeout";
+  variant: "neutral" | "smiling" | "proud" | "pleading" | "thinking" | "timesUp" | "wrong";
   showFor: number; // scroll percentage range
 };
 
@@ -16,7 +16,7 @@ const guideMessages: GuideMessage[] = [
   {
     id: "welcome",
     message: "Hey there! Ready to learn smarter?",
-    variant: "success",
+    variant: "smiling",
     showFor: 0,
   },
   {
@@ -40,7 +40,7 @@ const guideMessages: GuideMessage[] = [
   {
     id: "cta",
     message: "Let's start your journey!",
-    variant: "success",
+    variant: "smiling",
     showFor: 90,
   },
 ];
@@ -152,8 +152,8 @@ export function MascotGuide({ className, enabled = true }: MascotGuideProps) {
 
 // Hero-specific mascot with larger presence and dynamic emotions
 export function HeroMascot({ className }: { className?: string }) {
-  const emotions: Array<"neutral" | "thinking" | "success"> = [
-    "success",
+  const emotions: Array<"neutral" | "thinking" | "smiling"> = [
+    "smiling",
     "thinking",
     "neutral",
   ];
@@ -244,7 +244,7 @@ export function FeatureMascot({
   variant = "thinking", 
   className 
 }: { 
-  variant?: "neutral" | "thinking" | "success" | "wrong";
+  variant?: "neutral" | "thinking" | "smiling" | "wrong";
   className?: string;
 }) {
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-type Variant = "neutral" | "thinking" | "wrong" | "success" | "timeout";
+type Variant = "neutral" | "smiling" | "proud" | "pleading" | "thinking" | "timesUp" | "wrong";
 type Mode = "dashboard" | "loading" | "quiz" | "results";
 type AnswerState = "idle" | "correct" | "wrong";
 
@@ -34,7 +34,7 @@ export function useMascotManager({
   // Timeout takes highest priority
   if (timedOut) {
     return {
-      variant: "timeout",
+      variant: "timesUp",
       message: "Time's up. Quick reset.",
       sizeClass: mode === "loading" ? SIZE_CLASSES.lg : SIZE_CLASSES.md,
     };
@@ -53,7 +53,7 @@ export function useMascotManager({
   if (mode === "quiz") {
     if (answerState === "correct") {
       return {
-        variant: "success",
+        variant: "smiling",
         message: "Nice. Locking that in.",
         sizeClass: SIZE_CLASSES.md,
       };
@@ -76,7 +76,7 @@ export function useMascotManager({
   if (mode === "results" && scorePercent !== undefined) {
     if (scorePercent >= 80) {
       return {
-        variant: "success",
+        variant: "smiling",
         message: "Solid run.",
         sizeClass: SIZE_CLASSES.md,
       };

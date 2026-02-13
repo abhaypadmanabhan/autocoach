@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion, useSpring } from "framer-motion";
+import { motion, useSpring, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-type Variant = "neutral" | "thinking" | "wrong" | "success" | "timeout";
+type Variant = "neutral" | "smiling" | "proud" | "pleading" | "thinking" | "timesUp" | "wrong";
 
 interface SentinelMascotProps {
   variant?: Variant;
@@ -47,6 +47,9 @@ const COLORS = {
 const LEFT_EYE_CENTER = { x: 1250, y: 750 };
 const RIGHT_EYE_CENTER = { x: 1566, y: 750 };
 
+// Variants where mouse tracking is disabled
+const NO_TRACKING_VARIANTS: Variant[] = ["thinking", "timesUp"];
+
 export function SentinelMascot({ variant = "neutral", className }: SentinelMascotProps) {
   const mousePosition = useMousePosition();
   const [isBlinking, setIsBlinking] = useState(false);
@@ -75,6 +78,14 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
 
   // Sentient "Look At" feature: track mouse position (max 10px)
   useEffect(() => {
+    if (NO_TRACKING_VARIANTS.includes(variant)) {
+      leftEyeX.set(0);
+      leftEyeY.set(0);
+      rightEyeX.set(0);
+      rightEyeY.set(0);
+      return;
+    }
+
     // Calculate offset toward mouse (simplified for SVG coordinate space)
     const offsetX = ((mousePosition.x - window.innerWidth / 2) / window.innerWidth) * 20;
     const offsetY = ((mousePosition.y - window.innerHeight / 2) / window.innerHeight) * 20;
@@ -87,7 +98,7 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
     leftEyeY.set(clampedY);
     rightEyeX.set(clampedX);
     rightEyeY.set(clampedY);
-  }, [mousePosition, leftEyeX, leftEyeY, rightEyeX, rightEyeY]);
+  }, [mousePosition, variant, leftEyeX, leftEyeY, rightEyeX, rightEyeY]);
 
   // Render eyes based on variant
   const renderEyes = () => {
@@ -97,7 +108,7 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
       case "neutral":
         // Two solid black circles
         return (
-          <>
+          <motion.g key="neutral" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.circle
               cx={LEFT_EYE_CENTER.x}
               cy={LEFT_EYE_CENTER.y}
@@ -116,69 +127,139 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
               animate={{ scaleY: blinkScale }}
               transition={{ duration: 0.075 }}
             />
-          </>
+          </motion.g>
         );
 
-      case "success":
-        // Two Dusty Rose four-pointed stars
+      case "smiling":
+        // Two arc paths (happy curved eyes)
         return (
-          <>
-            <motion.g
-              style={{ x: leftEyeX, y: leftEyeY }}
-              animate={{ scaleY: blinkScale }}
-              transition={{ duration: 0.075 }}
-            >
+          <motion.g key="smiling" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.g style={{ x: leftEyeX, y: leftEyeY }}>
               <path
-                d={`M${LEFT_EYE_CENTER.x} ${LEFT_EYE_CENTER.y - 50} 
-                    L${LEFT_EYE_CENTER.x + 15} ${LEFT_EYE_CENTER.y - 15} 
-                    L${LEFT_EYE_CENTER.x + 50} ${LEFT_EYE_CENTER.y} 
-                    L${LEFT_EYE_CENTER.x + 15} ${LEFT_EYE_CENTER.y + 15} 
-                    L${LEFT_EYE_CENTER.x} ${LEFT_EYE_CENTER.y + 50} 
-                    L${LEFT_EYE_CENTER.x - 15} ${LEFT_EYE_CENTER.y + 15} 
-                    L${LEFT_EYE_CENTER.x - 50} ${LEFT_EYE_CENTER.y} 
-                    L${LEFT_EYE_CENTER.x - 15} ${LEFT_EYE_CENTER.y - 15} Z`}
-                fill={COLORS.dustyRose}
+                d="M1000 800 Q1237 600 1474 800"
+                stroke={COLORS.black}
+                strokeWidth="20"
+                strokeLinecap="round"
+                fill="none"
               />
             </motion.g>
-            <motion.g
-              style={{ x: rightEyeX, y: rightEyeY }}
-              animate={{ scaleY: blinkScale }}
-              transition={{ duration: 0.075 }}
-            >
+            <motion.g style={{ x: rightEyeX, y: rightEyeY }}>
               <path
-                d={`M${RIGHT_EYE_CENTER.x} ${RIGHT_EYE_CENTER.y - 50} 
-                    L${RIGHT_EYE_CENTER.x + 15} ${RIGHT_EYE_CENTER.y - 15} 
-                    L${RIGHT_EYE_CENTER.x + 50} ${RIGHT_EYE_CENTER.y} 
-                    L${RIGHT_EYE_CENTER.x + 15} ${RIGHT_EYE_CENTER.y + 15} 
-                    L${RIGHT_EYE_CENTER.x} ${RIGHT_EYE_CENTER.y + 50} 
-                    L${RIGHT_EYE_CENTER.x - 15} ${RIGHT_EYE_CENTER.y + 15} 
-                    L${RIGHT_EYE_CENTER.x - 50} ${RIGHT_EYE_CENTER.y} 
-                    L${RIGHT_EYE_CENTER.x - 15} ${RIGHT_EYE_CENTER.y - 15} Z`}
-                fill={COLORS.dustyRose}
+                d="M1500 800 Q1737 600 1974 800"
+                stroke={COLORS.black}
+                strokeWidth="20"
+                strokeLinecap="round"
+                fill="none"
               />
             </motion.g>
-          </>
+          </motion.g>
+        );
+
+      case "proud":
+        // Left eye = open circle, Right eye = thick wink line
+        return (
+          <motion.g key="proud" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.g style={{ x: leftEyeX, y: leftEyeY }}>
+              <path
+                d="M1237 780 m-65 0 a65 65 0 1 0 130 0 a65 65 0 1 0 -130 0"
+                fill="none"
+                stroke={COLORS.black}
+                strokeWidth="12"
+              />
+            </motion.g>
+            <motion.g style={{ x: rightEyeX, y: rightEyeY }}>
+              <line
+                x1={1514}
+                y1={780}
+                x2={1644}
+                y2={780}
+                stroke={COLORS.black}
+                strokeWidth="16"
+                strokeLinecap="round"
+              />
+            </motion.g>
+          </motion.g>
+        );
+
+      case "pleading":
+        // Two flat-top chord shapes (puppy eyes)
+        return (
+          <motion.g key="pleading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.g style={{ x: leftEyeX, y: leftEyeY }}>
+              <path
+                d="M1172 780 a65 65 0 0 0 130 0 H1172 Z"
+                fill={COLORS.black}
+              />
+            </motion.g>
+            <motion.g style={{ x: rightEyeX, y: rightEyeY }}>
+              <path
+                d="M1514 780 a65 65 0 0 0 130 0 H1514 Z"
+                fill={COLORS.black}
+              />
+            </motion.g>
+          </motion.g>
         );
 
       case "thinking":
-        // Three solid black dots in horizontal row
+        // 3 animated dots with staggered opacity
         return (
-          <>
-            <motion.g
-              animate={{ scaleY: blinkScale }}
-              transition={{ duration: 0.075 }}
-            >
-              <circle cx={1340} cy={LEFT_EYE_CENTER.y} r="25" fill={COLORS.black} />
-              <circle cx={1408} cy={LEFT_EYE_CENTER.y} r="25" fill={COLORS.black} />
-              <circle cx={1476} cy={LEFT_EYE_CENTER.y} r="25" fill={COLORS.black} />
-            </motion.g>
-          </>
+          <motion.g key="thinking" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.circle
+              cx={1200}
+              cy={780}
+              r="35"
+              fill={COLORS.black}
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
+            />
+            <motion.circle
+              cx={1408}
+              cy={780}
+              r="35"
+              fill={COLORS.black}
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
+            />
+            <motion.circle
+              cx={1616}
+              cy={780}
+              r="35"
+              fill={COLORS.black}
+              animate={{ opacity: [0.3, 1, 0.3] }}
+              transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
+            />
+          </motion.g>
+        );
+
+      case "timesUp":
+        // Two squint lines
+        return (
+          <motion.g key="timesUp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <line
+              x1={1180}
+              y1={780}
+              x2={1300}
+              y2={780}
+              stroke={COLORS.black}
+              strokeWidth="20"
+              strokeLinecap="round"
+            />
+            <line
+              x1={1520}
+              y1={780}
+              x2={1640}
+              y2={780}
+              stroke={COLORS.black}
+              strokeWidth="20"
+              strokeLinecap="round"
+            />
+          </motion.g>
         );
 
       case "wrong":
         // Two black X-shapes (thick strokes)
         return (
-          <>
+          <motion.g key="wrong" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.g
               style={{ x: leftEyeX, y: leftEyeY }}
               animate={{ scaleY: blinkScale }}
@@ -227,34 +308,7 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
                 strokeLinecap="round"
               />
             </motion.g>
-          </>
-        );
-
-      case "timeout":
-        // Two flat black rectangles
-        return (
-          <>
-            <motion.rect
-              x={LEFT_EYE_CENTER.x - 45}
-              y={LEFT_EYE_CENTER.y - 20}
-              width="90"
-              height="40"
-              fill={COLORS.black}
-              style={{ x: leftEyeX, y: leftEyeY }}
-              animate={{ scaleY: blinkScale }}
-              transition={{ duration: 0.075 }}
-            />
-            <motion.rect
-              x={RIGHT_EYE_CENTER.x - 45}
-              y={RIGHT_EYE_CENTER.y - 20}
-              width="90"
-              height="40"
-              fill={COLORS.black}
-              style={{ x: rightEyeX, y: rightEyeY }}
-              animate={{ scaleY: blinkScale }}
-              transition={{ duration: 0.075 }}
-            />
-          </>
+          </motion.g>
         );
 
       default:
@@ -262,9 +316,35 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
     }
   };
 
+  // Determine head animation based on variant
+  const headAnimation = (() => {
+    if (variant === "wrong") {
+      return {
+        animate: { x: [-10, 10, -10, 10, 0] },
+        transition: { type: "spring" as const, stiffness: 300, damping: 10 },
+      };
+    }
+    if (variant === "proud") {
+      return {
+        animate: { rotate: [-5, 0] },
+        transition: { type: "spring" as const, stiffness: 120, damping: 14 },
+      };
+    }
+    return {};
+  })();
+
+  // Determine float class based on variant
+  const floatClass =
+    variant === "timesUp"
+      ? "animate-mascot-float-fast"
+      : variant === "pleading"
+        ? "animate-mascot-float-slow"
+        : "animate-mascot-float";
+
   return (
-    <div
-      className={cn("relative animate-mascot-float", className)}
+    <motion.div
+      className={cn("relative", floatClass, className)}
+      {...headAnimation}
     >
       <svg
         viewBox="0 0 2816 1536"
@@ -279,11 +359,13 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
           className="fill-[var(--brand-secondary)]"
         />
 
-        {/* Eyes */}
-        {renderEyes()}
+        {/* Eyes with morph transitions */}
+        <AnimatePresence mode="wait">
+          {renderEyes()}
+        </AnimatePresence>
 
-        {/* Whistle for timeout variant */}
-        {variant === "timeout" && (
+        {/* Whistle for timesUp variant */}
+        {variant === "timesUp" && (
           <motion.g
             initial={{ opacity: 0 }}
             animate={{
@@ -299,10 +381,10 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
               },
             }}
           >
-            {/* Whistle positioned below eyes */}
+            {/* Whistle positioned at mouth level */}
             <rect
               x={1358}
-              y={950}
+              y={870}
               width="100"
               height="60"
               rx="8"
@@ -310,13 +392,13 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
             />
             <circle
               cx={1408}
-              cy={980}
+              cy={900}
               r="20"
               fill={COLORS.black}
             />
             {/* Whistle ring */}
             <path
-              d="M1458 1000 C1480 1000, 1490 990, 1490 980 C1490 970, 1480 960, 1458 960"
+              d="M1458 920 C1480 920, 1490 910, 1490 900 C1490 890, 1480 880, 1458 880"
               stroke={COLORS.dustyRose}
               strokeWidth="12"
               strokeLinecap="round"
@@ -325,6 +407,6 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
           </motion.g>
         )}
       </svg>
-    </div>
+    </motion.div>
   );
 }

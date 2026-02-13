@@ -202,7 +202,7 @@ export function DailySprintCard() {
                     )} />
 
                     <SentinelMascot
-                        variant={isCompleted ? "success" : isActive ? "thinking" : "neutral"}
+                        variant={isCompleted ? "smiling" : isActive ? "thinking" : "neutral"}
                         className="w-full h-full drop-shadow-2xl"
                     />
                 </div>

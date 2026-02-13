@@ -124,7 +124,7 @@ function SprintCompletion({
                     className="relative mb-8"
                 >
                     <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-500/20 blur-3xl rounded-full scale-150" />
-                    <SentinelMascot variant="success" className="relative w-48 h-48 md:w-64 md:h-64" />
+                    <SentinelMascot variant="smiling" className="relative w-48 h-48 md:w-64 md:h-64" />
                 </motion.div>
 
                 {/* Title */}
@@ -436,9 +436,9 @@ function SprintContent() {
     const totalQuestions = questions.length;
 
     // Mascot variant based on state
-    let mascotVariant: "neutral" | "thinking" | "success" | "wrong" = "neutral";
+    let mascotVariant: "neutral" | "thinking" | "smiling" | "wrong" = "neutral";
     if (submittingAnswer) mascotVariant = "thinking";
-    else if (showFeedback) mascotVariant = lastResult?.is_correct ? "success" : "wrong";
+    else if (showFeedback) mascotVariant = lastResult?.is_correct ? "smiling" : "wrong";
 
     // Focus messaging
     const focusLabel = targetsWeak
