@@ -131,23 +131,23 @@ export function SentinelMascot({ variant = "neutral", className }: SentinelMasco
         );
 
       case "smiling":
-        // Two arc paths (happy curved eyes)
+        // Two small arc paths (happy curved eyes), sized to match neutral ~80px
         return (
           <motion.g key="smiling" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.g style={{ x: leftEyeX, y: leftEyeY }}>
               <path
-                d="M1000 800 Q1237 600 1474 800"
+                d="M1210 770 Q1250 730 1290 770"
                 stroke={COLORS.black}
-                strokeWidth="20"
+                strokeWidth="14"
                 strokeLinecap="round"
                 fill="none"
               />
             </motion.g>
             <motion.g style={{ x: rightEyeX, y: rightEyeY }}>
               <path
-                d="M1500 800 Q1737 600 1974 800"
+                d="M1526 770 Q1566 730 1606 770"
                 stroke={COLORS.black}
-                strokeWidth="20"
+                strokeWidth="14"
                 strokeLinecap="round"
                 fill="none"
               />
