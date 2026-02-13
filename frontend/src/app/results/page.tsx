@@ -1,42 +1,39 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import confetti from "canvas-confetti";
 import {
   Loader2,
   AlertCircle,
   Home,
   RotateCcw,
-  Clock,
-  Target,
   BarChart3,
-  ChevronRight,
   Trophy,
   Sparkles,
-  CheckCircle2,
-  XCircle,
+  Target,
 } from "lucide-react";
 import { useSession } from "@/hooks/useQuiz";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { ScoreCircle, ScoreBreakdown, StatSatellite } from "@/components/results/ScoreCircle";
-import { ReviewList } from "@/components/results/ReviewRow";
+import { ScoreCircle, InlineStats } from "@/components/results/ScoreCircle";
+import { ReviewAccordion } from "@/components/results/ReviewRow";
 import { MascotStage } from "@/components/brand/MascotStage";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { staggerContainer, slideUpItem, cardLiftVariants } from "@/lib/motions";
-import { cn } from "@/lib/utils";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { resultsStaggerContainer, slideUpItem } from "@/lib/motions";
 
 function ResultsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
   const { session, loading, error: sessionError } = useSession(sessionId);
+  const confettiFired = useRef(false);
 
   const displayError = sessionError ? getErrorMessage(sessionError) : null;
 
@@ -56,6 +53,70 @@ function ResultsContent() {
     }
   }, [sessionId, router]);
 
+  // Derived data — computed early so confetti effect can use scorePercent
+  const questions = session?.questions ?? [];
+  const hasQuestions = questions.length > 0;
+
+  const toSafeNumber = (value: unknown) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+      const coerced = Number(value);
+      return Number.isFinite(coerced) ? coerced : 0;
+    }
+    return 0;
+  };
+
+  const correctFromQuestions = questions.filter((q) => q.is_correct === true).length;
+  const answeredFromQuestions = questions.filter((q) => q.user_answer != null).length;
+  const sessionTotal = toSafeNumber(session?.total_questions);
+  const sessionCorrect = toSafeNumber(session?.correct_answers);
+
+  const total = hasQuestions ? questions.length : sessionTotal;
+  const correct = hasQuestions ? correctFromQuestions : sessionCorrect;
+  const scorePercent = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const hasAnyAnswers = total > 0;
+
+  // Confetti on high scores
+  useEffect(() => {
+    if (scorePercent >= 80 && hasAnyAnswers && !confettiFired.current) {
+      confettiFired.current = true;
+      const timer = setTimeout(() => {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: ["#cd776a", "#c18c5d", "#22c55e", "#eab308"],
+        });
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [scorePercent, hasAnyAnswers]);
+
+  // Filtered question lists for tabs
+  const reviewItems = useMemo(
+    () =>
+      questions.map((q, index) => ({
+        question_id: q.question_id,
+        question_number: index + 1,
+        question_text: q.question_text,
+        question_type: q.question_type,
+        user_answer: q.user_answer || "",
+        correct_answer: q.correct_answer,
+        is_correct: q.is_correct ?? false,
+        explanation: q.explanation || undefined,
+      })),
+    [questions]
+  );
+
+  const correctItems = useMemo(
+    () => reviewItems.filter((q) => q.is_correct),
+    [reviewItems]
+  );
+  const wrongItems = useMemo(
+    () => reviewItems.filter((q) => !q.is_correct),
+    [reviewItems]
+  );
+
   if (loading) {
     return (
       <PageContainer size="xl">
@@ -67,11 +128,8 @@ function ResultsContent() {
                 <div className="flex-1 text-center md:text-left w-full">
                   <Skeleton className="h-10 w-48 mb-4 mx-auto md:mx-0" />
                   <Skeleton className="h-8 w-32 rounded-full mb-6 mx-auto md:mx-0" />
-                  <div className="grid grid-cols-3 gap-4">
-                    <Skeleton className="h-16 rounded-xl" />
-                    <Skeleton className="h-16 rounded-xl" />
-                    <Skeleton className="h-16 rounded-xl" />
-                  </div>
+                  <Skeleton className="h-6 w-56 mb-2 mx-auto md:mx-0" />
+                  <Skeleton className="h-2.5 w-64 rounded-full mx-auto md:mx-0" />
                 </div>
               </div>
             </div>
@@ -110,36 +168,11 @@ function ResultsContent() {
     );
   }
 
-  const toSafeNumber = (value: unknown) => {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-      const coerced = Number(value);
-      return Number.isFinite(coerced) ? coerced : 0;
-    }
-    return 0;
-  };
-
-  const questions = session.questions ?? [];
-  const hasQuestions = questions.length > 0;
-  const correctFromQuestions = questions.filter((q) => q.is_correct === true).length;
-  const answeredFromQuestions = questions.filter((q) => q.user_answer != null).length;
-  const sessionTotal = toSafeNumber(session.total_questions);
-  const sessionCorrect = toSafeNumber(session.correct_answers);
-
-  const total = hasQuestions ? questions.length : sessionTotal;
-  const correct = hasQuestions ? correctFromQuestions : sessionCorrect;
-  const answered = hasQuestions ? answeredFromQuestions : sessionTotal;
-  const incorrect = Math.max(total - correct, 0);
-
-  const scorePercent = total > 0 ? Math.round((correct / total) * 100) : 0;
-  const accuracyPercent = answered > 0 ? Math.round((correct / answered) * 100) : 0;
-  const hasAnyAnswers = total > 0;
-
   const getPerformanceMessage = () => {
-    if (scorePercent >= 80) return { message: "Outstanding! 🎉", color: "#22c55e", icon: Trophy };
-    if (scorePercent >= 60) return { message: "Great job! 👏", color: "#c18c5d", icon: Sparkles };
-    if (scorePercent >= 40) return { message: "Good effort! 💪", color: "#eab308", icon: Target };
-    return { message: "Keep practicing! 📚", color: "#ef4444", icon: BarChart3 };
+    if (scorePercent >= 80) return { message: "Outstanding!", color: "#22c55e", icon: Trophy };
+    if (scorePercent >= 60) return { message: "Great job!", color: "#c18c5d", icon: Sparkles };
+    if (scorePercent >= 40) return { message: "Good effort!", color: "#eab308", icon: Target };
+    return { message: "Keep practicing!", color: "#ef4444", icon: BarChart3 };
   };
 
   const performance = getPerformanceMessage();
@@ -148,12 +181,12 @@ function ResultsContent() {
   return (
     <PageContainer size="xl">
       <motion.div
-        variants={staggerContainer}
+        variants={resultsStaggerContainer}
         initial="hidden"
         animate="show"
         className="py-8"
       >
-        {/* Hero Score Section */}
+        {/* Hero Score Card */}
         <Section spacing="sm">
           <motion.div
             variants={slideUpItem}
@@ -164,7 +197,7 @@ function ResultsContent() {
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-[var(--brand-secondary)]/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
             <div className="relative flex flex-col md:flex-row items-center gap-8 md:gap-12">
-              {/* Score Circle */}
+              {/* Left: Score Circle */}
               <div className="shrink-0">
                 {hasAnyAnswers ? (
                   <ScoreCircle
@@ -181,7 +214,7 @@ function ResultsContent() {
                 )}
               </div>
 
-              {/* Score Details */}
+              {/* Right: Mascot + badge + InlineStats */}
               <div className="flex-1 text-center md:text-left">
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
@@ -203,101 +236,97 @@ function ResultsContent() {
                   </div>
                 </motion.div>
 
-                {/* Stats Grid */}
-                <ScoreBreakdown
-                  correct={correct}
-                  incorrect={incorrect}
-                  total={total}
-                />
+                {/* InlineStats replaces ScoreBreakdown */}
+                <InlineStats correct={correct} total={total} />
               </div>
             </div>
 
-            {/* Satellite Stats */}
+            {/* Action buttons inside hero card */}
+            <Separator className="my-8 bg-[var(--surface-border)]/50" />
+
             <motion.div
-              variants={staggerContainer}
-              initial="hidden"
-              animate="show"
-              className="grid grid-cols-3 gap-4 mt-8 max-w-md mx-auto"
+              variants={slideUpItem}
+              className="relative flex flex-col sm:flex-row gap-4"
             >
-              <StatSatellite
-                icon={<Clock size={20} />}
-                label="Time"
-                value="--:--"
-                orbitDelay={1}
-              />
-              <StatSatellite
-                icon={<Target size={20} />}
-                label="Accuracy"
-                value={hasAnyAnswers ? `${accuracyPercent}%` : "No answers recorded"}
-                orbitDelay={2}
-              />
-              <StatSatellite
-                icon={<BarChart3 size={20} />}
-                label="Questions"
-                value={total}
-                orbitDelay={3}
-              />
+              <Button
+                variant="outline"
+                asChild
+                className="flex-1"
+              >
+                <Link href="/dashboard">
+                  <Home size={20} className="mr-2" />
+                  Dashboard
+                </Link>
+              </Button>
+
+              <Button
+                asChild
+                className="flex-1 shadow-lg shadow-[var(--brand-primary)]/20"
+              >
+                <Link href={`/config?document_id=${session.document_id}`}>
+                  <RotateCcw size={20} className="mr-2" />
+                  Try Again
+                </Link>
+              </Button>
             </motion.div>
           </motion.div>
         </Section>
 
-        {/* Question Review */}
+        {/* Question Review with Tabs */}
         <Section>
           <motion.div variants={slideUpItem}>
-            <Card className="bg-[var(--surface-card)] border-[var(--surface-border)]">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[var(--surface-darker)] border border-[var(--surface-border)] flex items-center justify-center">
-                    <BarChart3 size={20} className="text-[var(--brand-primary)]" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-xl font-heading">Question Review</CardTitle>
-                    <p className="text-sm text-[var(--text-muted)]">Review your answers and learn from mistakes</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ReviewList items={session.questions.map((q, index) => ({
-                  question_id: q.question_id,
-                  question_number: index + 1,
-                  question_text: q.question_text,
-                  question_type: q.question_type,
-                  user_answer: q.user_answer || "",
-                  correct_answer: q.correct_answer,
-                  is_correct: q.is_correct ?? false,
-                  explanation: q.explanation || undefined,
-                }))} />
-              </CardContent>
-            </Card>
-          </motion.div>
-        </Section>
+            <h2 className="text-xl font-heading font-semibold text-[var(--text-primary)] mb-1">
+              Question Review
+            </h2>
+            <p className="text-sm text-[var(--text-muted)] mb-6">
+              Review your answers and learn from mistakes
+            </p>
 
-        {/* Action Buttons */}
-        <Section spacing="sm">
-          <motion.div
-            variants={slideUpItem}
-            className="flex flex-col sm:flex-row gap-4"
-          >
-            <Button
-              variant="outline"
-              asChild
-              className="flex-1"
-            >
-              <Link href="/dashboard">
-                <Home size={20} className="mr-2" />
-                Dashboard
-              </Link>
-            </Button>
+            <Tabs defaultValue="all">
+              <TabsList className="mb-4 bg-[var(--surface-darker)] border border-[var(--surface-border)]">
+                <TabsTrigger value="all">
+                  All ({reviewItems.length})
+                </TabsTrigger>
+                <TabsTrigger value="correct">
+                  Correct ({correctItems.length})
+                </TabsTrigger>
+                <TabsTrigger value="wrong">
+                  Wrong ({wrongItems.length})
+                </TabsTrigger>
+              </TabsList>
 
-            <Button
-              asChild
-              className="flex-1 shadow-lg shadow-[var(--brand-primary)]/20"
-            >
-              <Link href={`/config?document_id=${session.document_id}`}>
-                <RotateCcw size={20} className="mr-2" />
-                Try Again
-              </Link>
-            </Button>
+              <div className="rounded-2xl border border-[var(--surface-border)] overflow-hidden bg-[var(--surface-card)]">
+                <TabsContent value="all" className="mt-0">
+                  {reviewItems.length > 0 ? (
+                    <ReviewAccordion items={reviewItems} />
+                  ) : (
+                    <p className="p-8 text-center text-[var(--text-muted)]">
+                      No questions to review.
+                    </p>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="correct" className="mt-0">
+                  {correctItems.length > 0 ? (
+                    <ReviewAccordion items={correctItems} />
+                  ) : (
+                    <p className="p-8 text-center text-[var(--text-muted)]">
+                      No correct answers yet.
+                    </p>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="wrong" className="mt-0">
+                  {wrongItems.length > 0 ? (
+                    <ReviewAccordion items={wrongItems} />
+                  ) : (
+                    <p className="p-8 text-center text-[var(--text-muted)]">
+                      No wrong answers — perfect score!
+                    </p>
+                  )}
+                </TabsContent>
+              </div>
+            </Tabs>
           </motion.div>
         </Section>
       </motion.div>

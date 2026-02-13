@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { scoreCircleVariants, scoreTextVariants, satelliteVariants } from "@/lib/motions";
+import { Progress } from "@/components/ui/progress";
 import type { ReactNode } from "react";
 
 interface ScoreCircleProps {
@@ -22,6 +23,7 @@ export function ScoreCircle({
 }: ScoreCircleProps) {
   const percentage = Math.round((score / total) * 100);
   const [displayScore, setDisplayScore] = useState(0);
+  const [countingDone, setCountingDone] = useState(false);
 
   // Animate the score counting up
   useEffect(() => {
@@ -35,6 +37,7 @@ export function ScoreCircle({
       if (current >= percentage) {
         setDisplayScore(percentage);
         clearInterval(timer);
+        setCountingDone(true);
       } else {
         setDisplayScore(Math.round(current));
       }
@@ -70,14 +73,25 @@ export function ScoreCircle({
 
   return (
     <div className={`relative ${sizeClasses[size]} ${className}`}>
-      {/* Background glow */}
+      {/* Background glow — reduced opacity */}
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 0.3, scale: 1 }}
+        animate={{ opacity: 0.15, scale: 1 }}
         transition={{ duration: 1 }}
         className="absolute inset-0 rounded-full blur-3xl"
         style={{ backgroundColor: getScoreColor() }}
       />
+
+      {/* One-shot pulse ring after counting completes */}
+      {countingDone && (
+        <motion.div
+          initial={{ opacity: 0.5, scale: 1 }}
+          animate={{ opacity: 0, scale: 1.15 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="absolute inset-0 rounded-full border-2 z-10"
+          style={{ borderColor: getScoreColor() }}
+        />
+      )}
 
       <svg
         className={`${sizeClasses[size]} -rotate-90 relative z-10`}
@@ -132,6 +146,52 @@ export function ScoreCircle({
   );
 }
 
+// ============================================
+// InlineStats — compact replacement for ScoreBreakdown
+// ============================================
+
+interface InlineStatsProps {
+  correct: number;
+  total: number;
+  className?: string;
+}
+
+function getScoreTierColor(percent: number) {
+  if (percent >= 80) return "bg-[#22c55e]";
+  if (percent >= 60) return "bg-[#c18c5d]";
+  if (percent >= 40) return "bg-[#eab308]";
+  return "bg-[#ef4444]";
+}
+
+export function InlineStats({ correct, total, className = "" }: InlineStatsProps) {
+  const percent = total > 0 ? Math.round((correct / total) * 100) : 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.6 }}
+      className={`space-y-2 ${className}`}
+    >
+      <p className="text-sm font-medium text-[var(--text-secondary)]">
+        <span className="text-lg font-bold text-[var(--text-primary)]">{correct}</span>
+        {" "}of{" "}
+        <span className="text-lg font-bold text-[var(--text-primary)]">{total}</span>
+        {" "}correct
+      </p>
+      <Progress
+        value={percent}
+        className="h-2.5 w-full max-w-xs bg-[var(--surface-border)]/30"
+        indicatorClassName={getScoreTierColor(percent)}
+      />
+    </motion.div>
+  );
+}
+
+// ============================================
+// StatSatellite — kept for backward compat
+// ============================================
+
 interface StatSatelliteProps {
   icon: ReactNode;
   label: string;
@@ -170,48 +230,9 @@ export function StatSatellite({
   );
 }
 
-interface OrbitingStatProps {
-  icon: ReactNode;
-  value: string | number;
-  angle: number; // 0-360 degrees
-  distance: number; // distance from center in pixels
-  delay?: number;
-}
-
-export function OrbitingStat({
-  icon,
-  value,
-  angle,
-  distance,
-  delay = 0,
-}: OrbitingStatProps) {
-  const radians = (angle * Math.PI) / 180;
-  const x = Math.cos(radians) * distance;
-  const y = Math.sin(radians) * distance;
-
-  return (
-    <motion.div
-      initial={{ scale: 0, opacity: 0, x: 0, y: 0 }}
-      animate={{
-        scale: 1,
-        opacity: 1,
-        x,
-        y,
-      }}
-      transition={{
-        type: "spring",
-        stiffness: 200,
-        delay: 0.5 + delay,
-      }}
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-    >
-      <div className="flex flex-col items-center gap-1 p-3 rounded-xl bg-surface-card border border-surface-border shadow-lg">
-        <div className="text-brand-primary">{icon}</div>
-        <span className="text-sm font-bold text-text-primary">{value}</span>
-      </div>
-    </motion.div>
-  );
-}
+// ============================================
+// ScoreBreakdown — kept for backward compat
+// ============================================
 
 interface ScoreBreakdownProps {
   correct: number;

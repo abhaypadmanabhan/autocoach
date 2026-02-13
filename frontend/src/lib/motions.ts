@@ -186,6 +186,19 @@ export const staggerSlow: Variants = {
   },
 };
 
+export const resultsStaggerContainer: Variants = {
+  hidden: {
+    opacity: 0,
+  },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.15,
+      delayChildren: 0.3,
+    },
+  },
+};
+
 // ============================================
 // ITEM ANIMATIONS
 // ============================================
@@ -498,8 +511,8 @@ export const scoreCircleVariants: Variants = {
     opacity: 1,
     transition: {
       pathLength: {
-        duration: 1.2,
-        ease: "easeOut",
+        duration: 1.5,
+        ease: [0.33, 1, 0.68, 1],
       },
       opacity: {
         duration: 0.3,
@@ -519,7 +532,7 @@ export const scoreTextVariants: Variants = {
     transition: {
       type: "spring",
       stiffness: 200,
-      delay: 0.8,
+      delay: 1.0,
     },
   },
 };

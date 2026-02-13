@@ -2,9 +2,152 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { CheckCircle, XCircle, ChevronDown, Clock, Target, HelpCircle } from "lucide-react";
+import { CheckCircle, XCircle, ChevronDown } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { accordionVariants, listItemVariants } from "@/lib/motions";
+import { cn } from "@/lib/utils";
 import type { QuestionType } from "@/lib/types";
+
+// ============================================
+// Shared helpers
+// ============================================
+
+function getQuestionTypeLabel(type: QuestionType) {
+  switch (type) {
+    case "mcq":
+      return "Multiple Choice";
+    case "true_false":
+      return "True/False";
+    case "free_text":
+      return "Free Response";
+    default:
+      return type;
+  }
+}
+
+// ============================================
+// ReviewAccordion — shadcn-based replacement
+// ============================================
+
+interface ReviewItem {
+  question_id: string;
+  question_number: number;
+  question_text: string;
+  question_type: QuestionType;
+  user_answer: string;
+  correct_answer: string;
+  is_correct: boolean;
+  explanation?: string;
+}
+
+interface ReviewAccordionProps {
+  items: ReviewItem[];
+  className?: string;
+}
+
+export function ReviewAccordion({ items, className = "" }: ReviewAccordionProps) {
+  return (
+    <Accordion type="multiple" className={className}>
+      {items.map((item, index) => (
+        <motion.div
+          key={item.question_id}
+          variants={listItemVariants}
+          custom={index}
+          initial="hidden"
+          animate="visible"
+        >
+          <AccordionItem
+            value={item.question_id}
+            className="border-b border-[var(--surface-border)]/50 last:border-0"
+          >
+            <AccordionTrigger className="hover:no-underline px-4 py-4 hover:bg-[var(--surface-card)]/50 transition-colors">
+              <div className="flex items-start gap-4 text-left w-full mr-4">
+                {/* Status indicator */}
+                <div
+                  className={cn(
+                    "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0",
+                    item.is_correct
+                      ? "bg-[var(--semantic-success)]/10 text-[var(--semantic-success)]"
+                      : "bg-[var(--semantic-error)]/10 text-[var(--semantic-error)]"
+                  )}
+                >
+                  {item.is_correct ? <CheckCircle size={20} /> : <XCircle size={20} />}
+                </div>
+
+                {/* Question content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-[var(--text-muted)] uppercase">
+                      Q{item.question_number}
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-lg bg-[var(--surface-card)] text-[var(--text-secondary)] border border-[var(--surface-border)]/50">
+                      {getQuestionTypeLabel(item.question_type)}
+                    </span>
+                  </div>
+                  <p className="text-[var(--text-primary)] font-medium line-clamp-2">
+                    {item.question_text}
+                  </p>
+                </div>
+              </div>
+            </AccordionTrigger>
+
+            <AccordionContent className="px-4 pl-[72px]">
+              <div className="space-y-3 p-4 rounded-xl bg-[var(--surface-card)] border border-[var(--surface-border)]/50">
+                {/* User's answer */}
+                <div>
+                  <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                    Your Answer
+                  </span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      item.is_correct
+                        ? "text-[var(--semantic-success)]"
+                        : "text-[var(--semantic-error)]"
+                    )}
+                  >
+                    {item.user_answer || "Not answered"}
+                  </span>
+                </div>
+
+                {/* Correct answer (if wrong) */}
+                {!item.is_correct && (
+                  <div>
+                    <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider block mb-1">
+                      Correct Answer
+                    </span>
+                    <span className="font-medium text-[var(--semantic-success)]">
+                      {item.correct_answer}
+                    </span>
+                  </div>
+                )}
+
+                {/* Explanation */}
+                {item.explanation && (
+                  <div className="pt-2 border-t border-[var(--surface-border)]/30">
+                    <span className="text-xs text-[var(--brand-secondary)] uppercase tracking-wider block mb-1">
+                      Explanation
+                    </span>
+                    <p className="text-sm text-[var(--text-secondary)]">{item.explanation}</p>
+                  </div>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </motion.div>
+      ))}
+    </Accordion>
+  );
+}
+
+// ============================================
+// Legacy exports — kept for backward compat
+// ============================================
 
 interface ReviewRowProps {
   questionNumber: number;
@@ -28,19 +171,6 @@ export function ReviewRow({
   className = "",
 }: ReviewRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-
-  const getQuestionTypeLabel = (type: QuestionType) => {
-    switch (type) {
-      case "mcq":
-        return "Multiple Choice";
-      case "true_false":
-        return "True/False";
-      case "free_text":
-        return "Free Response";
-      default:
-        return type;
-    }
-  };
 
   const getQuestionTypeIcon = (type: QuestionType) => {
     switch (type) {
@@ -220,7 +350,6 @@ export function ReviewSummary({
       className={`grid grid-cols-2 md:grid-cols-4 gap-4 ${className}`}
     >
       <div className="p-4 rounded-xl bg-surface-card border border-surface-border text-center">
-        <HelpCircle size={24} className="mx-auto mb-2 text-text-muted" />
         <p className="text-2xl font-bold text-text-primary">{total}</p>
         <p className="text-xs text-text-muted uppercase tracking-wider">Total</p>
       </div>
@@ -239,7 +368,6 @@ export function ReviewSummary({
 
       {skipped > 0 && (
         <div className="p-4 rounded-xl bg-surface-card border border-surface-border text-center">
-          <Clock size={24} className="mx-auto mb-2 text-semantic-warning" />
           <p className="text-2xl font-bold text-semantic-warning">{skipped}</p>
           <p className="text-xs text-text-muted uppercase tracking-wider">Skipped</p>
         </div>
