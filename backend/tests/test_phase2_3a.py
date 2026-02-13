@@ -45,13 +45,14 @@ class TestPhase23a(unittest.TestCase):
             focus_concept_ids=[c1_id]
         )
         
-        # Verify generator called with target names
+        # Verify generator called with target concepts and focus IDs
         mock_gen_quiz.assert_called_with(
             document_id=doc_id,
             num_questions=1,
             difficulty="medium",
             question_types=["mcq"],
-            target_concept_names=["C1"]
+            target_concepts=[{"name": "C1", "description": ""}],
+            focus_concept_ids=[c1_id],
         )
         
         # Verify database insert of questions includes concept_ids

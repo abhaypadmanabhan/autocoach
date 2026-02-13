@@ -244,6 +244,7 @@ def create_session(
             difficulty=difficulty,
             question_types=question_types,
             target_concepts=target_concepts_list,
+            focus_concept_ids=focus_concept_ids,
         )
 
         if not questions:
@@ -273,8 +274,14 @@ def create_session(
         # Create question records
         question_records = []
         for i, q in enumerate(questions, 1):
-            # Assign first 1-2 target concepts if available
-            q_concept_ids = target_concept_ids[:2] if target_concept_ids else None
+            # Use per-question concept_id from LLM if available
+            q_concept_ids = None
+            if target_concept_ids:
+                llm_concept_id = q.get("concept_id")
+                if llm_concept_id and llm_concept_id in target_concept_ids:
+                    q_concept_ids = [llm_concept_id]
+                else:
+                    q_concept_ids = [target_concept_ids[0]]
 
             question_record = {
                 "id": str(uuid4()),

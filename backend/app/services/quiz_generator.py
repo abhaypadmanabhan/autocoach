@@ -3,10 +3,20 @@
 import json
 import logging
 
+from app.core.supabase import supabase_admin
 from app.services.retrieval import retrieve_relevant_chunks
 from app.services.llm import call_kimi, call_openai
 
 logger = logging.getLogger(__name__)
+
+STOP_WORDS = {
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
+    "being", "have", "has", "had", "do", "does", "did", "will", "would",
+    "could", "should", "may", "might", "can", "shall", "it", "its", "this",
+    "that", "these", "those", "i", "you", "he", "she", "we", "they", "my",
+    "your", "his", "her", "our", "their", "not", "no", "as", "if", "so",
+}
 
 QUIZ_SYSTEM_PROMPT = """You are an expert tutor creating quiz questions. Generate questions based ONLY on the provided content.
 
@@ -25,22 +35,174 @@ Output format (JSON array):
     "question_text": "What is...?",
     "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
     "correct_answer": "A",
-    "explanation": "Brief explanation why this is correct"
+    "explanation": "Brief explanation why this is correct",
+    "concept_id": "optional-uuid-if-targeting-concepts"
   },
   {
-    "question_type": "true_false", 
+    "question_type": "true_false",
     "question_text": "Statement to evaluate",
     "correct_answer": "true",
-    "explanation": "Why this is true/false"
+    "explanation": "Why this is true/false",
+    "concept_id": "optional-uuid-if-targeting-concepts"
   },
   {
     "question_type": "free_text",
     "question_text": "Explain how...?",
     "correct_answer": "Key points that should be mentioned",
-    "explanation": "What a good answer should include"
+    "explanation": "What a good answer should include",
+    "concept_id": "optional-uuid-if-targeting-concepts"
   }
 ]
 """
+
+
+def _tokenize_keywords(text: str) -> list[str]:
+    """Extract meaningful keywords from text, filtering stop words."""
+    words = text.lower().split()
+    return [w.strip(".,;:!?()[]{}\"'") for w in words if w.strip(".,;:!?()[]{}\"'") not in STOP_WORDS and len(w) > 1]
+
+
+def get_targeted_chunks(document_id: str, focus_concept_ids: list[str], limit_chars: int = 12000) -> list[dict]:
+    """
+    Retrieve chunks relevant to specific concepts using keyword matching.
+
+    Args:
+        document_id: The document to get chunks from.
+        focus_concept_ids: Concept UUIDs to target.
+        limit_chars: Max total characters of chunk content to return.
+
+    Returns:
+        List of chunk dicts with 'content' and 'chunk_index' keys.
+    """
+    try:
+        # Fetch concept details
+        concepts_res = (
+            supabase_admin.table("concepts")
+            .select("id, concept_name, concept_description")
+            .in_("id", focus_concept_ids)
+            .execute()
+        )
+        concepts = concepts_res.data or []
+
+        if not concepts:
+            logger.warning(f"No concepts found for IDs: {focus_concept_ids}")
+            return []
+
+        # Build keyword lists from concept names and descriptions
+        name_keywords = []
+        desc_keywords = []
+        for c in concepts:
+            name_keywords.extend(_tokenize_keywords(c.get("concept_name", "")))
+            desc_keywords.extend(_tokenize_keywords(c.get("concept_description", "")))
+
+        # Fetch all chunks for the document
+        chunks_res = (
+            supabase_admin.table("chunks")
+            .select("content, chunk_index")
+            .eq("document_id", document_id)
+            .order("chunk_index")
+            .execute()
+        )
+        all_chunks = chunks_res.data or []
+
+        if not all_chunks:
+            logger.warning(f"No chunks found for document {document_id}")
+            return []
+
+        # Score each chunk by keyword matching
+        scored_chunks = []
+        for chunk in all_chunks:
+            content_lower = chunk["content"].lower()
+            score = 0
+            for kw in name_keywords:
+                score += content_lower.count(kw) * 2
+            for kw in desc_keywords:
+                score += content_lower.count(kw)
+            scored_chunks.append((score, chunk))
+
+        # Sort by score descending
+        scored_chunks.sort(key=lambda x: x[0], reverse=True)
+
+        # Accumulate chunks until limit_chars
+        selected = []
+        total_chars = 0
+        for score, chunk in scored_chunks:
+            if score == 0:
+                break
+            chunk_len = len(chunk["content"])
+            if total_chars + chunk_len > limit_chars and selected:
+                break
+            selected.append(chunk)
+            total_chars += chunk_len
+
+        # Fallback: if no chunks scored > 0, return first N chunks by index
+        if not selected:
+            logger.info("No keyword-matched chunks, falling back to first chunks by index")
+            total_chars = 0
+            for chunk in all_chunks:
+                chunk_len = len(chunk["content"])
+                if total_chars + chunk_len > limit_chars and selected:
+                    break
+                selected.append(chunk)
+                total_chars += chunk_len
+
+        logger.info(f"get_targeted_chunks: selected {len(selected)} chunks ({total_chars} chars) for {len(concepts)} concepts")
+        return selected
+
+    except Exception as e:
+        logger.error(f"Failed to get targeted chunks: {e}")
+        return []
+
+
+def validate_question_alignment(question: dict, concept_names: list[str]) -> bool:
+    """
+    Check if a question is aligned with at least one target concept.
+
+    Args:
+        question: Question dict with question_text, correct_answer, explanation.
+        concept_names: List of concept name strings to check against.
+
+    Returns:
+        True if at least one concept keyword appears in the question content.
+    """
+    # Combine searchable text from the question
+    searchable = " ".join([
+        question.get("question_text", ""),
+        question.get("correct_answer", ""),
+        question.get("explanation", ""),
+    ]).lower()
+
+    for name in concept_names:
+        keywords = _tokenize_keywords(name)
+        for kw in keywords:
+            if kw in searchable:
+                return True
+    return False
+
+
+def _parse_llm_questions(response: str) -> list[dict]:
+    """Parse and validate LLM JSON response into question dicts."""
+    cleaned_response = response.strip()
+    if cleaned_response.startswith("```json"):
+        cleaned_response = cleaned_response[7:]
+    if cleaned_response.startswith("```"):
+        cleaned_response = cleaned_response[3:]
+    if cleaned_response.endswith("```"):
+        cleaned_response = cleaned_response[:-3]
+    cleaned_response = cleaned_response.strip()
+
+    questions = json.loads(cleaned_response)
+
+    if not isinstance(questions, list):
+        logger.error(f"Parsed JSON is not a list: {type(questions)}")
+        return []
+
+    valid_questions = []
+    for q in questions:
+        if isinstance(q, dict) and "question_text" in q and "question_type" in q:
+            valid_questions.append(q)
+
+    return valid_questions
 
 
 def generate_quiz_questions(
@@ -48,7 +210,8 @@ def generate_quiz_questions(
     num_questions: int = 5,
     difficulty: str = "medium",
     question_types: list[str] = None,
-    target_concepts: list[dict] = None  # Changed from list[str] to list[dict] {name, description}
+    target_concepts: list[dict] = None,
+    focus_concept_ids: list[str] | None = None,
 ) -> list[dict]:
     """
     Generate quiz questions from document content using LLM.
@@ -59,6 +222,7 @@ def generate_quiz_questions(
         difficulty: Difficulty level - "easy", "medium", or "hard".
         question_types: List of question types to include (mcq, true_false, free_text).
         target_concepts: List of dicts [{"name":Str, "description":Str}] to focus on.
+        focus_concept_ids: List of concept UUIDs for targeted chunk retrieval.
 
     Returns:
         List of question dictionaries, or empty list on failure.
@@ -67,22 +231,32 @@ def generate_quiz_questions(
         question_types = ["mcq", "true_false", "free_text"]
 
     try:
-        # Retrieve more chunks than needed for variety
-        top_k = num_questions * 3
-        
-        # Custom query based on targets
-        query = "Generate quiz questions covering key concepts"
-        target_names = []
-        if target_concepts:
-            target_names = [c.get("concept_name", "Unnamed") for c in target_concepts]
-            concepts_str = ", ".join(target_names)
-            query = f"Generate quiz questions about: {concepts_str}"
-            
-        chunks = retrieve_relevant_chunks(
-            query=query,
-            document_id=document_id,
-            top_k=top_k
-        )
+        # Determine chunk retrieval strategy
+        if focus_concept_ids and target_concepts:
+            # Targeted mode: keyword-based chunk retrieval
+            chunks = get_targeted_chunks(document_id, focus_concept_ids)
+            if not chunks:
+                logger.warning("Targeted chunks empty, falling back to RAG retrieval")
+                chunks = retrieve_relevant_chunks(
+                    query="Generate quiz questions covering key concepts",
+                    document_id=document_id,
+                    top_k=num_questions * 3,
+                )
+        else:
+            # Default RAG-based retrieval
+            top_k = num_questions * 3
+            query = "Generate quiz questions covering key concepts"
+            target_names = []
+            if target_concepts:
+                target_names = [c.get("name", "Unnamed") for c in target_concepts]
+                concepts_str = ", ".join(target_names)
+                query = f"Generate quiz questions about: {concepts_str}"
+
+            chunks = retrieve_relevant_chunks(
+                query=query,
+                document_id=document_id,
+                top_k=top_k,
+            )
 
         if not chunks:
             logger.error(f"No chunks retrieved for document {document_id}")
@@ -98,22 +272,40 @@ def generate_quiz_questions(
 
         # Build user prompt
         types_str = ", ".join(question_types)
-        
+
         focus_instruction = ""
+        concept_id_map = {}
         if target_concepts:
+            # Build concept ID map for the LLM
+            if focus_concept_ids and len(focus_concept_ids) == len(target_concepts):
+                for cid, tc in zip(focus_concept_ids, target_concepts):
+                    concept_id_map[tc.get("name", "Unnamed")] = cid
+
             focus_details = []
             for c in target_concepts:
-                name = c.get("concept_name", "Unnamed")
-                desc = c.get("concept_description", "")
+                name = c.get("name", "Unnamed")
+                desc = c.get("description", "")
+                cid = concept_id_map.get(name, "")
                 if desc:
-                    focus_details.append(f"- {name}: {desc}")
+                    focus_details.append(f"- {name} (concept_id: \"{cid}\"): {desc}")
                 else:
-                    focus_details.append(f"- {name}")
-            
+                    focus_details.append(f"- {name} (concept_id: \"{cid}\")")
+
             focus_block = "\n".join(focus_details)
-            focus_instruction = f"\nFOCUS: Create questions specifically testing these concepts:\n{focus_block}"
-            
-        user_prompt = f"""Based on the following content, generate {num_questions} quiz questions. {focus_instruction}
+            focus_instruction = f"""
+
+STRICT CONCEPT TARGETING:
+Generate questions ONLY about these concepts:
+{focus_block}
+
+Rules for targeted mode:
+- Every question MUST be clearly about exactly one of the listed concepts
+- Include "concept_id" field in each question JSON with the UUID of the concept it tests
+- Do NOT generate generic or off-topic questions
+- If you cannot create a question about a specific concept from the content, skip it
+- The question text should directly reference or test knowledge of the target concept"""
+
+        user_prompt = f"""Based on the following content, generate {num_questions} quiz questions.{focus_instruction}
 
 Difficulty: {difficulty}
 Question types to include: {types_str}
@@ -128,7 +320,7 @@ For hard: focus on analysis, synthesis, and deeper concepts
 
 Return ONLY a valid JSON array with no markdown formatting."""
 
-        # Call Kimi API
+        # Call LLM
         logger.info(f"Calling Kimi API to generate {num_questions} questions")
         response = call_kimi(QUIZ_SYSTEM_PROMPT, user_prompt)
 
@@ -142,27 +334,37 @@ Return ONLY a valid JSON array with no markdown formatting."""
 
         # Parse JSON response
         try:
-            # Clean up response - remove markdown code blocks if present
-            cleaned_response = response.strip()
-            if cleaned_response.startswith("```json"):
-                cleaned_response = cleaned_response[7:]
-            if cleaned_response.startswith("```"):
-                cleaned_response = cleaned_response[3:]
-            if cleaned_response.endswith("```"):
-                cleaned_response = cleaned_response[:-3]
-            cleaned_response = cleaned_response.strip()
+            valid_questions = _parse_llm_questions(response)
 
-            questions = json.loads(cleaned_response)
+            # Validate alignment for targeted mode
+            if target_concepts and valid_questions:
+                concept_names = [c.get("name", "") for c in target_concepts]
+                aligned = [validate_question_alignment(q, concept_names) for q in valid_questions]
+                misaligned_count = sum(1 for a in aligned if not a)
+                total = len(valid_questions)
 
-            if not isinstance(questions, list):
-                logger.error(f"Parsed JSON is not a list: {type(questions)}")
-                return []
+                if total > 0 and misaligned_count / total > 0.3:
+                    logger.warning(
+                        f"Alignment check: {misaligned_count}/{total} questions misaligned, regenerating"
+                    )
+                    # Regenerate with stronger instruction
+                    stronger_prompt = user_prompt + (
+                        "\n\nIMPORTANT: Previous generation was too generic. "
+                        "Every question MUST directly reference the target concept in the question text. "
+                        "Do not create questions about general topics."
+                    )
+                    retry_response = call_kimi(QUIZ_SYSTEM_PROMPT, stronger_prompt)
+                    if not retry_response:
+                        retry_response = call_openai(QUIZ_SYSTEM_PROMPT, stronger_prompt, temperature=0.7)
 
-            # Validate and clean questions
-            valid_questions = []
-            for q in questions:
-                if isinstance(q, dict) and "question_text" in q and "question_type" in q:
-                    valid_questions.append(q)
+                    if retry_response:
+                        try:
+                            retry_questions = _parse_llm_questions(retry_response)
+                            if retry_questions:
+                                valid_questions = retry_questions
+                                logger.info(f"Regeneration produced {len(retry_questions)} questions")
+                        except json.JSONDecodeError:
+                            logger.warning("Regeneration parse failed, using original questions")
 
             logger.info(f"Successfully generated {len(valid_questions)} questions")
             return valid_questions[:num_questions]
