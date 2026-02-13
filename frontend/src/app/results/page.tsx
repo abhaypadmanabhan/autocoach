@@ -20,7 +20,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { ScoreCircle, InlineStats } from "@/components/results/ScoreCircle";
+import { ScoreHero } from "@/components/results/ScoreCircle";
 import { ReviewAccordion } from "@/components/results/ReviewRow";
 import { MascotStage } from "@/components/brand/MascotStage";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ function ResultsContent() {
     }
   }, [sessionId, router]);
 
-  // Derived data — computed early so confetti effect can use scorePercent
+  // Derived data
   const questions = session?.questions ?? [];
   const hasQuestions = questions.length > 0;
 
@@ -67,12 +67,12 @@ function ResultsContent() {
   };
 
   const correctFromQuestions = questions.filter((q) => q.is_correct === true).length;
-  const answeredFromQuestions = questions.filter((q) => q.user_answer != null).length;
   const sessionTotal = toSafeNumber(session?.total_questions);
   const sessionCorrect = toSafeNumber(session?.correct_answers);
 
   const total = hasQuestions ? questions.length : sessionTotal;
   const correct = hasQuestions ? correctFromQuestions : sessionCorrect;
+  const incorrect = Math.max(total - correct, 0);
   const scorePercent = total > 0 ? Math.round((correct / total) * 100) : 0;
   const hasAnyAnswers = total > 0;
 
@@ -123,13 +123,19 @@ function ResultsContent() {
         <div className="py-8">
           <Section spacing="sm">
             <div className="rounded-3xl bg-[var(--surface-card)] border border-[var(--surface-border)] p-8 md:p-12">
-              <div className="flex flex-col md:flex-row items-center gap-8 md:gap-12">
-                <Skeleton className="w-40 h-40 rounded-full shrink-0" />
-                <div className="flex-1 text-center md:text-left w-full">
-                  <Skeleton className="h-10 w-48 mb-4 mx-auto md:mx-0" />
-                  <Skeleton className="h-8 w-32 rounded-full mb-6 mx-auto md:mx-0" />
-                  <Skeleton className="h-6 w-56 mb-2 mx-auto md:mx-0" />
-                  <Skeleton className="h-2.5 w-64 rounded-full mx-auto md:mx-0" />
+              <div className="flex flex-col items-center gap-6">
+                <Skeleton className="w-12 h-12 rounded-full" />
+                <Skeleton className="w-[200px] h-[180px] rounded-xl" />
+                <Skeleton className="h-8 w-48 rounded-full" />
+                <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
+                  <Skeleton className="h-20 rounded-xl" />
+                  <Skeleton className="h-20 rounded-xl" />
+                  <Skeleton className="h-20 rounded-xl" />
+                </div>
+                <div className="flex gap-1.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="w-3 h-3 rounded-full" />
+                  ))}
                 </div>
               </div>
             </div>
@@ -190,63 +196,60 @@ function ResultsContent() {
         <Section spacing="sm">
           <motion.div
             variants={slideUpItem}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-darker)] border border-[var(--surface-border)] p-8 md:p-12"
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-darker)] border border-[var(--surface-border)] p-8 md:p-10"
           >
             {/* Background decoration */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--brand-primary)]/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[var(--brand-secondary)]/10 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--brand-primary)]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[var(--brand-secondary)]/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
 
-            <div className="relative flex flex-col md:flex-row items-center gap-8 md:gap-12">
-              {/* Left: Score Circle */}
-              <div className="shrink-0">
-                {hasAnyAnswers ? (
-                  <ScoreCircle
-                    score={scorePercent}
-                    total={100}
-                    size="lg"
-                  />
-                ) : (
-                  <div className="relative w-64 h-64 flex items-center justify-center rounded-full bg-[var(--surface-card)] border border-[var(--surface-border)]">
-                    <span className="text-sm text-[var(--text-muted)] uppercase tracking-wider text-center px-6">
-                      No answers recorded
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Right: Mascot + badge + InlineStats */}
-              <div className="flex-1 text-center md:text-left">
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
+            <div className="relative flex flex-col items-center text-center">
+              {/* Mascot + performance badge */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="flex flex-col items-center mb-4"
+              >
+                <MascotStage mode="results" scorePercent={scorePercent} />
+                <div
+                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold mt-2"
+                  style={{
+                    backgroundColor: `${performance.color}15`,
+                    color: performance.color,
+                    border: `1px solid ${performance.color}30`,
+                  }}
                 >
-                  <div className="mb-4">
-                    <MascotStage mode="results" scorePercent={scorePercent} />
-                  </div>
-                  <div
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-6"
-                    style={{
-                      backgroundColor: `${performance.color}20`,
-                      color: performance.color,
-                    }}
-                  >
-                    <PerformanceIcon size={18} />
-                    {performance.message}
-                  </div>
-                </motion.div>
+                  <PerformanceIcon size={16} />
+                  {performance.message}
+                </div>
+              </motion.div>
 
-                {/* InlineStats replaces ScoreBreakdown */}
-                <InlineStats correct={correct} total={total} />
-              </div>
+              {/* Score gauge + stats + dots */}
+              {hasAnyAnswers ? (
+                <ScoreHero
+                  scorePercent={scorePercent}
+                  correct={correct}
+                  incorrect={incorrect}
+                  total={total}
+                  questions={questions.map((q) => ({ is_correct: q.is_correct ?? false }))}
+                />
+              ) : (
+                <div className="py-12">
+                  <p className="text-sm text-[var(--text-muted)] uppercase tracking-wider">
+                    No answers recorded
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Action buttons inside hero card */}
-            <Separator className="my-8 bg-[var(--surface-border)]/50" />
+            {/* Action buttons */}
+            <Separator className="my-6 bg-[var(--surface-border)]/40" />
 
             <motion.div
-              variants={slideUpItem}
-              className="relative flex flex-col sm:flex-row gap-4"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+              className="relative flex flex-col sm:flex-row gap-3"
             >
               <Button
                 variant="outline"
@@ -254,7 +257,7 @@ function ResultsContent() {
                 className="flex-1"
               >
                 <Link href="/dashboard">
-                  <Home size={20} className="mr-2" />
+                  <Home size={18} className="mr-2" />
                   Dashboard
                 </Link>
               </Button>
@@ -264,7 +267,7 @@ function ResultsContent() {
                 className="flex-1 shadow-lg shadow-[var(--brand-primary)]/20"
               >
                 <Link href={`/config?document_id=${session.document_id}`}>
-                  <RotateCcw size={20} className="mr-2" />
+                  <RotateCcw size={18} className="mr-2" />
                   Try Again
                 </Link>
               </Button>
