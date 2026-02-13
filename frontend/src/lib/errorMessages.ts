@@ -23,8 +23,8 @@ const ERROR_MESSAGES: Record<number, ErrorDisplay> = {
     icon: "search",
   },
   429: {
-    title: "Too Many Requests",
-    message: "Whoa, slow down! Too many requests. Try again in a moment.",
+    title: "Daily limit reached",
+    message: "Come back tomorrow to continue.",
     icon: "clock",
   },
   500: {

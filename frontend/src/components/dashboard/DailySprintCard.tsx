@@ -4,9 +4,10 @@ import { useDailySprint } from "@/hooks/useDailySprint";
 import { SentinelMascot } from "@/components/brand/SentinelMascot";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/useToast";
-import { Loader2, Zap, CheckCircle2, Flame, Trophy, Target, Sparkles, Play } from "lucide-react";
+import { Loader2, Zap, CheckCircle2, Flame, Trophy, Target, Sparkles, Play, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function DailySprintCard() {
@@ -26,22 +27,24 @@ export function DailySprintCard() {
     const isCompleted = status?.status === "completed";
     const isActive = status?.status === "active";
     const isReady = status?.status === "ready" || !status?.status;
-    
+
     // User stats
     const streak = status?.streak_count ?? 0;
     const xp = status?.total_xp ?? 0;
     const xpEarnedToday = status?.xp_earned_today ?? 0;
-    
+
     // Progress for active sprint
     const progressCurrent = status?.progress?.completed ?? 0;
     const progressTotal = status?.progress?.total ?? 5;
-    
+
     // Focus messaging (only show for non-completed states)
     const targetsWeak = status?.targets_weak_concepts;
     const focusLabel = targetsWeak
         ? { text: "Focused on weak spots", icon: Target, color: "text-orange-400 bg-orange-400/10" }
         : { text: "Core concepts today", icon: Sparkles, color: "text-blue-400 bg-blue-400/10" };
     const FocusIcon = focusLabel.icon;
+
+    const [limitReached, setLimitReached] = useState(false);
 
     // Handle CTA click
     const handleStart = async () => {
@@ -55,14 +58,21 @@ export function DailySprintCard() {
         try {
             const quiz = await startSprint();
             router.push(`/daily-sprint/${quiz.session_id}`);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Failed to start sprint", err);
-            showToast("Failed to start sprint. Try again!", "error");
+            // Check for 429 limit reached
+            if (err?.status === 429 || err?.response?.status === 429 || err?.message?.includes("limit")) {
+                setLimitReached(true);
+                showToast("Daily limit reached. Come back tomorrow.", "error");
+            } else {
+                showToast("Failed to start sprint. Try again!", "error");
+            }
         }
     };
 
     // Get title based on state
     const getTitle = () => {
+        if (limitReached) return "Daily limit reached";
         if (isCompleted) return "Daily Goal Achieved!";
         if (isActive) return `Resume Sprint (${progressCurrent}/${progressTotal})`;
         return "Start Today's Sprint (5Q)";
@@ -70,6 +80,9 @@ export function DailySprintCard() {
 
     // Get subtitle based on state
     const getSubtitle = () => {
+        if (limitReached) {
+            return "Come back tomorrow to continue your streak.";
+        }
         if (isCompleted) {
             return `You've earned ${xpEarnedToday} XP today. Come back tomorrow to keep your streak alive!`;
         }
@@ -81,28 +94,39 @@ export function DailySprintCard() {
 
     // Get CTA button config
     const getCtaConfig = () => {
+        if (limitReached) {
+            return {
+                text: "Come back tomorrow",
+                icon: <Clock className="mr-2 h-5 w-5" />,
+                disabled: true,
+                variant: "outline" as const
+            };
+        }
         if (isCompleted) return null; // No CTA for completed state
-        
+
         if (starting) {
             return {
                 text: isActive ? "Resuming..." : "Starting...",
                 icon: <Loader2 className="mr-2 h-5 w-5 animate-spin" />,
-                disabled: true
+                disabled: true,
+                variant: "default" as const
             };
         }
-        
+
         if (isActive) {
             return {
                 text: "Resume Sprint",
                 icon: <Play className="mr-2 h-5 w-5" />,
-                disabled: false
+                disabled: false,
+                variant: "default" as const
             };
         }
-        
+
         return {
             text: "Start Sprint",
             icon: <Zap className="mr-2 h-5 w-5" />,
-            disabled: false
+            disabled: false,
+            variant: "default" as const
         };
     };
 
@@ -158,7 +182,13 @@ export function DailySprintCard() {
                                 size="lg"
                                 onClick={handleStart}
                                 disabled={ctaConfig.disabled}
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95"
+                                variant={ctaConfig.variant}
+                                className={cn(
+                                    "font-semibold px-8 transition-all",
+                                    ctaConfig.disabled 
+                                        ? "opacity-60 cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground"
+                                        : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
+                                )}
                             >
                                 {ctaConfig.icon}
                                 {ctaConfig.text}

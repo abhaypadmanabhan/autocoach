@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, date
 from uuid import UUID, uuid4
 from typing import List, Optional
 
@@ -7,6 +7,7 @@ from sqlalchemy import (
     Boolean,
     ForeignKey,
     DateTime,
+    Date,
     Numeric,
     Text,
     ARRAY,
@@ -17,6 +18,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
+
 
 from app.db.base import Base
 
@@ -334,4 +336,26 @@ class Chunk(Base):
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+class UserDailyUsage(Base):
+    __tablename__ = "user_daily_usage"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("auth.users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    date: Mapped[date] = mapped_column(Date, primary_key=True)
+    sprints_used: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), nullable=False
+    )
+    quizzes_used: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )

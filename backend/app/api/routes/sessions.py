@@ -21,7 +21,7 @@ from app.services.session_manager import (
     submit_answer,
     get_current_question,
 )
-from app.services.abuse_controls import enforce_daily_quiz_sessions
+from app.services.usage import consume_quiz_usage_or_429
 from app.api.routes.documents import get_user_id_from_token
 from app.core.supabase import supabase_admin
 from app.core.rate_limit import rate_limiter
@@ -59,9 +59,6 @@ async def create_quiz_session(
         HTTPException: 404 if document not found, 400 if not ready, 500 on error.
     """
     try:
-        # Enforce daily session quota
-        enforce_daily_quiz_sessions(user_id, settings.max_quiz_sessions_per_day)
-
         # Verify document exists and belongs to user
         doc_response = (
             supabase_admin.table("documents")
@@ -85,18 +82,24 @@ async def create_quiz_session(
 
         if request.focus_concept_ids:
             if len(request.focus_concept_ids) > 3:
-                raise HTTPException(status_code=400, detail="Maximum 3 focus concepts allowed.")
-            
+                raise HTTPException(
+                    status_code=400, detail="Maximum 3 focus concepts allowed."
+                )
+
             # Check for duplicates
             if len(set(request.focus_concept_ids)) != len(request.focus_concept_ids):
-                raise HTTPException(status_code=400, detail="Duplicate focus concept IDs requested.")
-                
+                raise HTTPException(
+                    status_code=400, detail="Duplicate focus concept IDs requested."
+                )
+
             # Validate UUID format
             try:
                 for cid in request.focus_concept_ids:
                     UUID(cid)
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid UUID format in focus_concept_ids.")
+                raise HTTPException(
+                    status_code=400, detail="Invalid UUID format in focus_concept_ids."
+                )
 
         # Create session
         session_data = create_session(
@@ -107,6 +110,18 @@ async def create_quiz_session(
             question_types=request.question_types,
             focus_concept_ids=request.focus_concept_ids,
         )
+
+        try:
+            consume_quiz_usage_or_429(user_id)
+        except HTTPException as exc:
+            if exc.status_code == 429:
+                supabase_admin.table("questions").delete().eq(
+                    "session_id", session_data["session_id"]
+                ).execute()
+                supabase_admin.table("quiz_sessions").delete().eq(
+                    "id", session_data["session_id"]
+                ).execute()
+            raise
 
         return session_data
 

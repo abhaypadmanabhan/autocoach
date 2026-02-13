@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Loader2, Zap, CheckCircle2, Clock, AlertCircle, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -44,6 +45,12 @@ export function ReviewTodayWidget() {
         }
     );
 
+
+
+
+
+    const [limitReached, setLimitReached] = useState(false);
+
     const handleReviewNow = async () => {
         if (!data || data.count === 0) return;
 
@@ -86,13 +93,61 @@ export function ReviewTodayWidget() {
             });
 
             router.push(`/session?session_id=${session.session_id}`);
-        } catch (err) {
-            showToast(getErrorMessage(err), "error");
+        } catch (err: any) {
+            // Check for 429 limit reached
+            if (err?.status === 429 || err?.response?.status === 429 || err?.message?.includes("limit")) {
+                setLimitReached(true);
+                showToast("Daily limit reached. Come back tomorrow.", "error");
+            } else {
+                showToast(getErrorMessage(err), "error");
+            }
         }
     };
 
     if (isLoading) {
         return <ReviewTodaySkeleton />;
+    }
+
+    if (limitReached) {
+        return (
+            <motion.div variants={slideUpItem} className="w-full">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="p-1.5 rounded-md bg-[var(--brand-primary)]/10 text-[var(--brand-primary)]">
+                        <Clock className="w-4 h-4" />
+                    </div>
+                    <h2 className="text-lg font-bold text-[var(--text-primary)] font-heading">
+                        Smart Review
+                    </h2>
+                </div>
+                <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] relative overflow-hidden">
+                    <CardContent className="p-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                            <div className="space-y-4 max-w-xl">
+                                <div className="space-y-2">
+                                    <div className="flex items-center gap-2 text-[var(--semantic-warning)] mb-1">
+                                        <Clock className="w-5 h-5" />
+                                        <span className="font-bold">Daily limit reached</span>
+                                    </div>
+                                    <p className="text-[var(--text-secondary)]">
+                                        Come back tomorrow to continue reviewing.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex-shrink-0">
+                                <Button
+                                    disabled
+                                    variant="outline"
+                                    className="w-full md:w-auto opacity-60 cursor-not-allowed bg-muted/50 border-muted text-muted-foreground"
+                                >
+                                    <Clock className="w-4 h-4 mr-2" />
+                                    Come back tomorrow
+                                </Button>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </motion.div>
+        );
     }
 
     if (error) {

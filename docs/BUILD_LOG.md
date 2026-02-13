@@ -198,3 +198,44 @@
 
 **Files changed:**
 - `frontend/src/components/dashboard/ReviewTodayWidget.tsx`
+
+## Sprint 5 – Daily Usage Limits (atomic + clean)
+- Verified daily usage limits for `POST /sprint/start` and `POST /quiz/sessions/`.
+- Hardened quota consume path to be atomic under race with compare-and-swap retries.
+- Kept quota increment after successful session creation, and added cleanup if quota consume fails after create.
+- Added structured 429 payload contract with stable fields: `error`, `type`, `limit`, `message`.
+- Refactored usage limit tests to remove brittle `sys.modules` patching and use direct route/service patching.
+
+### Sprint 5 QA Pass – Notes
+**Date:** 2026-02-13
+
+**Checked:**
+- ✅ Atomicity: quota consumption now retries on contention and avoids lost updates.
+- ✅ Error shape: 429 detail now includes `{ error: "daily_limit_reached", type, limit, message }`.
+- ✅ Placement: quota is consumed only after successful sprint/quiz creation.
+- ✅ Retry safety: `/sprint/start` returns existing active session without re-consuming quota.
+- ✅ Tests: usage-limit tests now use clean dependency patching (no `sys.modules` mutation).
+
+### Sprint 5 UI QA – Daily Limit States
+**Date:** 2026-02-13
+
+**Messaging Consistency:**
+- ✅ Unified to "Daily limit reached" + "Come back tomorrow" pattern across both components
+- ✅ Updated `errorMessages.ts` 429 message to match premium tone (was "Whoa, slow down!")
+- ✅ Toast messages now consistent: "Daily limit reached. Come back tomorrow."
+
+**Disabled State Polish:**
+- ✅ DailySprintCard: Disabled button uses muted styling (`bg-muted text-muted-foreground`) with 60% opacity
+- ✅ ReviewTodayWidget: Disabled button uses consistent muted styling with Clock icon
+- ✅ Both CTAs show `cursor-not-allowed` for clear affordance
+- ✅ Outline variant used for disabled state to reduce visual weight
+
+**Limit Info Display:**
+- ℹ️ Sprint: 1/1 used today – **deferred** (requires backend to expose usage in status response)
+- ℹ️ Quizzes: 5/5 used today – **deferred** (requires backend to expose usage in review endpoint)
+- Note: Paywall UI intentionally not added per requirements
+
+**Files changed:**
+- `frontend/src/components/dashboard/DailySprintCard.tsx`
+- `frontend/src/components/dashboard/ReviewTodayWidget.tsx`
+- `frontend/src/lib/errorMessages.ts`

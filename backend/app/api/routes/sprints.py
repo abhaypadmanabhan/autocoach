@@ -23,6 +23,7 @@ from app.services.session_manager import (
     _recompute_document_progress,
     _recompute_session_counts,
 )
+from app.services.usage import consume_sprint_usage_or_429
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -614,13 +615,48 @@ async def get_sprint_status(user_id: UUID = Depends(get_user_id_from_token)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def get_session_creator():
+    return start_sprint_session
+
+
 @router.post("/start", response_model=StartSprintResponse)
 async def start_sprint(
     request: StartSprintRequest = Body(...),
     user_id: UUID = Depends(get_user_id_from_token),
+    session_creator=Depends(get_session_creator),
 ):
     try:
-        return start_sprint_session(user_id)
+        existing = _get_today_session(user_id)
+        if existing and existing.get("status") == "active":
+            session_id = str(existing.get("id"))
+            total_questions = int(existing.get("total_questions") or 0)
+            questions, _, _ = _fetch_session_questions(
+                session_id=session_id,
+                difficulty=str(existing.get("difficulty") or "medium"),
+                total_questions=total_questions,
+            )
+            return StartSprintResponse(
+                session_id=session_id,
+                document_id=str(existing.get("document_id")),
+                document_title=_get_document_title(str(existing.get("document_id"))),
+                questions=questions,
+            )
+
+        response = session_creator(user_id)
+
+        try:
+            consume_sprint_usage_or_429(user_id)
+        except HTTPException as exc:
+            if exc.status_code == 429:
+                supabase_admin.table("questions").delete().eq(
+                    "session_id", response.session_id
+                ).execute()
+                supabase_admin.table("quiz_sessions").delete().eq(
+                    "id", response.session_id
+                ).execute()
+            raise
+
+        return response
     except HTTPException:
         raise
     except Exception as e:
