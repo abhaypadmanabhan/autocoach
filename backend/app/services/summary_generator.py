@@ -47,9 +47,9 @@ def _normalize_concepts_for_hash(
     for concept in concepts:
         normalized.append(
             {
-                "concept_name": (concept.get("concept_name") or "").strip(),
+                "concept_name": (concept.get("concept_name") or concept.get("name") or "").strip(),
                 "concept_description": (
-                    concept.get("concept_description") or ""
+                    concept.get("concept_description") or concept.get("description") or ""
                 ).strip(),
                 "importance_score": float(concept.get("importance_score") or 0.0),
             }
@@ -103,9 +103,9 @@ def _validate_and_normalize_summary(payload: dict) -> DocumentSummarySchema:
 
 def _fallback_summary(concepts: List[dict[str, Any]]) -> DocumentSummarySchema:
     concept_names = [
-        (concept.get("concept_name") or "").strip()
+        (concept.get("concept_name") or concept.get("name") or "").strip()
         for concept in concepts
-        if (concept.get("concept_name") or "").strip()
+        if (concept.get("concept_name") or concept.get("name") or "").strip()
     ]
     top = concept_names[:6]
     one_liner_topics = ", ".join(top[:3]) if top else "the core topics"
@@ -134,7 +134,7 @@ def _build_prompts(
     concept_list = concepts[:20]
     concepts_text = "\n".join(
         [
-            f"- {c.get('concept_name')}: {c.get('concept_description', '')}"
+            f"- {c.get('concept_name') or c.get('name', '')}: {c.get('concept_description') or c.get('description', '')}"
             for c in concept_list
         ]
     )

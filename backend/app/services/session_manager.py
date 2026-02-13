@@ -38,9 +38,23 @@ def _update_concept_mastery(user_id: str, concept_ids: list[str], is_correct: bo
                 1 if is_correct else 0
             )
 
-            # Simple MVP formula: (correct / tested) * 100
-            mastery_score = round((times_correct / times_tested) * 100.0, 2)
-            mastery_score = min(100.0, max(0.0, mastery_score))
+            # Bayesian-smoothed accuracy: (correct + 1) / (tested + 2)
+            smoothed = (times_correct + 1) / (times_tested + 2)
+
+            # EMA blend with previous mastery (0-1 scale internally)
+            prev = (current["mastery_score"] / 100.0) if current else 0.0
+            raw = 0.85 * prev + 0.15 * smoothed
+            raw = max(0.0, min(1.0, raw))
+
+            # Anti-100% cap: restrict display value until sufficient evidence
+            if times_tested < 5:
+                display = min(raw, 0.95)
+            elif times_tested >= 5 and smoothed >= 0.9:
+                display = raw  # allow full 1.0
+            else:
+                display = min(raw, 0.95)
+
+            mastery_score = round(display * 100.0, 2)
 
             data = {
                 "user_id": user_id,
@@ -51,11 +65,12 @@ def _update_concept_mastery(user_id: str, concept_ids: list[str], is_correct: bo
                 "last_tested_at": now,
             }
 
-            # Check if mastered (>= 80)
+            # Check if mastered (>= 80); clear mastered_at if score dropped
             if mastery_score >= 80.0:
-                # If newly mastered or mastered_at was null
                 if not current or not current.get("mastered_at"):
                     data["mastered_at"] = now
+            else:
+                data["mastered_at"] = None
 
             supabase_admin.table("user_concept_mastery").upsert(data).execute()
             logger.info(
@@ -180,14 +195,15 @@ def create_session(
 
                         # "unless document core is complete (progress_core >= 100)"
                         if (prog or 0) < 100:
+                            cname = c.get("concept_name") or c.get("name") or "Unnamed Concept"
                             raise ValueError(
-                                f"Concept '{c['concept_name']}' is not core. Finish core concepts first (current progress: {prog or 0}%)."
+                                f"Concept '{cname}' is not core. Finish core concepts first (current progress: {prog or 0}%)."
                             )
 
                     target_concepts_list.append(
                         {
-                            "name": c["concept_name"],
-                            "description": c.get("concept_description", ""),
+                            "name": c.get("concept_name") or c.get("name") or "Unnamed Concept",
+                            "description": c.get("concept_description") or c.get("description") or "",
                         }
                     )
                 else:
@@ -215,8 +231,8 @@ def create_session(
             selected_candidates = candidates[:3]
             target_concepts_list = [
                 {
-                    "name": c["concept_name"],
-                    "description": c.get("concept_description", ""),
+                    "name": c.get("concept_name") or c.get("name") or "Unnamed Concept",
+                    "description": c.get("concept_description") or c.get("description") or "",
                 }
                 for c in selected_candidates
             ]

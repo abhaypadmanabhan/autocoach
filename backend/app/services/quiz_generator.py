@@ -248,7 +248,7 @@ def generate_quiz_questions(
             query = "Generate quiz questions covering key concepts"
             target_names = []
             if target_concepts:
-                target_names = [c.get("name", "Unnamed") for c in target_concepts]
+                target_names = [c.get("name") or c.get("concept_name") or "Unnamed" for c in target_concepts]
                 concepts_str = ", ".join(target_names)
                 query = f"Generate quiz questions about: {concepts_str}"
 
@@ -279,12 +279,12 @@ def generate_quiz_questions(
             # Build concept ID map for the LLM
             if focus_concept_ids and len(focus_concept_ids) == len(target_concepts):
                 for cid, tc in zip(focus_concept_ids, target_concepts):
-                    concept_id_map[tc.get("name", "Unnamed")] = cid
+                    concept_id_map[tc.get("name") or tc.get("concept_name") or "Unnamed"] = cid
 
             focus_details = []
             for c in target_concepts:
-                name = c.get("name", "Unnamed")
-                desc = c.get("description", "")
+                name = c.get("name") or c.get("concept_name") or "Unnamed"
+                desc = c.get("description") or c.get("concept_description") or ""
                 cid = concept_id_map.get(name, "")
                 if desc:
                     focus_details.append(f"- {name} (concept_id: \"{cid}\"): {desc}")
@@ -338,7 +338,7 @@ Return ONLY a valid JSON array with no markdown formatting."""
 
             # Validate alignment for targeted mode
             if target_concepts and valid_questions:
-                concept_names = [c.get("name", "") for c in target_concepts]
+                concept_names = [c.get("name") or c.get("concept_name") or "" for c in target_concepts]
                 aligned = [validate_question_alignment(q, concept_names) for q in valid_questions]
                 misaligned_count = sum(1 for a in aligned if not a)
                 total = len(valid_questions)
