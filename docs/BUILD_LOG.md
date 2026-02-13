@@ -122,3 +122,8 @@
    - Conditional rendering for each section based on data availability
    - Removed unused `ApiError` import (error is string from SWR)
 2. `useDocumentSummary.ts`: Already exposes `mutate` for refresh functionality
+
+**Bugfix:** DocumentSummary component was not mounted on DocumentDashboard; now calls summary endpoint.
+- **Problem:** `DocumentSummary` component existed but was never imported or used in `DocumentDashboard.tsx`
+- **Solution:** Added import and mounted `<DocumentSummary documentId={documentId} />` unconditionally between Stats Grid and Concept List
+- **Files changed:** `frontend/src/components/dashboard/DocumentDashboard.tsx`
