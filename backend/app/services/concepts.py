@@ -96,7 +96,7 @@ def get_document_concepts(document_id: str, user_id: str) -> list[dict]:
     for c in concepts:
         m = mastery_map.get(c.get("id"), {})
         imp_score = c.get("importance_score", 0.0)
-        is_core = imp_score >= 0.6
+        is_core = c.get("importance") == "core"
         
         result.append({
             "id": c.get("id"),

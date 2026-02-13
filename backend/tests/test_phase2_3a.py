@@ -26,8 +26,8 @@ class TestPhase23a(unittest.TestCase):
         # Mock concepts
         # Need >= 0.6 for validation pass or mock doc progress
         mock_get_concepts.return_value = [
-            {"id": c1_id, "name": "C1", "concept_name": "C1", "importance_score": 0.8, "mastery_score": 0},
-            {"id": c2_id, "name": "C2", "concept_name": "C2", "importance_score": 0.9, "mastery_score": 0}
+            {"id": c1_id, "name": "C1", "concept_name": "C1", "importance_score": 5, "importance": "core", "is_core": True, "mastery_score": 0},
+            {"id": c2_id, "name": "C2", "concept_name": "C2", "importance_score": 4, "importance": "core", "is_core": True, "mastery_score": 0}
         ]
         
         # Mock quiz generation

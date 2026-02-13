@@ -77,8 +77,8 @@ def _recompute_document_progress(user_id: str, document_id: str):
         if not concepts:
             return
 
-        # Filter for CORE concepts (importance >= 0.6)
-        core_concepts = [c for c in concepts if c["importance_score"] >= 0.6]
+        # Filter for CORE concepts
+        core_concepts = [c for c in concepts if c["is_core"]]
 
         if not core_concepts:
             # No core concepts defined yet, can't compute core progress
@@ -163,7 +163,7 @@ def create_session(
                     # Per req: "Validate: only allow concepts with importance_score >= 0.6 unless document core is complete"
                     # I'll enable it for now to be safe, but ideally we check document.progress_core
                     c = concept_map[cid]
-                    if c["importance_score"] < 0.6:
+                    if not c["is_core"]:
                         # Check doc status
                         # Per requirement: "If document.progress_core is stored per-user incorrectly, treat it as unknown and allow only core concepts"
                         # So unless we are SURE it is 100, we block.
@@ -181,7 +181,7 @@ def create_session(
                         # "unless document core is complete (progress_core >= 100)"
                         if (prog or 0) < 100:
                             raise ValueError(
-                                f"Concept '{c['concept_name']}' is not core (importance < 0.6). Finish core concepts first (current progress: {prog or 0}%)."
+                                f"Concept '{c['concept_name']}' is not core. Finish core concepts first (current progress: {prog or 0}%)."
                             )
 
                     target_concepts_list.append(
@@ -199,11 +199,11 @@ def create_session(
 
         else:
             # Auto-selection: 3 weak core concepts
-            # Filter: importance >= 0.6 AND mastery < 80
+            # Filter: is_core AND mastery < 80
             candidates = [
                 c
                 for c in all_concepts
-                if c["importance_score"] >= 0.6 and c["mastery_score"] < 80.0
+                if c["is_core"] and c["mastery_score"] < 80.0
             ]
             # Sort: Importance DESC, then Mastery ASC (lowest mastery first) - wait, python sort is stable
             # Sort by mastery ASC first
