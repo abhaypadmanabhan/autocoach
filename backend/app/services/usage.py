@@ -62,6 +62,22 @@ def get_or_create_daily_usage(user_id: str | UUID) -> dict:
     return _as_dict(getattr(created_res, "data", None)) or new_usage
 
 
+def is_pro_user(user_id: str | UUID) -> bool:
+    """Check if user has pro plan."""
+    try:
+        res = (
+            supabase_admin.table("users")
+            .select("plan_type")
+            .eq("id", str(user_id))
+            .single()
+            .execute()
+        )
+        data = _as_dict(getattr(res, "data", None))
+        return data.get("plan_type") == "pro"
+    except Exception:
+        return False
+
+
 def _build_limit_error(limit_type: str, limit: int, message: str) -> HTTPException:
     return HTTPException(
         status_code=429,
@@ -83,6 +99,11 @@ def _consume_usage_or_raise(
     message: str,
 ) -> int:
     """Atomically increment usage with optimistic retry and limit enforcement."""
+    # Pro users bypass limits and don't increment counters
+    if is_pro_user(user_id):
+        return 0
+
+    today = _get_today_str()
     today = _get_today_str()
     uid = str(user_id)
 
