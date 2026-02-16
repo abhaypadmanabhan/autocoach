@@ -239,3 +239,5 @@
 - `frontend/src/components/dashboard/DailySprintCard.tsx`
 - `frontend/src/components/dashboard/ReviewTodayWidget.tsx`
 - `frontend/src/lib/errorMessages.ts`
+
+Sprint 5 Hook-Order Hotfix – Fixed conditional hook in DailySprintCard causing React error #310 when plan_type changes or limits trigger UI state transitions.

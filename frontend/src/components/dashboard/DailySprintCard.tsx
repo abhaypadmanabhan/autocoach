@@ -14,14 +14,7 @@ export function DailySprintCard() {
     const { status, isLoading, startSprint, starting } = useDailySprint();
     const router = useRouter();
     const { showToast } = useToast();
-
-    if (isLoading) {
-        return (
-            <Card className="relative overflow-hidden border-none bg-gradient-to-br from-card to-background shadow-lg p-6 h-[200px] flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-            </Card>
-        );
-    }
+    const [limitReached, setLimitReached] = useState(false);
 
     // Determine sprint state
     const isCompleted = status?.status === "completed";
@@ -43,8 +36,6 @@ export function DailySprintCard() {
         ? { text: "Focused on weak spots", icon: Target, color: "text-orange-400 bg-orange-400/10" }
         : { text: "Core concepts today", icon: Sparkles, color: "text-blue-400 bg-blue-400/10" };
     const FocusIcon = focusLabel.icon;
-
-    const [limitReached, setLimitReached] = useState(false);
 
     // Handle CTA click
     const handleStart = async () => {
@@ -132,7 +123,11 @@ export function DailySprintCard() {
 
     const ctaConfig = getCtaConfig();
 
-    return (
+    return isLoading ? (
+        <Card className="relative overflow-hidden border-none bg-gradient-to-br from-card to-background shadow-lg p-6 h-[200px] flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </Card>
+    ) : (
         <Card className={cn(
             "relative overflow-hidden border-none shadow-lg transition-all duration-300",
             "bg-gradient-to-br from-[#1a1b1e] to-[#121214] hover:shadow-xl",
