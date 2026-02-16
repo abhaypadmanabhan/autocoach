@@ -353,6 +353,9 @@ class UserDailyUsage(Base):
     quizzes_used: Mapped[int] = mapped_column(
         Integer, server_default=text("0"), nullable=False
     )
+    extra_quizzes: Mapped[int] = mapped_column(
+        Integer, server_default=text("0"), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

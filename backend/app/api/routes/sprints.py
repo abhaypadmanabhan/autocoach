@@ -23,7 +23,7 @@ from app.services.session_manager import (
     _recompute_document_progress,
     _recompute_session_counts,
 )
-from app.services.usage import consume_sprint_usage_or_429
+from app.services.usage import consume_sprint_usage_or_429, get_or_create_daily_usage, QUIZ_LIMIT
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -228,6 +228,11 @@ def get_sprint_today(user_id: UUID) -> SprintStatusResponse:
         if last_date_obj == today:
             is_done_today = True
 
+    # Calculate credits
+    usage = get_or_create_daily_usage(user_id)
+    allowed = QUIZ_LIMIT + usage.get("extra_quizzes", 0)
+    credits_remaining = max(0, allowed - usage.get("quizzes_used", 0))
+
     session = _get_today_session(user_id)
     if session:
         session = _as_dict(session)
@@ -265,6 +270,7 @@ def get_sprint_today(user_id: UUID) -> SprintStatusResponse:
                 "current": progress_current,
                 "total": session.get("total_questions", 0),
             },
+            quiz_credits=credits_remaining,
         )
 
     if is_done_today:
@@ -280,6 +286,7 @@ def get_sprint_today(user_id: UUID) -> SprintStatusResponse:
             questions=[],
             next_question_number=None,
             progress={"current": 5, "total": 5},
+            quiz_credits=credits_remaining,
         )
 
     created = _create_sprint_session(user_id)
@@ -295,10 +302,11 @@ def get_sprint_today(user_id: UUID) -> SprintStatusResponse:
         document_title=created["document_title"],
         questions=created["questions"],
         next_question_number=created["next_question_number"],
-        progress={
-            "current": created["answered_count"],
-            "total": created["total_questions"],
-        },
+            progress={
+                "current": created["answered_count"],
+                "total": created["total_questions"],
+            },
+        quiz_credits=credits_remaining,
     )
 
 

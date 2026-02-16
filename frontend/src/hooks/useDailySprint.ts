@@ -99,6 +99,16 @@ export function useDailySprint() {
         }
     }, [refreshStatus]);
 
+    // Redeem XP for quiz credit
+    const redeemXP = useCallback(async (): Promise<{ success: boolean; new_total_xp: number; credits_added: number }> => {
+        const res = await apiFetch<{ success: boolean; new_total_xp: number; credits_added: number }>("/xp/redeem", {
+            method: "POST",
+            body: { amount: 100 },
+        });
+        await refreshStatus();
+        return res;
+    }, [refreshStatus]);
+
     return {
         status,
         isLoading,
@@ -107,6 +117,7 @@ export function useDailySprint() {
         fetchSprintQuestions,
         submitAnswer,
         completeSprint,
+        redeemXP,
         starting,
         completing,
         submittingAnswer,
@@ -131,6 +142,7 @@ export function useUserStats() {
         streak: status?.streak_count ?? 0,
         totalXp: status?.total_xp ?? 0,
         xpEarnedToday: status?.xp_earned_today ?? 0,
+        quizCredits: status?.quiz_credits ?? 0,
         completedToday: status?.status === "completed",
         isLoading,
         error: error ? getErrorMessage(error) : null,

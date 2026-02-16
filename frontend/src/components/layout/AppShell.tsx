@@ -4,14 +4,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { ArrowLeft, Flame, Trophy, Loader2, Zap, Calendar } from "lucide-react";
+import { ArrowLeft, Flame, Trophy, Loader2, Zap, Calendar, Gamepad2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { pageVariants, pageTransition } from "@/lib/motions";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ToastProvider } from "@/components/ui/Toast";
 import { AvatarDropdown } from "@/components/ui/AvatarDropdown";
 import { useAvatar } from "@/hooks/useAvatar";
-import { useUserStats } from "@/hooks/useDailySprint";
+import { useUserStats, useDailySprint } from "@/hooks/useDailySprint";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
@@ -91,7 +91,9 @@ function AnimatedBackground() {
 
 // Stats HUD Component - Functional with tooltips
 function StatsHUD({ className }: { className?: string }) {
-  const { streak, totalXp, xpEarnedToday, completedToday, isLoading } = useUserStats();
+  const { streak, totalXp, xpEarnedToday, quizCredits, completedToday, isLoading } = useUserStats();
+  const { redeemXP } = useDailySprint();
+  const [redeeming, setRedeeming] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<"streak" | "xp" | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -185,16 +187,17 @@ function StatsHUD({ className }: { className?: string }) {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 4, scale: 0.95 }}
               transition={{ duration: 0.15 }}
-              className="absolute top-full mt-2 right-0 z-50 w-52"
+              className="absolute top-full mt-2 right-0 z-50 w-64"
               onMouseEnter={() => showTooltip("xp")}
               onMouseLeave={hideTooltip}
             >
-              <div className="bg-[var(--surface-darker)] border border-[var(--surface-border)] rounded-xl p-3 shadow-xl">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="bg-[var(--surface-darker)] border border-[var(--surface-border)] rounded-xl p-4 shadow-xl">
+                <div className="flex items-center gap-2 mb-3">
                   <Zap className="w-3.5 h-3.5 text-yellow-400" />
                   <span className="text-xs font-semibold text-[var(--text-primary)]">Experience Points</span>
                 </div>
-                <div className="space-y-1">
+
+                <div className="space-y-2 mb-3">
                   <div className="flex justify-between text-[11px]">
                     <span className="text-[var(--text-muted)]">Total XP</span>
                     <span className="text-yellow-400 font-semibold">{totalXp.toLocaleString()}</span>
@@ -205,10 +208,51 @@ function StatsHUD({ className }: { className?: string }) {
                       <span className="text-emerald-400 font-semibold">+{xpEarnedToday}</span>
                     </div>
                   )}
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-[var(--text-muted)]">Quiz Credits</span>
+                    <span className="text-purple-400 font-semibold">{quizCredits} remaining</span>
+                  </div>
                 </div>
-                <p className="text-[10px] text-[var(--text-muted)] mt-2 leading-relaxed">
-                  Earn XP by completing quizzes and daily sprints.
-                </p>
+
+                <div className="pt-3 border-t border-[var(--surface-border)]">
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (totalXp >= 100 && !redeeming) {
+                        try {
+                          setRedeeming(true);
+                          const res = await redeemXP();
+                          if (res.success) {
+                            // Optional: success toast
+                          }
+                        } catch (e) {
+                          console.error(e);
+                        } finally {
+                          setRedeeming(false);
+                        }
+                      }
+                    }}
+                    disabled={totalXp < 100 || redeeming}
+                    className={cn(
+                      "w-full px-2 py-1.5 rounded-lg text-[10px] font-medium transition-colors flex items-center justify-center gap-1.5",
+                      totalXp >= 100
+                        ? "bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 active:bg-purple-500/30"
+                        : "bg-[var(--surface-hover)] text-[var(--text-disabled)] cursor-not-allowed"
+                    )}
+                  >
+                    {redeeming ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Gamepad2 className="w-3 h-3" />
+                    )}
+                    Redeem 100 XP for +1 Credit
+                  </button>
+                  {totalXp < 100 && (
+                    <p className="text-[9px] text-red-400 mt-1.5 text-center">
+                      Need {100 - totalXp} more XP to redeem
+                    </p>
+                  )}
+                </div>
               </div>
             </motion.div>
           )}

@@ -43,7 +43,9 @@ def get_or_create_daily_usage(user_id: str | UUID) -> dict:
         "user_id": uid,
         "date": today,
         "sprints_used": 0,
+        "sprints_used": 0,
         "quizzes_used": 0,
+        "extra_quizzes": 0,
     }
     # Upsert to handle race conditions
     supabase_admin.table("user_daily_usage").upsert(
@@ -118,7 +120,9 @@ def _consume_usage_or_raise(
             "user_id": uid,
             "date": today,
             "sprints_used": 0,
+            "sprints_used": 0,
             "quizzes_used": 0,
+            "extra_quizzes": 0,
         },
         on_conflict="user_id, date",
     ).execute()
@@ -174,11 +178,12 @@ def check_sprint_limit(user_id: UUID) -> None:
 def check_quiz_limit(user_id: UUID) -> None:
     """Raise 429 if quiz limit reached."""
     usage = get_or_create_daily_usage(user_id)
-    if usage["quizzes_used"] >= QUIZ_LIMIT:
+    allowed = QUIZ_LIMIT + usage.get("extra_quizzes", 0)
+    if usage["quizzes_used"] >= allowed:
         raise _build_limit_error(
             "quiz",
-            QUIZ_LIMIT,
-            "You've reached your daily quiz limit.",
+            allowed,
+            f"You've reached your daily quiz limit of {allowed}.",
         )
 
 
@@ -217,10 +222,14 @@ def consume_sprint_usage_or_429(user_id: UUID) -> int:
 
 def consume_quiz_usage_or_429(user_id: UUID) -> int:
     """Atomically consume one quiz from daily quota or raise 429."""
+    # We need to fetch current usage to know the limit dynamically
+    usage = get_or_create_daily_usage(user_id)
+    allowed = QUIZ_LIMIT + usage.get("extra_quizzes", 0)
+
     return _consume_usage_or_raise(
         user_id,
         field="quizzes_used",
-        limit=QUIZ_LIMIT,
+        limit=allowed,
         limit_type="quiz",
-        message="You've reached your daily quiz limit.",
+        message=f"You've reached your daily quiz limit of {allowed}.",
     )

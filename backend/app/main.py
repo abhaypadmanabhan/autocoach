@@ -16,6 +16,7 @@ from app.api.routes import (
     sprints,
     concepts,
     review,
+    xp,
 )
 from app.config import get_settings
 
@@ -83,6 +84,7 @@ app.include_router(daily_sprint.router, prefix="/daily-sprint", tags=["daily-spr
 app.include_router(sprints.router, prefix="/sprint", tags=["sprint"])
 app.include_router(concepts.router, prefix="/concepts", tags=["concepts"])
 app.include_router(review.router, prefix="/review", tags=["review"])
+app.include_router(xp.router, prefix="/xp", tags=["xp"])
 
 
 @app.get("/")

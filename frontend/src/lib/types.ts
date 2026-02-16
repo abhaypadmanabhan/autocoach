@@ -121,6 +121,7 @@ export interface SprintStatusResponse {
   session_id?: string;
   document_title?: string;
   progress?: { completed: number; total: number };
+  quiz_credits?: number;
 }
 
 export interface StartSprintResponse {

@@ -246,3 +246,17 @@ Sprint 5 Hook-Order Hotfix – Fixed conditional hook in DailySprintCard causing
 - Implemented `is_pro` helper and updated usage service to bypass limits for Pro users.
 - Added comprehensive tests verifying Pro users can exceed daily sprint/quiz limits without error.
 - Verified Free users are still subject to limits.
+
+## [Sprint 6] XP Redemption Implementation
+- **Goal**: Allow users to exchange 100 XP for 1 extra quiz credit.
+- **Backend**:
+  - Added `extra_quizzes` column to `user_daily_usage`.
+  - Implemented `POST /xp/redeem` handling atomic deductions and credit grants.
+  - Updated `SprintStatusResponse` to include calculated `quiz_credits`.
+- **Frontend**:
+  - Updated `StatsHUD` to display available quiz credits.
+  - Added redemption CTA within the XP tooltip.
+  - Integrated with `useDailySprint` hook for redemption actions.
+- **Verification**:
+  - Added `backend/tests/test_xp_redemption.py` covering success and failure scenarios.
+  - Manual UI verification of credit display and redemption flow.
