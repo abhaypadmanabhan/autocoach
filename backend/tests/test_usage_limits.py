@@ -25,6 +25,7 @@ from app.main import app
 from app.api.routes.documents import get_user_id_from_token
 from app.api.routes import sprints as sprints_route
 from app.api.routes import sessions as sessions_route
+from app.services.usage import is_pro
 
 
 client = TestClient(app)
@@ -228,3 +229,40 @@ def test_create_quiz_session_consumes_quota_after_success(mocker):
     assert response.status_code == 200
     create_mock.assert_called_once()
     consume_mock.assert_called_once()
+
+
+def test_is_pro_helper():
+    assert is_pro("pro") is True
+    assert is_pro("Pro") is True  # case insensitive
+    assert is_pro(" PRO ") is True  # strip whitespace
+    assert is_pro("free") is False
+    assert is_pro(None) is False
+    assert is_pro("") is False
+
+
+def test_consume_sprint_usage_bypasses_limit_for_pro_user(mocker):
+    # Mock user as Pro
+    mocker.patch("app.services.usage.is_pro_user", return_value=True)
+    
+    # Mock verify limits would be hit if checked (though logic shouldn't check DB count if pro)
+    # We'll mock the internal usage checkout to ensure it proceeds
+    mocker.patch.object(sprints_route, "consume_sprint_usage_or_429", return_value=0)
+    
+    # But specifically for the usage service itself, let's test the lower level service function 
+    # to ensure IT bypasses.
+    from app.services.usage import consume_sprint_usage_or_429
+    
+    # If is_pro_user is True, it should return 0 and NOT raise exception
+    # even if we didn't mock the DB calls because it returns early.
+    val = consume_sprint_usage_or_429(uuid4())
+    assert val == 0
+
+
+def test_consume_quiz_usage_bypasses_limit_for_pro_user(mocker):
+    # Mock user as Pro
+    mocker.patch("app.services.usage.is_pro_user", return_value=True)
+    
+    from app.services.usage import consume_quiz_usage_or_429
+    
+    val = consume_quiz_usage_or_429(uuid4())
+    assert val == 0

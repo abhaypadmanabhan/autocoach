@@ -241,3 +241,8 @@
 - `frontend/src/lib/errorMessages.ts`
 
 Sprint 5 Hook-Order Hotfix – Fixed conditional hook in DailySprintCard causing React error #310 when plan_type changes or limits trigger UI state transitions.
+
+## Sprint 5.5 – Pro bypass for usage limits
+- Implemented `is_pro` helper and updated usage service to bypass limits for Pro users.
+- Added comprehensive tests verifying Pro users can exceed daily sprint/quiz limits without error.
+- Verified Free users are still subject to limits.

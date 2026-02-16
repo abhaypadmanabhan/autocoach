@@ -62,6 +62,11 @@ def get_or_create_daily_usage(user_id: str | UUID) -> dict:
     return _as_dict(getattr(created_res, "data", None)) or new_usage
 
 
+def is_pro(plan_type: str | None) -> bool:
+    """Check if plan type is pro."""
+    return (plan_type or "").lower().strip() == "pro"
+
+
 def is_pro_user(user_id: str | UUID) -> bool:
     """Check if user has pro plan."""
     try:
@@ -73,7 +78,7 @@ def is_pro_user(user_id: str | UUID) -> bool:
             .execute()
         )
         data = _as_dict(getattr(res, "data", None))
-        return data.get("plan_type") == "pro"
+        return is_pro(data.get("plan_type"))
     except Exception:
         return False
 
