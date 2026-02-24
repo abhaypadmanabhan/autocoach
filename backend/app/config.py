@@ -24,9 +24,12 @@ class Settings(BaseSettings):
     backend_url: str = "http://localhost:8000"
     frontend_url: str = "http://localhost:3000"
 
-    # CORS - comma-separated list of allowed origins for production
-    # Example: "https://myapp.vercel.app,https://myapp-git-main.vercel.app"
-    frontend_origins: str = ""
+    # CORS - comma-separated list of allowed origins
+    # Example: "https://autocoach-rho.vercel.app,http://localhost:3000"
+    frontend_origins: str = (
+        "https://autocoach-rho.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
+    )
+    cors_allow_credentials: bool = False
 
     # Environment: "development" or "production"
     environment: str = "development"
@@ -43,14 +46,11 @@ class Settings(BaseSettings):
 
     def get_cors_origins(self) -> List[str]:
         """Build list of allowed CORS origins based on environment."""
-        origins: List[str] = []
-
-        # In development (or if not explicitly production), allow localhost
-        if self.environment != "production":
-            origins.extend([
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-            ])
+        origins: List[str] = [
+            "https://autocoach-rho.vercel.app",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+        ]
 
         # Add comma-separated origins from FRONTEND_ORIGINS (primary method)
         if self.frontend_origins:

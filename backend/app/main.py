@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -65,12 +65,19 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=True,
+    allow_credentials=settings.cors_allow_credentials,
     allow_methods=["*"],  # Allows all methods including OPTIONS
     allow_headers=["*"],  # Allows all headers including Authorization
     expose_headers=["*"],
     max_age=600,  # Cache preflight for 10 minutes
 )
+
+
+@app.options("/{full_path:path}", include_in_schema=False)
+async def options_preflight_passthrough(_full_path: str):
+    """Return empty response for non-CORS OPTIONS probes."""
+    return Response(status_code=204)
+
 
 # =============================================================================
 # ROUTERS - Added AFTER CORS middleware
@@ -87,7 +94,6 @@ app.include_router(concepts.router, prefix="/concepts", tags=["concepts"])
 app.include_router(review.router, prefix="/review", tags=["review"])
 app.include_router(xp.router, prefix="/xp", tags=["xp"])
 app.include_router(onboarding.router, prefix="/onboarding", tags=["onboarding"])
-
 
 
 @app.get("/")
