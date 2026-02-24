@@ -7,10 +7,14 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
 
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
+
     # Supabase
-    supabase_url: str
-    supabase_publishable_key: str
-    supabase_secret_key: str
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
+    supabase_secret_key: str = ""
 
     # Qdrant
     qdrant_url: str
@@ -39,10 +43,6 @@ class Settings(BaseSettings):
     max_documents_per_user: int = 2
     max_quiz_sessions_per_day: int = 5
     quiz_requests_per_minute: int = 60
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
 
     def get_cors_origins(self) -> List[str]:
         """Build list of allowed CORS origins based on environment."""
