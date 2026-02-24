@@ -1,0 +1,138 @@
+diff --git a/backend/app/api/routes/onboarding.py b/backend/app/api/routes/onboarding.py
+index df86823..d4b42b7 100644
+--- a/backend/app/api/routes/onboarding.py
++++ b/backend/app/api/routes/onboarding.py
+@@ -12,27 +12,6 @@ router = APIRouter()
+ logger = logging.getLogger(__name__)
+ 
+ 
+-def _check_response(res, context: str):
+-    """Guard: check if Supabase response is None or malformed."""
+-    if res is None:
+-        raise HTTPException(
+-            status_code=500,
+-            detail=f"Supabase returned None (client/config/version issue) at {context}",
+-        )
+-    has_data_attr = hasattr(res, "data")
+-    logger.info(
+-        "Supabase response check | context=%s | type=%s | has_data_attr=%s",
+-        context,
+-        type(res).__name__,
+-        has_data_attr,
+-    )
+-    if not has_data_attr:
+-        raise HTTPException(
+-            status_code=500,
+-            detail=f"Supabase response missing 'data' attribute at {context}",
+-        )
+-
+-
+ @router.get("", response_model=OnboardingResponse)
+ async def get_onboarding(
+     user_id: UUID = Depends(get_user_id_from_token),
+@@ -41,32 +20,35 @@ async def get_onboarding(
+     try:
+         response = (
+             supabase_admin.table("user_onboarding")
+-            .select("learning_topics, goal, study_frequency")
++            .select("learning_topics,goal,study_frequency")
+             .eq("user_id", str(user_id))
+-            .maybe_single()
++            .limit(1)
+             .execute()
+         )
+-        _check_response(response, "get_onboarding")
+-        onboarding = response.data
++        if response is None:
++            raise HTTPException(
++                status_code=500, detail="Supabase returned None (client/config/version issue) at get_onboarding"
++            )
++        
++        rows = response.data or []
++        row = rows[0] if rows else None
+     except HTTPException:
+         raise
+     except Exception as exc:
+         raise HTTPException(
+-            status_code=500, detail=f"Failed to load onboarding: {str(exc)}"
++            status_code=500, detail="Failed to load onboarding from db"
+         )
+ 
+-    if not onboarding:
++    if not row:
+         return OnboardingResponse(has_completed=False)
+ 
+-    learning_topics = onboarding.get("learning_topics")
+-    if learning_topics is None:
+-        learning_topics = []
++    learning_topics = row.get("learning_topics") or []
+ 
+     return OnboardingResponse(
+         has_completed=True,
+         learning_topics=learning_topics,
+-        goal=onboarding.get("goal"),
+-        study_frequency=onboarding.get("study_frequency"),
++        goal=row.get("goal"),
++        study_frequency=row.get("study_frequency"),
+     )
+ 
+ 
+@@ -77,29 +59,11 @@ async def save_onboarding(
+ ):
+     """Save onboarding responses for the authenticated user (upsert)."""
+     try:
+-        existing_res = (
+-            supabase_admin.table("user_onboarding")
+-            .select("learning_topics, goal, study_frequency")
+-            .eq("user_id", str(user_id))
+-            .maybe_single()
+-            .execute()
+-        )
+-        _check_response(existing_res, "save_onboarding_select")
+-        existing = existing_res.data or {}
+-
+         upsert_payload = {
+             "user_id": str(user_id),
+-            "learning_topics": (
+-                payload.learning_topics
+-                if payload.learning_topics is not None
+-                else existing.get("learning_topics")
+-            ),
+-            "goal": payload.goal if payload.goal is not None else existing.get("goal"),
+-            "study_frequency": (
+-                payload.study_frequency
+-                if payload.study_frequency is not None
+-                else existing.get("study_frequency")
+-            ),
++            "learning_topics": payload.learning_topics or [],
++            "goal": payload.goal,
++            "study_frequency": payload.study_frequency,
+         }
+ 
+         upsert_res = (
+@@ -107,21 +71,18 @@ async def save_onboarding(
+             .upsert(upsert_payload, on_conflict="user_id")
+             .execute()
+         )
+-        _check_response(upsert_res, "save_onboarding_upsert")
++        if upsert_res is None:
++            raise HTTPException(status_code=500, detail="Supabase returned None at save_onboarding")
+     except HTTPException:
+         raise
+     except Exception as exc:
+         raise HTTPException(
+-            status_code=500, detail=f"Failed to save onboarding: {str(exc)}"
++            status_code=500, detail="Failed to save onboarding to db"
+         )
+ 
+-    learning_topics = upsert_payload.get("learning_topics")
+-    if learning_topics is None:
+-        learning_topics = []
+-
+     return OnboardingResponse(
+         has_completed=True,
+-        learning_topics=learning_topics,
++        learning_topics=upsert_payload.get("learning_topics", []),
+         goal=upsert_payload.get("goal"),
+         study_frequency=upsert_payload.get("study_frequency"),
+     )
