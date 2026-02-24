@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { useState, useCallback } from "react";
 import { useSWRConfig } from "swr";
 import { apiFetch, normalizeAnswer, getErrorMessage } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import type {
   QuizSession,
   CurrentQuestion,
@@ -79,6 +80,12 @@ export function useCreateSession() {
           body: data,
         });
         globalMutate(`/quiz/sessions/${response.session_id}`, response, false);
+
+        analytics.capture("quiz_session_started", {
+          session_id: response.session_id,
+          document_id: data.document_id
+        });
+
         return response;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : getErrorMessage(err);
@@ -106,12 +113,12 @@ export function useAnswerQuestion(sessionId: string | null) {
       try {
         // Normalize answer to string before sending
         const normalizedAnswer = normalizeAnswer(answer);
-        
+
         // Validate answer is not empty
         if (!normalizedAnswer) {
           throw new Error("Answer cannot be empty");
         }
-        
+
         if (process.env.NODE_ENV === "development") {
           console.log("submitAnswer payload", {
             answer: normalizedAnswer,
@@ -128,6 +135,13 @@ export function useAnswerQuestion(sessionId: string | null) {
         // Only mutate session data, NOT current question
         // Question will be refetched when user clicks "Next Question"
         await globalMutate(`/quiz/sessions/${sessionId}`);
+
+        analytics.capture("question_answered", {
+          session_id: sessionId,
+          question_id: questionId,
+          input_method: inputMethod
+        });
+
         return response;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : getErrorMessage(err);

@@ -23,6 +23,22 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 from app.db.base import Base
 
 
+class UserOnboarding(Base):
+    __tablename__ = "user_onboarding"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("auth.users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    learning_topics: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    goal: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    study_frequency: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class User(Base):
     __tablename__ = "users"
 

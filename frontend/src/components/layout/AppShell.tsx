@@ -12,6 +12,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { AvatarDropdown } from "@/components/ui/AvatarDropdown";
 import { useAvatar } from "@/hooks/useAvatar";
 import { useUserStats, useDailySprint } from "@/hooks/useDailySprint";
+import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { cn } from "@/lib/utils";
 import type { ReactNode } from "react";
 
@@ -414,6 +415,7 @@ export function AppShell({
           )}
         </div>
       </div>
+      <OnboardingModal />
     </ToastProvider>
   );
 }

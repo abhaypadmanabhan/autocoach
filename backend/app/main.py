@@ -17,6 +17,7 @@ from app.api.routes import (
     concepts,
     review,
     xp,
+    onboarding,
 )
 from app.config import get_settings
 
@@ -85,6 +86,8 @@ app.include_router(sprints.router, prefix="/sprint", tags=["sprint"])
 app.include_router(concepts.router, prefix="/concepts", tags=["concepts"])
 app.include_router(review.router, prefix="/review", tags=["review"])
 app.include_router(xp.router, prefix="/xp", tags=["xp"])
+app.include_router(onboarding.router, prefix="/onboarding", tags=["onboarding"])
+
 
 
 @app.get("/")

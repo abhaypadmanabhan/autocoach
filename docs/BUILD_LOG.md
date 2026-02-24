@@ -257,6 +257,46 @@ Sprint 5 Hook-Order Hotfix – Fixed conditional hook in DailySprintCard causing
   - Updated `StatsHUD` to display available quiz credits.
   - Added redemption CTA within the XP tooltip.
   - Integrated with `useDailySprint` hook for redemption actions.
-- **Verification**:
   - Added `backend/tests/test_xp_redemption.py` covering success and failure scenarios.
   - Manual UI verification of credit display and redemption flow.
+
+## [Sprint 7] Product Analytics + Onboarding (v1)
+- **Goal**: Add telemetry to track early user behavior and gather onboarding profiling.
+- **Backend (Onboarding)**:
+  - Created `user_onboarding` table to capture learning goals, experience levels, and weekly time commitments.
+  - Implemented `GET /onboarding` and `POST /onboarding` endpoints. 
+  - Set up Alembic migration to apply the table into the authenticated public schema reliably.
+- **Frontend (Onboarding)**:
+  - Created an `OnboardingModal` interface that interrupts users without a valid `onboarding_completed` record.
+  - The modal collects goals iteratively and syncs to both the API and the Analytics profile directly.
+- **Frontend (Analytics SDK)**:
+  - Integrated `posthog-js` with a custom `analytics.ts` abstraction wrapper.
+  - Bound essential events across critical workflows: `sign_in`, `document_uploaded`, `concepts_extracted`, `summary_viewed`, `sprint_started`, `sprint_completed`, `quiz_session_started`, `quiz_session_completed`, and `xp_redeemed`.
+- **Verification**:
+  - Validated proper TS payloads.
+  - `npm run build` succeeds seamlessly.
+
+### Sprint 7 QA – PostHog + Onboarding
+- Added `sanitizeProps()` in `frontend/src/lib/analytics.ts` to strip sensitive keys (`email`, `token`, `authorization`, `raw_text`, `content`) from analytics payloads.
+- Added analytics identify flow in `frontend/src/components/providers/AnalyticsProvider.tsx` using Supabase user UUID and properties: `plan_type`, `xp_total`, `streak_current`.
+- Added identify de-duplication guard to avoid repeated identify calls from re-renders/auth churn.
+- Updated `summary_viewed` to fire only when the summary accordion is opened in `frontend/src/components/documents/DocumentSummary.tsx`.
+- Updated `quiz_session_completed` tracking in `frontend/src/app/results/page.tsx` to fire once per session.
+- Aligned onboarding frontend payload/response handling with backend schema (`has_completed`, `goal`, `study_frequency`, `learning_topics`) so modal completion persists and is not re-shown after completion.
+
+### Sprint 7 UI QA – Onboarding Modal
+**Date:** 2026-02-23
+
+**Checked:**
+- ✅ Modal persistence: Uses database flag via SWR with `revalidateOnFocus: false`, no localStorage flicker on refresh.
+- ✅ 3-step flow: Clear progress bar, smooth step transitions with Framer Motion.
+- ✅ Premium feel: Backdrop blur, rounded-3xl, shadow-2xl, branded colors per step.
+- ✅ Back button: Works correctly, preserves form state.
+- ✅ Copy: Minimal, professional tone ("What do you want to learn?", "Start Learning").
+- ✅ Submission success: Closes modal and redirects to `/upload` to guide user to upload first doc.
+
+**Polish applied:**
+- Added `useRouter` redirect to `/upload` after successful onboarding completion.
+
+**Files changed:**
+- `frontend/src/components/onboarding/OnboardingModal.tsx`

@@ -5,6 +5,7 @@ import { useSWRConfig } from "swr";
 import { v4 as uuidv4 } from "uuid";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { apiFetch, ApiError } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import type { Document } from "@/lib/types";
 
 interface RegisterDocumentRequest {
@@ -117,6 +118,11 @@ export function useUploadDocument() {
 
         // Invalidate documents list cache
         await mutate("/documents/");
+
+        analytics.capture("document_uploaded", {
+          file_type: document.file_type,
+          file_size: document.file_size,
+        });
 
         return document;
       } catch (err) {

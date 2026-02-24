@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/useToast";
 import { PlayCircle, Star, GraduationCap, CheckCircle2, Trash2, AlertTriangle, Loader2, Trophy, Info } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { analytics } from "@/lib/analytics";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,9 +70,11 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
             if (concepts.length === 0) {
                 console.log("Document ready but no concepts, triggering refetch...");
                 refetch();
+            } else {
+                analytics.capture("concepts_extracted", { document_id: documentId, concepts_count: concepts.length });
             }
         }
-    }, [document?.status, concepts.length, refetch]);
+    }, [document?.status, concepts.length, refetch, documentId]);
 
     if (documentLoading || conceptsLoading || progressLoading) {
         return <DashboardSkeleton />;

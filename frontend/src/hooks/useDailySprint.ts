@@ -1,6 +1,7 @@
 import useSWR, { useSWRConfig } from "swr";
 import { useCallback, useState } from "react";
 import { apiFetch, getErrorMessage } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import type {
     SprintStatusResponse,
     SprintQuiz,
@@ -40,6 +41,11 @@ export function useDailySprint() {
             });
             // Invalidate status cache after starting
             await refreshStatus();
+
+            analytics.capture("sprint_started", {
+                session_id: res.session_id
+            });
+
             return res;
         } finally {
             setStarting(false);
@@ -93,6 +99,15 @@ export function useDailySprint() {
             });
             // Refresh status to update streak/xp
             await refreshStatus();
+
+            analytics.capture("sprint_completed", {
+                session_id: sessionId,
+                correct_count: correctCount,
+                total_questions: totalQuestions,
+                xp_earned: res.xp_awarded,
+                streak_updated: res.new_streak
+            });
+
             return res;
         } finally {
             setCompleting(false);
@@ -106,6 +121,15 @@ export function useDailySprint() {
             body: { amount: 100 },
         });
         await refreshStatus();
+
+        if (res.success) {
+            analytics.capture("xp_redeemed", {
+                amount: 100,
+                new_total_xp: res.new_total_xp,
+                credits_added: res.credits_added
+            });
+        }
+
         return res;
     }, [refreshStatus]);
 

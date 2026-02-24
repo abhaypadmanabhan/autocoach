@@ -12,6 +12,7 @@ import { loginSchema, type LoginFormData } from "@/lib/validation/auth";
 import { Button } from "@/components/primitives/Button";
 import { Input, Label } from "@/components/primitives/Input";
 import { SocialButtons } from "@/components/auth/SocialButtons";
+import { analytics } from "@/lib/analytics";
 
 const inputClassName =
   "h-auto pl-12 pr-4 py-3 border-slate-border rounded-xl bg-white shadow-none transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus-visible:ring-0 text-indigo-space placeholder:text-slate-text/60";
@@ -56,6 +57,8 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
+
+    analytics.capture("sign_in");
 
     router.push("/dashboard");
     router.refresh();

@@ -18,6 +18,7 @@ import {
 import { useSession } from "@/hooks/useQuiz";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ScoreHero } from "@/components/results/ScoreCircle";
@@ -34,6 +35,7 @@ function ResultsContent() {
   const sessionId = searchParams.get("session_id");
   const { session, loading, error: sessionError } = useSession(sessionId);
   const confettiFired = useRef(false);
+  const completionTracked = useRef<Set<string>>(new Set());
 
   const displayError = sessionError ? getErrorMessage(sessionError) : null;
 
@@ -76,8 +78,23 @@ function ResultsContent() {
   const scorePercent = total > 0 ? Math.round((correct / total) * 100) : 0;
   const hasAnyAnswers = total > 0;
 
-  // Confetti on high scores
+  // Confetti on high scores and Analytics Tracking
   useEffect(() => {
+    if (
+      total > 0 &&
+      session?.status === "completed" &&
+      sessionId &&
+      !completionTracked.current.has(sessionId)
+    ) {
+      analytics.capture("quiz_session_completed", {
+        session_id: sessionId,
+        score_percent: scorePercent,
+        total_questions: total,
+        correct_answers: correct
+      });
+      completionTracked.current.add(sessionId);
+    }
+
     if (scorePercent >= 80 && hasAnyAnswers && !confettiFired.current) {
       confettiFired.current = true;
       const timer = setTimeout(() => {
@@ -90,7 +107,7 @@ function ResultsContent() {
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [scorePercent, hasAnyAnswers]);
+  }, [scorePercent, hasAnyAnswers, total, session?.status, sessionId, correct]);
 
   // Filtered question lists for tabs
   const reviewItems = useMemo(
