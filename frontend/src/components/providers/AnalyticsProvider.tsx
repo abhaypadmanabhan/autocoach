@@ -1,5 +1,6 @@
 "use client";
 
+import posthog from "posthog-js";
 import { useEffect } from "react";
 import { analytics } from "@/lib/analytics";
 import { apiFetch } from "@/lib/api";
