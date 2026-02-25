@@ -1,4 +1,8 @@
+"use client";
+
 import posthog from "posthog-js";
+
+let isInitialized = false;
 
 const SENSITIVE_PROP_KEYS = new Set([
     "email",
@@ -53,14 +57,24 @@ export function sanitizeProps(props?: Record<string, unknown>): Record<string, u
 
 export const analytics = {
     init: () => {
-        if (
-            typeof window !== "undefined" &&
-            process.env.NEXT_PUBLIC_POSTHOG_KEY &&
-            process.env.NEXT_PUBLIC_POSTHOG_HOST
-        ) {
-            posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-                api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+        if (isInitialized) return;
+        if (typeof window === "undefined") return;
+
+        const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+        const host = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
+
+        if (key) {
+            posthog.init(key, {
+                api_host: host,
                 capture_pageview: false, // We'll manage this if needed
+            });
+            isInitialized = true;
+            (window as any).posthog = posthog;
+            console.log("[posthog] init ok with host:", host);
+        } else {
+            console.warn("[posthog] init failed", {
+                keyPresent: !!key,
+                host: host,
             });
         }
     },

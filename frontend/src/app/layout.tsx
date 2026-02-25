@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
+import { PosthogDebug } from "@/components/debug/PosthogDebug";
 
 
 const inter = Inter({
@@ -26,10 +27,13 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const shouldRenderDebug = process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_POSTHOG_DEBUG === "true";
+
   return (
     <html lang="en" className="light">
       <body className={`${inter.variable} ${plusJakartaSans.variable} font-sans antialiased`}>
         <AnalyticsProvider>
+          {shouldRenderDebug && <PosthogDebug />}
           {children}
         </AnalyticsProvider>
       </body>
