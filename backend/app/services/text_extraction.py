@@ -31,8 +31,8 @@ def sanitize_text(text: str) -> str:
     cleaned_chars = []
     for char in text:
         code = ord(char)
-        # Allow printable characters (32-126), newlines (10), tabs (9), carriage returns (13)
-        if (32 <= code <= 126) or code in (9, 10, 13):
+        # Allow printable characters (32-126), extended Unicode, newlines (10), tabs (9), carriage returns (13)
+        if code >= 32 or code in (9, 10, 13):
             cleaned_chars.append(char)
         # Skip other control characters (including null 0x00)
 

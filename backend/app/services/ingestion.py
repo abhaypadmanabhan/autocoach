@@ -12,7 +12,7 @@ from app.services.embeddings import get_embeddings
 logger = logging.getLogger(__name__)
 
 
-async def process_document(document_id: str) -> None:
+def process_document(document_id: str) -> None:
     """
     Process a document through the full ingestion pipeline.
 
@@ -149,7 +149,7 @@ async def process_document(document_id: str) -> None:
              # Need to pass chunks in a format that concept_extractor expects (list of dicts with content)
              # We can reuse the `chunks` variable from earlier which are dicts from `chunk_text` function
              from app.services.concept_extractor import extract_concepts
-             await extract_concepts(document_id, chunks)
+             extract_concepts(document_id, chunks)
         except Exception as e:
              logger.error(f"Concept extraction failed for document {document_id}: {e}")
              # Do NOT mark document as failed, just log the error.

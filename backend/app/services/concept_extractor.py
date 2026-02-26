@@ -110,7 +110,7 @@ def _postprocess_concepts(concepts: List[ExtractedConcept]) -> List[dict]:
     return items
 
 
-async def extract_concepts(document_id: str, chunks: List[dict]) -> None:
+def extract_concepts(document_id: str, chunks: List[dict]) -> None:
     """
     Extract learning concepts from a document's chunks and store them.
 
@@ -255,17 +255,17 @@ async def extract_concepts(document_id: str, chunks: List[dict]) -> None:
         logger.info(f"Concept extraction completed for document {document_id}")
 
         # Step 3: Generate AI Title
-        await generate_ai_title(document_id, concepts, chunks)
+        generate_ai_title(document_id, concepts, chunks)
 
         # Step 4: Generate Document Summary
         from app.services.summary_generator import generate_document_summary
-        await generate_document_summary(document_id, concepts)
+        generate_document_summary(document_id, concepts)
 
     except Exception as e:
         logger.exception(f"Unexpected error in concept extraction: {e}")
 
 
-async def generate_ai_title(document_id: str, concepts: List[dict], chunks: List[dict]) -> None:
+def generate_ai_title(document_id: str, concepts: List[dict], chunks: List[dict]) -> None:
     """
     Generate a short, study-friendly title for the document.
     

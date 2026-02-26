@@ -874,7 +874,7 @@ async def get_document_progress(
 
 
 @router.get("/{document_id}/summary", response_model=DocumentSummaryResponse)
-async def get_document_summary(
+def get_document_summary(
     document_id: UUID, user_id: UUID = Depends(get_user_id_from_token)
 ):
     """Get document summary and regenerate if concept set changed."""
@@ -915,7 +915,7 @@ async def get_document_summary(
                 version=doc.get("summary_version"),
             )
 
-        regenerated_summary = await generate_document_summary(
+        regenerated_summary = generate_document_summary(
             str(document_id), concepts, force=True
         )
 

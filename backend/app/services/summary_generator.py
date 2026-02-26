@@ -170,7 +170,7 @@ def _build_prompts(
     return system_prompt, user_prompt
 
 
-async def generate_document_summary(
+def generate_document_summary(
     document_id: str, concepts: List[dict[str, Any]], force: bool = False
 ) -> dict[str, Any]:
     """Generate and persist document summary. Returns summary JSON."""
