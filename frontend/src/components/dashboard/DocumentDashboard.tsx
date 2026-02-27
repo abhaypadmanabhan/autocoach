@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { mutate } from "swr";
 
 import { useDocument, useDeleteDocument } from "@/hooks/useDocuments";
@@ -49,6 +49,11 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const { deleteDocument, deleting } = useDeleteDocument();
     const { showToast } = useToast();
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+    const conceptsTrackedRef = useRef(false);
+
+    useEffect(() => {
+        conceptsTrackedRef.current = false;
+    }, [documentId]);
 
     const handleDeleteConfirm = async () => {
         try {
@@ -70,8 +75,12 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
             if (concepts.length === 0) {
                 console.log("Document ready but no concepts, triggering refetch...");
                 refetch();
-            } else {
-                analytics.capture("concepts_extracted", { document_id: documentId, concepts_count: concepts.length });
+            } else if (!conceptsTrackedRef.current) {
+                analytics.capture("concepts_extracted", {
+                    document_id: documentId,
+                    concept_count: concepts.length,
+                });
+                conceptsTrackedRef.current = true;
             }
         }
     }, [document?.status, concepts.length, refetch, documentId]);
