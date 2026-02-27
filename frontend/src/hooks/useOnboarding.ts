@@ -7,12 +7,14 @@ export interface OnboardingData {
     learning_topics?: Record<string, unknown> | null;
     goal?: string | null;
     study_frequency?: string | null;
+    experience_level?: "beginner" | "intermediate" | "advanced" | null;
 }
 
 export interface OnboardingUpdateRequest {
     learning_topics?: Record<string, unknown>;
     goal?: string;
     study_frequency?: string;
+    experience_level?: "beginner" | "intermediate" | "advanced";
 }
 
 const ONBOARDING_KEY = "/onboarding";

@@ -8,6 +8,7 @@ import { useOnboarding } from "@/hooks/useOnboarding";
 import { Button } from "@/components/ui/button";
 import { Logo } from "@/components/brand/Logo";
 import { analytics } from "@/lib/analytics";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 const EXPERIENCE_LEVELS = [
     { id: "beginner", label: "Beginner", desc: "New to the topics I want to learn" },
@@ -50,11 +51,23 @@ export function OnboardingModal() {
             await completeOnboarding({
                 goal: learningGoal,
                 study_frequency: `${weeklyMinutes} minutes/day`,
+                experience_level: experienceLevel as "beginner" | "intermediate" | "advanced",
                 learning_topics: {
                     experience_level: experienceLevel,
                     weekly_target_minutes: weeklyMinutes,
                 },
             });
+
+            const supabase = createBrowserClient();
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+
+            if (user) {
+                analytics.identify(user.id, {
+                    experience_level: experienceLevel,
+                });
+            }
 
             analytics.capture("onboarding_completed", {
                 goal: learningGoal,

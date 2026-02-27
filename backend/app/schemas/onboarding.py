@@ -7,10 +7,11 @@ class OnboardingResponse(BaseModel):
     learning_topics: Optional[Dict[str, Any]] = None
     goal: Optional[str] = None
     study_frequency: Optional[str] = None
+    experience_level: Optional[str] = None
 
 
 class OnboardingCreate(BaseModel):
     learning_topics: Optional[Dict[str, Any]] = None
     goal: Optional[str] = None
     study_frequency: Optional[str] = None
-
+    experience_level: Optional[str] = None

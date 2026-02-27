@@ -34,6 +34,11 @@ class UserOnboarding(Base):
     learning_topics: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     goal: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     study_frequency: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    experience_level: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        server_default=text("'beginner'::text"),
+    )
     completed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -353,6 +358,7 @@ class Chunk(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
 
 class UserDailyUsage(Base):
     __tablename__ = "user_daily_usage"
