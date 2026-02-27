@@ -295,6 +295,8 @@ async def submit_quiz_answer(
                 score_so_far=result["result"]["score_so_far"],
                 total_answered=result["result"]["total_answered"],
                 feedback=result["result"].get("feedback"),
+                xp_awarded=result["result"].get("xp_awarded", 0),
+                mastery_delta=result["result"].get("mastery_delta", 0.0),
             ),
             next_question=next_question,
             session_complete=result["session_complete"],

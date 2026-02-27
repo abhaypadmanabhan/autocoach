@@ -23,7 +23,11 @@ from app.services.session_manager import (
     _recompute_document_progress,
     _recompute_session_counts,
 )
-from app.services.usage import consume_sprint_usage_or_429, get_or_create_daily_usage, QUIZ_LIMIT
+from app.services.usage import (
+    consume_sprint_usage_or_429,
+    get_or_create_daily_usage,
+    QUIZ_LIMIT,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -31,6 +35,26 @@ logger = logging.getLogger(__name__)
 
 def _as_dict(value: Any) -> dict:
     return value if isinstance(value, dict) else {}
+
+
+def _get_mastery_scores(user_id: UUID, concept_ids: list[str]) -> dict[str, float]:
+    if not concept_ids:
+        return {}
+
+    response = (
+        supabase_admin.table("user_concept_mastery")
+        .select("concept_id,mastery_score")
+        .eq("user_id", str(user_id))
+        .in_("concept_id", concept_ids)
+        .execute()
+    )
+
+    rows = response.data or []
+    return {
+        str(row.get("concept_id")): float(row.get("mastery_score") or 0.0)
+        for row in rows
+        if row.get("concept_id") is not None
+    }
 
 
 def _ensure_user_profile(user_id: UUID) -> dict:
@@ -302,10 +326,10 @@ def get_sprint_today(user_id: UUID) -> SprintStatusResponse:
         document_title=created["document_title"],
         questions=created["questions"],
         next_question_number=created["next_question_number"],
-            progress={
-                "current": created["answered_count"],
-                "total": created["total_questions"],
-            },
+        progress={
+            "current": created["answered_count"],
+            "total": created["total_questions"],
+        },
         quiz_credits=credits_remaining,
     )
 
@@ -367,6 +391,10 @@ def answer_sprint_question(
             progress={"current": answered, "total": total_questions},
             streak_count=stats["streak_count"],
             total_xp=stats["total_xp"],
+            xp_awarded=0,
+            mastery_delta=0.0,
+            mastery_improved_concept_ids=[],
+            is_repeat_submission=True,
         )
 
     if session.get("status") != "active":
@@ -389,8 +417,12 @@ def answer_sprint_question(
     )
 
     is_correct = eval_result["is_correct"]
+    xp_awarded = 10 if is_correct else 5
     feedback = eval_result.get("feedback")
     now = datetime.now(timezone.utc).isoformat()
+
+    q_concept_ids = [str(cid) for cid in (question.get("concept_ids") or [])]
+    before_scores = _get_mastery_scores(user_id, q_concept_ids)
 
     update_res = (
         supabase_admin.table("questions")
@@ -438,15 +470,36 @@ def answer_sprint_question(
             progress={"current": answered, "total": total_questions},
             streak_count=stats["streak_count"],
             total_xp=stats["total_xp"],
+            xp_awarded=0,
+            mastery_delta=0.0,
+            mastery_improved_concept_ids=[],
+            is_repeat_submission=True,
         )
 
+    mastery_delta = 0.0
+    improved_concept_ids: list[str] = []
     try:
-        q_concept_ids = question.get("concept_ids")
         if q_concept_ids:
             _update_concept_mastery(str(user_id), q_concept_ids, is_correct)
             document_id = session.get("document_id")
             if document_id:
                 _recompute_document_progress(str(user_id), str(document_id))
+
+            after_scores = _get_mastery_scores(user_id, q_concept_ids)
+            mastery_delta = round(
+                sum(
+                    after_scores.get(concept_id, 0.0)
+                    - before_scores.get(concept_id, 0.0)
+                    for concept_id in q_concept_ids
+                ),
+                2,
+            )
+            improved_concept_ids = [
+                concept_id
+                for concept_id in q_concept_ids
+                if after_scores.get(concept_id, 0.0)
+                > before_scores.get(concept_id, 0.0)
+            ]
     except Exception as e:
         logger.error("Failed to update mastery/progress: %s", e)
 
@@ -484,6 +537,10 @@ def answer_sprint_question(
         progress={"current": answered, "total": total_questions},
         streak_count=stats["streak_count"],
         total_xp=stats["total_xp"],
+        xp_awarded=xp_awarded,
+        mastery_delta=mastery_delta,
+        mastery_improved_concept_ids=improved_concept_ids,
+        is_repeat_submission=False,
     )
 
 

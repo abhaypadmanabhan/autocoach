@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useSWRConfig } from "swr";
 import { apiFetch, normalizeAnswer, getErrorMessage } from "@/lib/api";
 import { analytics } from "@/lib/analytics";
@@ -104,6 +104,7 @@ export function useAnswerQuestion(sessionId: string | null) {
   const { mutate: globalMutate } = useSWRConfig();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const capturedQuestionAnswersRef = useRef<Set<string>>(new Set());
 
   const submitAnswer = useCallback(
     async (questionId: string, answer: unknown, inputMethod: InputMethod = "typed"): Promise<AnswerResponse> => {
@@ -136,11 +137,19 @@ export function useAnswerQuestion(sessionId: string | null) {
         // Question will be refetched when user clicks "Next Question"
         await globalMutate(`/quiz/sessions/${sessionId}`);
 
-        analytics.capture("question_answered", {
-          session_id: sessionId,
-          question_id: questionId,
-          input_method: inputMethod
-        });
+        const answerEventKey = `${sessionId}:${questionId}`;
+        if (!capturedQuestionAnswersRef.current.has(answerEventKey)) {
+          capturedQuestionAnswersRef.current.add(answerEventKey);
+          analytics.capture("question_answered", {
+            session_id: sessionId,
+            question_id: questionId,
+            input_method: inputMethod,
+            correct: response.result.is_correct,
+            xp_awarded: response.result.xp_awarded ?? 0,
+            mastery_delta: response.result.mastery_delta ?? 0,
+            mode: "quiz",
+          });
+        }
 
         return response;
       } catch (err: unknown) {

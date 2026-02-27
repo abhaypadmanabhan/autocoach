@@ -71,6 +71,8 @@ class AnswerResult(BaseModel):
     score_so_far: int
     total_answered: int
     feedback: str | None = None
+    xp_awarded: int = 0
+    mastery_delta: float = 0.0
 
 
 class AnswerResponse(BaseModel):

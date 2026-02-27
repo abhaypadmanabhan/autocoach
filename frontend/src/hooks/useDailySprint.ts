@@ -1,5 +1,5 @@
-import useSWR, { useSWRConfig } from "swr";
-import { useCallback, useState } from "react";
+import useSWR from "swr";
+import { useCallback, useRef, useState } from "react";
 import { apiFetch, getErrorMessage } from "@/lib/api";
 import { analytics } from "@/lib/analytics";
 import type {
@@ -13,8 +13,24 @@ import type {
 // Cache key for sprint data
 const SPRINT_TODAY_KEY = "/sprint/today";
 
+type SprintAnswerApiResponse = {
+    correct: boolean;
+    explanation?: string | null;
+    feedback?: string | null;
+    correct_answer?: string | null;
+    next_question_id?: string | null;
+    next_question_number?: number | null;
+    session_complete: boolean;
+    xp_awarded?: number;
+    mastery_delta?: number;
+    mastery_improved_concept_ids?: string[];
+    is_repeat_submission?: boolean;
+};
+
 export function useDailySprint() {
-    const { mutate: globalMutate } = useSWRConfig();
+    const capturedQuestionEventsRef = useRef<Set<string>>(new Set());
+    const capturedSprintCompleteEventsRef = useRef<Set<string>>(new Set());
+    const masteryImprovedConceptsRef = useRef<Set<string>>(new Set());
 
     // Fetch sprint status - includes active session info if any
     const { data: status, error, isLoading, mutate: refreshStatus } = useSWR<SprintStatusResponse>(
@@ -46,6 +62,10 @@ export function useDailySprint() {
                 session_id: res.session_id
             });
 
+            capturedQuestionEventsRef.current.clear();
+            capturedSprintCompleteEventsRef.current.delete(res.session_id);
+            masteryImprovedConceptsRef.current.clear();
+
             return res;
         } finally {
             setStarting(false);
@@ -66,16 +86,49 @@ export function useDailySprint() {
 
     // Submit an answer
     const submitAnswer = useCallback(async (
+        sessionId: string,
         questionId: string,
         answer: string
     ): Promise<SprintAnswerResponse> => {
         setSubmittingAnswer(true);
         try {
-            const res = await apiFetch<SprintAnswerResponse>("/sprint/answer", {
+            const res = await apiFetch<SprintAnswerApiResponse>("/sprint/answer", {
                 method: "POST",
-                body: { question_id: questionId, answer },
+                body: { session_id: sessionId, question_id: questionId, answer },
             });
-            return res;
+
+            for (const conceptId of res.mastery_improved_concept_ids ?? []) {
+                masteryImprovedConceptsRef.current.add(conceptId);
+            }
+
+            const eventKey = `${sessionId}:${questionId}`;
+            if (!res.is_repeat_submission && !capturedQuestionEventsRef.current.has(eventKey)) {
+                capturedQuestionEventsRef.current.add(eventKey);
+                analytics.capture("question_answered", {
+                    session_id: sessionId,
+                    question_id: questionId,
+                    correct: res.correct,
+                    xp_awarded: res.xp_awarded ?? 0,
+                    mastery_delta: res.mastery_delta ?? 0,
+                    mode: "sprint",
+                });
+            }
+
+            return {
+                result: {
+                    is_correct: res.correct,
+                    correct_answer: res.correct_answer ?? "",
+                    explanation: res.explanation ?? null,
+                    feedback: res.feedback ?? null,
+                },
+                next_question: null,
+                session_complete: res.session_complete,
+                xp_earned: res.xp_awarded,
+                xp_awarded: res.xp_awarded,
+                mastery_delta: res.mastery_delta,
+                mastery_improved_concept_ids: res.mastery_improved_concept_ids,
+                is_repeat_submission: res.is_repeat_submission,
+            };
         } finally {
             setSubmittingAnswer(false);
         }
@@ -100,13 +153,15 @@ export function useDailySprint() {
             // Refresh status to update streak/xp
             await refreshStatus();
 
-            analytics.capture("sprint_completed", {
-                session_id: sessionId,
-                correct_count: correctCount,
-                total_questions: totalQuestions,
-                xp_earned: res.xp_awarded,
-                streak_updated: res.new_streak
-            });
+            if (res.xp_awarded > 0 && !capturedSprintCompleteEventsRef.current.has(sessionId)) {
+                capturedSprintCompleteEventsRef.current.add(sessionId);
+                analytics.capture("sprint_completed", {
+                    session_id: sessionId,
+                    total_xp: res.new_total_xp,
+                    streak_count: res.new_streak,
+                    mastery_improved_concepts: masteryImprovedConceptsRef.current.size,
+                });
+            }
 
             return res;
         } finally {

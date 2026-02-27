@@ -12,6 +12,26 @@ from app.services.concepts import get_document_concepts
 logger = logging.getLogger(__name__)
 
 
+def _get_mastery_scores(user_id: str, concept_ids: list[str]) -> dict[str, float]:
+    if not concept_ids:
+        return {}
+
+    response = (
+        supabase_admin.table("user_concept_mastery")
+        .select("concept_id,mastery_score")
+        .eq("user_id", user_id)
+        .in_("concept_id", concept_ids)
+        .execute()
+    )
+
+    rows = response.data or []
+    return {
+        str(row.get("concept_id")): float(row.get("mastery_score") or 0.0)
+        for row in rows
+        if row.get("concept_id") is not None
+    }
+
+
 def _update_concept_mastery(user_id: str, concept_ids: list[str], is_correct: bool):
     """
     Update mastery for a list of concepts.
@@ -195,15 +215,23 @@ def create_session(
 
                         # "unless document core is complete (progress_core >= 100)"
                         if (prog or 0) < 100:
-                            cname = c.get("concept_name") or c.get("name") or "Unnamed Concept"
+                            cname = (
+                                c.get("concept_name")
+                                or c.get("name")
+                                or "Unnamed Concept"
+                            )
                             raise ValueError(
                                 f"Concept '{cname}' is not core. Finish core concepts first (current progress: {prog or 0}%)."
                             )
 
                     target_concepts_list.append(
                         {
-                            "name": c.get("concept_name") or c.get("name") or "Unnamed Concept",
-                            "description": c.get("concept_description") or c.get("description") or "",
+                            "name": c.get("concept_name")
+                            or c.get("name")
+                            or "Unnamed Concept",
+                            "description": c.get("concept_description")
+                            or c.get("description")
+                            or "",
                         }
                     )
                 else:
@@ -217,9 +245,7 @@ def create_session(
             # Auto-selection: 3 weak core concepts
             # Filter: is_core AND mastery < 80
             candidates = [
-                c
-                for c in all_concepts
-                if c["is_core"] and c["mastery_score"] < 80.0
+                c for c in all_concepts if c["is_core"] and c["mastery_score"] < 80.0
             ]
             # Sort: Importance DESC, then Mastery ASC (lowest mastery first) - wait, python sort is stable
             # Sort by mastery ASC first
@@ -232,7 +258,9 @@ def create_session(
             target_concepts_list = [
                 {
                     "name": c.get("concept_name") or c.get("name") or "Unnamed Concept",
-                    "description": c.get("concept_description") or c.get("description") or "",
+                    "description": c.get("concept_description")
+                    or c.get("description")
+                    or "",
                 }
                 for c in selected_candidates
             ]
@@ -588,9 +616,11 @@ def submit_answer(
             logger.error(f"Failed to update quiz session counts: {e}")
 
         # Update Concept Mastery & Document Progress
+        mastery_delta = 0.0
         try:
             q_concept_ids = question.get("concept_ids")
             if q_concept_ids:
+                before_scores = _get_mastery_scores(user_id, q_concept_ids)
                 # Update specific concept mastery
                 background_tasks = None  # Ideally this should be background, but existing function is sync and called from sync route wrapper
                 # We'll run it synchronously for safety/simplicity as requested ("safe defaults")
@@ -598,6 +628,16 @@ def submit_answer(
 
                 # Recompute doc progress
                 _recompute_document_progress(user_id, session["document_id"])
+
+                after_scores = _get_mastery_scores(user_id, q_concept_ids)
+                mastery_delta = round(
+                    sum(
+                        after_scores.get(str(concept_id), 0.0)
+                        - before_scores.get(str(concept_id), 0.0)
+                        for concept_id in q_concept_ids
+                    ),
+                    2,
+                )
 
                 # Log mastery update details
                 # Fetch updated progress for logging
@@ -647,6 +687,8 @@ def submit_answer(
                     "difficulty": session["difficulty"],
                 }
 
+        xp_awarded = 10 if is_correct else 0
+
         return {
             "result": {
                 "is_correct": is_correct,
@@ -655,6 +697,8 @@ def submit_answer(
                 "score_so_far": new_correct,
                 "total_answered": new_answered,
                 "feedback": feedback,
+                "xp_awarded": xp_awarded,
+                "mastery_delta": mastery_delta,
             },
             "next_question": next_question,
             "session_complete": is_complete,

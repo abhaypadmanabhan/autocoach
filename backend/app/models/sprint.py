@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date, datetime
 from typing import Optional
 
@@ -46,6 +46,10 @@ class SprintAnswerResponse(BaseModel):
     progress: Optional[dict] = None  # { "current": int, "total": int }
     streak_count: Optional[int] = None
     total_xp: Optional[int] = None
+    xp_awarded: int = 0
+    mastery_delta: float = 0.0
+    mastery_improved_concept_ids: list[str] = Field(default_factory=list)
+    is_repeat_submission: bool = False
 
 
 class CompleteSprintRequest(BaseModel):

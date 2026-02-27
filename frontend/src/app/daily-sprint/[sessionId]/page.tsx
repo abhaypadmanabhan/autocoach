@@ -344,7 +344,7 @@ function SprintContent() {
             setAnswer(trimmedAnswer);
 
             // Submit via sprint API
-            const result = await submitSprintAnswer(currentQuestion.question_id, trimmedAnswer);
+            const result = await submitSprintAnswer(sessionId, currentQuestion.question_id, trimmedAnswer);
 
             setLastResult(result.result);
 

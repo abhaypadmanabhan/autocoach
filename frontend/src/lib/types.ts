@@ -102,6 +102,8 @@ export interface AnswerResult {
   score_so_far: number;
   total_answered: number;
   feedback?: string | null;
+  xp_awarded?: number;
+  mastery_delta?: number;
 }
 
 export interface AnswerResponse {
@@ -168,6 +170,10 @@ export interface SprintAnswerResponse {
   next_question: SprintQuestion | null;
   session_complete: boolean;
   xp_earned?: number;
+  xp_awarded?: number;
+  mastery_delta?: number;
+  mastery_improved_concept_ids?: string[];
+  is_repeat_submission?: boolean;
 }
 
 export interface CompleteSprintResponse {
