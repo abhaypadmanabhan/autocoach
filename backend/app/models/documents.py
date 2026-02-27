@@ -13,6 +13,7 @@ class DocumentResponse(BaseModel):
     file_size: int
     status: str
     ai_title: str | None = None
+    session_id: str | None = None
     created_at: datetime
 
 

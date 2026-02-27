@@ -50,11 +50,15 @@ export default function Upload() {
   useEffect(() => {
     if (document?.status === "ready") {
       const timeout = setTimeout(() => {
-        router.push(`/config?document_id=${document.id}`);
+        if (document.session_id) {
+          router.push(`/session?session_id=${document.session_id}`);
+        } else {
+          router.push(`/config?document_id=${document.id}`);
+        }
       }, 1500);
       return () => clearTimeout(timeout);
     }
-  }, [document?.status, document?.id, router]);
+  }, [document?.status, document?.id, document?.session_id, router]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();

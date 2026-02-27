@@ -12,6 +12,7 @@ export interface Document {
   error_message?: string;
   ai_title?: string;
   progress?: number;
+  session_id?: string;
 }
 
 export interface DocumentListResponse {

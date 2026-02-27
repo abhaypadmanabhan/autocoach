@@ -347,6 +347,22 @@ async def list_documents(user_id: UUID = Depends(get_user_id_from_token)):
         if not response.data:
             return DocumentListResponse(documents=[])
 
+        # Fetch all session IDs for these documents
+        doc_ids = [str(doc["id"]) for doc in response.data]
+        sessions_map = {}
+        if doc_ids:
+            sessions_response = (
+                supabase_admin.table("quiz_sessions")
+                .select("id, document_id, created_at")
+                .in_("document_id", doc_ids)
+                .order("created_at", desc=True)
+                .execute()
+            )
+            for session in (sessions_response.data or []):
+                doc_id = session["document_id"]
+                if doc_id not in sessions_map:
+                    sessions_map[doc_id] = session["id"]
+
         documents = [
             DocumentResponse(
                 id=UUID(doc["id"]),
@@ -356,6 +372,7 @@ async def list_documents(user_id: UUID = Depends(get_user_id_from_token)):
                 status=doc["status"],
                 created_at=doc["created_at"],
                 ai_title=doc.get("ai_title"),
+                session_id=sessions_map.get(str(doc["id"])),
             )
             for doc in response.data
         ]
@@ -401,6 +418,19 @@ async def get_document(
 
         doc = response.data[0]
 
+        # Fetch latest session ID for this document
+        session_id = None
+        session_response = (
+            supabase_admin.table("quiz_sessions")
+            .select("id")
+            .eq("document_id", str(document_id))
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if session_response.data:
+            session_id = session_response.data[0]["id"]
+
         return DocumentResponse(
             id=UUID(doc["id"]),
             filename=doc["filename"],
@@ -409,6 +439,7 @@ async def get_document(
             status=doc["status"],
             created_at=doc["created_at"],
             ai_title=doc.get("ai_title"),
+            session_id=session_id,
         )
     except HTTPException:
         raise

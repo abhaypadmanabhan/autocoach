@@ -154,6 +154,37 @@ def process_document(document_id: str) -> None:
              logger.error(f"Concept extraction failed for document {document_id}: {e}")
              # Do NOT mark document as failed, just log the error.
 
+        # Auto-create quiz session (Non-blocking)
+        try:
+            from app.services.session_manager import create_session
+            from datetime import datetime, timezone
+            
+            user_id = document["user_id"]
+            now = datetime.now(timezone.utc)
+            start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+            
+            # Check for existing session today
+            existing_session = supabase_admin.table("quiz_sessions") \
+                .select("id") \
+                .eq("document_id", document_id) \
+                .gte("created_at", start_of_day) \
+                .limit(1) \
+                .execute()
+                
+            if not existing_session.data:
+                logger.info(f"Auto-creating quiz session for document {document_id}")
+                create_session(
+                    user_id=user_id,
+                    document_id=document_id,
+                    num_questions=5,
+                    difficulty="medium",
+                    question_types=["mcq", "true_false", "free_text"],
+                )
+            else:
+                logger.info(f"Quiz session already exists for document {document_id} today, skipping auto-creation.")
+        except Exception as e:
+             logger.error(f"Auto quiz session creation failed for document {document_id}: {e}")
+
         # Update document status to 'ready'
         try:
             supabase_admin.table("documents").update({
