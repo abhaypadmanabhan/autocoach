@@ -2,6 +2,7 @@
 
 import { useDailySprint } from "@/hooks/useDailySprint";
 import { SentinelMascot } from "@/components/brand/SentinelMascot";
+import { SprintPreparingFallback } from "@/components/dashboard/SprintPreparingFallback";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useState } from "react";
@@ -11,7 +12,16 @@ import { Loader2, Zap, CheckCircle2, Flame, Trophy, Target, Sparkles, Play, Cloc
 import { cn } from "@/lib/utils";
 
 export function DailySprintCard() {
-    const { status, isLoading, startSprint, starting } = useDailySprint();
+    const {
+        status,
+        isLoading,
+        startSprintWithFallback,
+        retryPrepareSprint,
+        starting,
+        preparing,
+        prepareTimedOut,
+        prepareElapsedMs,
+    } = useDailySprint();
     const router = useRouter();
     const { showToast } = useToast();
     const [limitReached, setLimitReached] = useState(false);
@@ -19,8 +29,6 @@ export function DailySprintCard() {
     // Determine sprint state
     const isCompleted = status?.status === "completed";
     const isActive = status?.status === "active";
-    const isReady = status?.status === "ready" || !status?.status;
-
     // User stats
     const streak = status?.streak_count ?? 0;
     const xp = status?.total_xp ?? 0;
@@ -47,12 +55,19 @@ export function DailySprintCard() {
 
         // Otherwise start a new sprint
         try {
-            const quiz = await startSprint();
-            router.push(`/daily-sprint/${quiz.session_id}`);
-        } catch (err: any) {
+            const result = await startSprintWithFallback();
+            if (result.sessionId) {
+                router.push(`/daily-sprint/${result.sessionId}`);
+            }
+        } catch (err: unknown) {
             console.error("Failed to start sprint", err);
             // Check for 429 limit reached
-            if (err?.status === 429 || err?.response?.status === 429 || err?.message?.includes("limit")) {
+            const typedErr = err as { status?: number; response?: { status?: number }; message?: string };
+            if (
+                typedErr?.status === 429 ||
+                typedErr?.response?.status === 429 ||
+                typedErr?.message?.includes("limit")
+            ) {
                 setLimitReached(true);
                 showToast("Daily limit reached. Come back tomorrow.", "error");
             } else {
@@ -61,9 +76,26 @@ export function DailySprintCard() {
         }
     };
 
+    const handleRetry = async () => {
+        try {
+            const result = await retryPrepareSprint();
+            if (result.sessionId) {
+                router.push(`/daily-sprint/${result.sessionId}`);
+                return;
+            }
+            if (result.timedOut) {
+                showToast("Still preparing your sprint. Please try again shortly.", "error");
+            }
+        } catch {
+            showToast("Failed to retry sprint preparation.", "error");
+        }
+    };
+
     // Get title based on state
     const getTitle = () => {
         if (limitReached) return "Daily limit reached";
+        if (preparing) return "Preparing your sprint...";
+        if (prepareTimedOut) return "Sprint preparation delayed";
         if (isCompleted) return "Daily Goal Achieved!";
         if (isActive) return `Resume Sprint (${progressCurrent}/${progressTotal})`;
         return "Start Today's Sprint (5Q)";
@@ -73,6 +105,12 @@ export function DailySprintCard() {
     const getSubtitle = () => {
         if (limitReached) {
             return "Come back tomorrow to continue your streak.";
+        }
+        if (preparing) {
+            return "Hang tight while we finish setting up your questions.";
+        }
+        if (prepareTimedOut) {
+            return "We are still preparing your quiz session. Retry to check again.";
         }
         if (isCompleted) {
             return `You've earned ${xpEarnedToday} XP today. Come back tomorrow to keep your streak alive!`;
@@ -95,9 +133,9 @@ export function DailySprintCard() {
         }
         if (isCompleted) return null; // No CTA for completed state
 
-        if (starting) {
+        if (starting || preparing) {
             return {
-                text: isActive ? "Resuming..." : "Starting...",
+                text: preparing ? "Preparing..." : isActive ? "Resuming..." : "Starting...",
                 icon: <Loader2 className="mr-2 h-5 w-5 animate-spin" />,
                 disabled: true,
                 variant: "default" as const
@@ -122,6 +160,7 @@ export function DailySprintCard() {
     };
 
     const ctaConfig = getCtaConfig();
+    const showPreparingFallback = preparing || prepareTimedOut;
 
     return isLoading ? (
         <Card className="relative overflow-hidden border-none bg-gradient-to-br from-card to-background shadow-lg p-6 h-[200px] flex items-center justify-center">
@@ -171,8 +210,17 @@ export function DailySprintCard() {
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-2">
+                        {showPreparingFallback && (
+                            <SprintPreparingFallback
+                                timedOut={prepareTimedOut}
+                                elapsedMs={prepareElapsedMs}
+                                retrying={preparing}
+                                onRetry={handleRetry}
+                            />
+                        )}
+
                         {/* CTA Button */}
-                        {!isCompleted && ctaConfig && (
+                        {!isCompleted && ctaConfig && !showPreparingFallback && (
                             <Button
                                 size="lg"
                                 onClick={handleStart}

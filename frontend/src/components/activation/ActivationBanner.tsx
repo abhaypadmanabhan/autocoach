@@ -17,10 +17,9 @@ const STORAGE_KEY = (id: string) => `activation_cta_shown_${id}`;
 
 export function ActivationBanner({ documentId, sessionId }: ActivationBannerProps) {
   const router = useRouter();
-  const { startSprint } = useDailySprint();
+  const { startSprintWithFallback } = useDailySprint();
   const [ready, setReady] = useState(false);
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (typeof window === "undefined") return;
     const key = STORAGE_KEY(documentId);
@@ -33,8 +32,10 @@ export function ActivationBanner({ documentId, sessionId }: ActivationBannerProp
   const handleStartSprint = async () => {
     analytics.capture("activation_cta_clicked", { document_id: documentId, session_id: sessionId });
     try {
-      const sprint = await startSprint();
-      router.push(`/daily-sprint/${sprint.session_id}`);
+      const result = await startSprintWithFallback();
+      if (result.sessionId) {
+        router.push(`/daily-sprint/${result.sessionId}`);
+      }
     } catch {
       // Silent fail - user can still use existing redirect
     }
