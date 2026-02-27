@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -14,6 +14,7 @@ import {
 import { useSession, useSubmitAnswer, useCurrentQuestion } from "@/hooks/useQuiz";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
 import { QuestionCardSkeleton, ErrorBanner } from "@/components/ui/Skeleton";
 import { QuestionCard } from "@/components/quiz/QuestionCard";
@@ -47,6 +48,10 @@ function SessionContent() {
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
   const [inputMethod, setInputMethod] = useState<"click" | "typed" | "voice">("typed");
+  const startedTrackedRef = useRef(false);
+  const resumedTrackedRef = useRef(false);
+  const abandonedTrackedRef = useRef(false);
+  const seenQuestionIdsRef = useRef<Set<string>>(new Set());
 
   // Timer state
   const [timeRemaining, setTimeRemaining] = useState<number | null>(() => {
@@ -99,12 +104,95 @@ function SessionContent() {
     }
   }, [sessionId, router]);
 
+  useEffect(() => {
+    startedTrackedRef.current = false;
+    resumedTrackedRef.current = false;
+    abandonedTrackedRef.current = false;
+    seenQuestionIdsRef.current.clear();
+  }, [sessionId]);
+
   // Redirect to results if session is already completed (handles refresh)
   useEffect(() => {
     if (session?.status === "completed" && sessionId) {
       router.replace(`/results?session_id=${sessionId}`);
     }
   }, [session?.status, sessionId, router]);
+
+  useEffect(() => {
+    if (!sessionId || !session || !question) return;
+    if (startedTrackedRef.current) return;
+    if (question.question_number !== 1) return;
+
+    analytics.capture("quiz_session_started", {
+      document_id: session.document_id,
+      session_id: sessionId,
+      question_id: question.question_id,
+      question_number: question.question_number,
+    });
+    startedTrackedRef.current = true;
+  }, [sessionId, session, question]);
+
+  useEffect(() => {
+    if (!sessionId || !session || !question) return;
+    if (seenQuestionIdsRef.current.has(question.question_id)) return;
+
+    analytics.capture("quiz_question_seen", {
+      document_id: session.document_id,
+      session_id: sessionId,
+      question_id: question.question_id,
+      question_number: question.question_number,
+    });
+    seenQuestionIdsRef.current.add(question.question_id);
+  }, [sessionId, session, question]);
+
+  useEffect(() => {
+    if (!sessionId || !session || !question) return;
+    if (resumedTrackedRef.current) return;
+    if (session.status !== "active" || session.answered_questions <= 0) return;
+
+    analytics.capture("quiz_resumed", {
+      document_id: session.document_id,
+      session_id: sessionId,
+      question_id: question.question_id,
+      question_number: question.question_number,
+    });
+    resumedTrackedRef.current = true;
+  }, [sessionId, session, question]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const captureAbandoned = () => {
+      if (!session || session.status === "completed" || isSessionComplete) return;
+      if (abandonedTrackedRef.current) return;
+
+      analytics.capture("quiz_abandoned", {
+        document_id: session.document_id,
+        session_id: sessionId,
+        question_id: question?.question_id,
+        question_number: question?.question_number,
+      });
+      abandonedTrackedRef.current = true;
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        captureAbandoned();
+      }
+    };
+
+    const onPageHide = () => {
+      captureAbandoned();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onPageHide);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onPageHide);
+    };
+  }, [sessionId, session, question, isSessionComplete]);
 
   // Timer countdown
   useEffect(() => {

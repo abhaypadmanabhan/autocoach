@@ -81,7 +81,7 @@ export function useCreateSession() {
         });
         globalMutate(`/quiz/sessions/${response.session_id}`, response, false);
 
-        analytics.capture("quiz_session_started", {
+        analytics.capture("quiz_session_created", {
           session_id: response.session_id,
           document_id: data.document_id
         });
