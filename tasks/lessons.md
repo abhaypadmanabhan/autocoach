@@ -1,0 +1,4 @@
+# Lessons Learned
+
+- **Missing Backend Endpoints**: When developing resuming logic for an active sprint, we found that relying on `/sprint/{sessionId}/questions` would not work because that endpoint does not exist. Always rely on the base context fetch `/sprint/today` and verify the available keys directly from the typescript model to ensure synchronization with the backend routing, avoiding fallback cascades.
+- **Frontend Type Safety vs API Return Value**: There was a regression in the `SprintStatusResponse` object where we specified `progress: { completed: number; total: number }` but the backend naturally returned `progress: { current: number; total: number }`. We learned to manually verify the Python Pydantic return models (`SprintStatusResponse` in backend vs TS interface) to ensure progress mapping works cleanly without manual coercion.

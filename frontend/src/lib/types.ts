@@ -121,7 +121,7 @@ export interface SprintStatusResponse {
   // Active session details
   session_id?: string;
   document_title?: string;
-  progress?: { completed: number; total: number };
+  progress?: { current: number; total: number };
   quiz_credits?: number;
 }
 

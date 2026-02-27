@@ -33,7 +33,7 @@ import confetti from "canvas-confetti";
 // Progress bar component
 function ProgressBar({ current, total }: { current: number; total: number }) {
     const progress = Math.min((current / total) * 100, 100);
-    
+
     return (
         <div className="w-full">
             <div className="flex justify-between text-xs text-muted-foreground mb-2">
@@ -161,7 +161,7 @@ function SprintCompletion({
                         <span className="text-3xl font-bold text-orange-500">{streak}</span>
                         <span className="text-sm text-muted-foreground">Day Streak</span>
                     </Card>
-                    
+
                     <Card className="p-5 border-none bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 flex flex-col items-center gap-2">
                         <div className="w-12 h-12 rounded-full bg-yellow-500/20 flex items-center justify-center">
                             <Trophy className="w-6 h-6 text-yellow-500" />
@@ -178,18 +178,18 @@ function SprintCompletion({
                     transition={{ delay: 0.5 }}
                     className="flex flex-col sm:flex-row gap-3 w-full max-w-md"
                 >
-                    <Button 
-                        onClick={onContinue} 
-                        size="lg" 
+                    <Button
+                        onClick={onContinue}
+                        size="lg"
                         className="flex-1 bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-semibold"
                     >
                         <Home className="w-4 h-4 mr-2" />
                         Continue Learning
                     </Button>
-                    
-                    <Button 
-                        variant="outline" 
-                        size="lg" 
+
+                    <Button
+                        variant="outline"
+                        size="lg"
                         onClick={onShare}
                         className="flex-1 border-surface-border hover:bg-surface-card"
                     >
@@ -234,10 +234,10 @@ function SprintContent() {
     const params = useParams();
     const sessionId = params.sessionId as string;
 
-    const { 
-        submitAnswer: submitSprintAnswer, 
-        submittingAnswer, 
-        completeSprint, 
+    const {
+        submitAnswer: submitSprintAnswer,
+        submittingAnswer,
+        completeSprint,
         completing,
         fetchSprintQuestions,
         fetchingQuestions
@@ -264,42 +264,48 @@ function SprintContent() {
     useEffect(() => {
         const loadQuestions = async () => {
             if (!sessionId) return;
-            
+
             try {
                 setLoading(true);
                 setError(null);
-                
-                // Try to fetch sprint questions from the dedicated endpoint
-                // Fallback to session endpoint if needed
+
+                // We only need to fetch from /sprint/today.
+                const status = await apiFetch<{
+                    questions?: SprintQuestion[];
+                    targets_weak_concepts?: boolean;
+                    progress?: { current: number; total: number };
+                }>("/sprint/today");
+
                 let sprintQuestions: SprintQuestion[] = [];
-                
-                try {
-                    sprintQuestions = await fetchSprintQuestions(sessionId);
-                } catch (err) {
-                    // Fallback: fetch from /sprint/today if it returns questions
-                    const status = await apiFetch<{ 
-                        questions?: SprintQuestion[];
-                        targets_weak_concepts?: boolean;
-                    }>("/sprint/today");
-                    
-                    if (status.questions) {
-                        sprintQuestions = status.questions;
-                        setTargetsWeak(status.targets_weak_concepts ?? false);
-                    } else {
-                        throw new Error("Could not load sprint questions");
-                    }
-                }
-                
-                if (sprintQuestions.length === 0) {
-                    setIsComplete(true);
-                } else {
+                if (status.questions && status.questions.length > 0) {
+                    sprintQuestions = status.questions;
+                    setTargetsWeak(status.targets_weak_concepts ?? false);
+                    setIsComplete(false);
                     setQuestions(sprintQuestions);
-                    // Calculate starting index based on answered questions
-                    const answeredCount = sprintQuestions.findIndex(q => !q.question_id);
-                    if (answeredCount > 0) {
-                        setCurrentQuestionIndex(answeredCount);
+
+                    const completedCount = status.progress?.current ?? 0;
+
+                    if (completedCount > 0 && completedCount < sprintQuestions.length) {
+                        // We are resuming
+                        setCurrentQuestionIndex(completedCount);
+
+                        // Fire analytics event
+                        import("@/lib/analytics").then(({ analytics }) => {
+                            analytics.capture("quiz_resumed", {
+                                session_id: sessionId,
+                                progress_current: completedCount,
+                                progress_total: sprintQuestions.length
+                            });
+                        });
+                    } else if (completedCount >= sprintQuestions.length) {
+                        setIsComplete(true);
                     }
+                } else {
+                    throw new Error("Could not load sprint questions");
                 }
+
+                // Logic handled above
+
             } catch (err) {
                 console.error("Failed to load sprint:", err);
                 setError("Failed to load sprint questions. Please try again.");
@@ -336,12 +342,12 @@ function SprintContent() {
         try {
             const trimmedAnswer = answer.trim();
             setAnswer(trimmedAnswer);
-            
+
             // Submit via sprint API
             const result = await submitSprintAnswer(currentQuestion.question_id, trimmedAnswer);
-            
+
             setLastResult(result.result);
-            
+
             if (result.result.is_correct) {
                 setCorrectCount(prev => prev + 1);
             }
@@ -360,7 +366,7 @@ function SprintContent() {
         setShowFeedback(false);
         setAnswer("");
         setLastResult(null);
-        
+
         if (currentQuestionIndex < questions.length - 1) {
             setCurrentQuestionIndex(prev => prev + 1);
         }
@@ -368,11 +374,11 @@ function SprintContent() {
 
     const handleFinishSprint = useCallback(async () => {
         if (!sessionId) return;
-        
+
         try {
             const finalCorrect = correctCount + (lastResult?.is_correct ? 1 : 0);
             const res = await completeSprint(sessionId, finalCorrect, questions.length);
-            
+
             setCompletionData({
                 xp: res.xp_awarded,
                 streak: res.new_streak,
@@ -455,7 +461,7 @@ function SprintContent() {
                     <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
                         Daily Sprint
                     </span>
-                    
+
                     {/* Focus Label */}
                     <span className={cn(
                         "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium w-fit",
@@ -467,10 +473,10 @@ function SprintContent() {
                     </span>
                 </div>
 
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    onClick={handleQuit} 
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleQuit}
                     className="rounded-full hover:bg-destructive/10 hover:text-destructive"
                 >
                     <X className="w-5 h-5" />

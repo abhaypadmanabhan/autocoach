@@ -27,7 +27,7 @@ export function DailySprintCard() {
     const xpEarnedToday = status?.xp_earned_today ?? 0;
 
     // Progress for active sprint
-    const progressCurrent = status?.progress?.completed ?? 0;
+    const progressCurrent = status?.progress?.current ?? 0;
     const progressTotal = status?.progress?.total ?? 5;
 
     // Focus messaging (only show for non-completed states)
@@ -180,7 +180,7 @@ export function DailySprintCard() {
                                 variant={ctaConfig.variant}
                                 className={cn(
                                     "font-semibold px-8 transition-all",
-                                    ctaConfig.disabled 
+                                    ctaConfig.disabled
                                         ? "opacity-60 cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                                         : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
                                 )}
