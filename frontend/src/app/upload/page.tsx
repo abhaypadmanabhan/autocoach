@@ -20,6 +20,7 @@ import { ErrorBanner } from "@/components/ui/Skeleton";
 import { DiamondSpinner } from "@/components/ui/DiamondButton";
 import { ProgressDots, ProgressBar } from "@/components/ui/StatusBadge";
 import { staggerContainer, slideUpItem, dropZoneVariants, circularRevealVariants } from "@/lib/motions";
+import { ActivationBanner } from "@/components/activation/ActivationBanner";
 
 export default function Upload() {
   const router = useRouter();
@@ -344,6 +345,11 @@ export default function Upload() {
               </motion.div>
             ))}
           </motion.div>
+
+          {/* Activation CTA - show once per document */}
+          {document?.status === "ready" && documentId && (
+            <ActivationBanner documentId={documentId} sessionId={document.session_id} />
+          )}
         </motion.div>
       </PageContainer>
     </AppShell>
