@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +7,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 import { Card } from '../../components/ui/Card';
@@ -13,6 +16,7 @@ import { Avatar } from '../../components/ui/Avatar';
 import { ProgressRing } from '../../components/ui/ProgressRing';
 import { Button } from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Skeleton';
+import { ProModal } from '../../components/ProModal';
 import { useProfile, useSignOut } from '../../hooks/useProfile';
 import { useUserStats } from '../../hooks/useDailySprint';
 
@@ -46,6 +50,7 @@ export default function ProfileScreen() {
   const { profile, isLoading } = useProfile();
   const { streak, totalXp, completedToday } = useUserStats();
   const { signOut, loading: signingOut } = useSignOut();
+  const [proModalVisible, setProModalVisible] = useState(false);
 
   const handleSignOut = () => {
     Alert.alert(
@@ -86,9 +91,18 @@ export default function ProfileScreen() {
         }}
       >
         {/* Header */}
-        <Text style={{ fontSize: Typography['2xl'], fontWeight: FontWeight.bold, color: Colors.textPrimary }}>
-          Profile
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={{ flex: 1, fontSize: Typography['2xl'], fontWeight: FontWeight.bold, color: Colors.textPrimary }}>
+            Profile
+          </Text>
+          <TouchableOpacity
+            onPress={() => router.push('/settings')}
+            style={{ padding: Spacing[2] }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="settings-outline" size={24} color={Colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
 
         {/* Avatar + Info */}
         <Card style={{ alignItems: 'center', paddingVertical: Spacing[6] }}>
@@ -107,6 +121,27 @@ export default function ProfileScreen() {
               <Text style={{ fontSize: Typography.sm, color: Colors.textMuted }}>
                 {profile?.email ?? ''}
               </Text>
+              <TouchableOpacity
+                onPress={() => setProModalVisible(true)}
+                style={{
+                  marginTop: Spacing[3],
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: 'rgba(255,107,107,0.12)',
+                  paddingHorizontal: Spacing[3],
+                  paddingVertical: 6,
+                  borderRadius: Radius.full,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,107,107,0.3)',
+                }}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flash" size={14} color={Colors.coral} />
+                <Text style={{ color: Colors.coral, fontSize: Typography.xs, fontWeight: FontWeight.semibold }}>
+                  Free Plan · Upgrade
+                </Text>
+              </TouchableOpacity>
             </>
           )}
         </Card>
@@ -165,6 +200,8 @@ export default function ProfileScreen() {
           Sign Out
         </Button>
       </ScrollView>
+
+      <ProModal visible={proModalVisible} onClose={() => setProModalVisible(false)} />
     </View>
   );
 }
