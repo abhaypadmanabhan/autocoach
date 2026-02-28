@@ -180,7 +180,7 @@ def get_weakest_concepts(user_id: str, limit: int = 3) -> list[dict]:
             return []
 
         mastery_data = mastery_response.data
-        concept_ids = [m["concept_id"] for m in mastery_data]
+        concept_ids = list(dict.fromkeys(m["concept_id"] for m in mastery_data))
 
         if not concept_ids:
             return []
@@ -199,11 +199,14 @@ def get_weakest_concepts(user_id: str, limit: int = 3) -> list[dict]:
 
         concepts_map = {c["id"]: c for c in concepts_response.data}
 
-        # Step 3: Merge and format
+        # Step 3: Merge and format (deduplicate by concept id — mastery table
+        # may have multiple rows per concept if the unique constraint is absent)
         result = []
+        seen_ids: set[str] = set()
         for m in mastery_data:
             c = concepts_map.get(m["concept_id"])
-            if c:
+            if c and c["id"] not in seen_ids:
+                seen_ids.add(c["id"])
                 score = float(m.get("mastery_score", 0))
                 result.append(
                     {
