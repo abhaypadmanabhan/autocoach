@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import {
@@ -93,6 +93,7 @@ function FeedbackOverlay({
             style={{
               fontSize: Typography.xl,
               fontWeight: FontWeight.bold,
+              fontFamily: Fonts.bold,
               color: result.is_correct ? Colors.success : Colors.error,
             }}
           >
@@ -108,7 +109,7 @@ function FeedbackOverlay({
                 paddingVertical: 4,
               }}
             >
-              <Text style={{ color: Colors.gold, fontWeight: FontWeight.bold, fontSize: Typography.sm }}>
+              <Text style={{ color: Colors.gold, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.sm }}>
                 +{result.xp_awarded} ⚡
               </Text>
             </View>
@@ -123,17 +124,17 @@ function FeedbackOverlay({
               padding: Spacing[3],
             }}
           >
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: 2 }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular, marginBottom: 2 }}>
               Correct answer:
             </Text>
-            <Text style={{ color: Colors.success, fontWeight: FontWeight.semibold, fontSize: Typography.sm }}>
+            <Text style={{ color: Colors.success, fontWeight: FontWeight.semibold, fontFamily: Fonts.semibold, fontSize: Typography.sm }}>
               {result.correct_answer}
             </Text>
           </View>
         )}
 
         {result.explanation && (
-          <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, lineHeight: 20 }}>
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontFamily: Fonts.regular, lineHeight: 20 }}>
             {result.explanation}
           </Text>
         )}
@@ -148,7 +149,7 @@ function FeedbackOverlay({
             marginTop: Spacing[1],
           }}
         >
-          <Text style={{ color: Colors.white, fontWeight: FontWeight.bold, fontSize: Typography.base }}>
+          <Text style={{ color: Colors.white, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.base }}>
             Next Question →
           </Text>
         </TouchableOpacity>
@@ -191,7 +192,7 @@ function QuestionCard({
           marginBottom: Spacing[4],
         }}
       >
-        <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginBottom: Spacing[2] }}>
+        <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular, marginBottom: Spacing[2] }}>
           Question {questionIndex + 1} of {totalQuestions}
         </Text>
         <Text
@@ -199,6 +200,7 @@ function QuestionCard({
             color: Colors.textPrimary,
             fontSize: Typography.lg,
             fontWeight: FontWeight.semibold,
+            fontFamily: Fonts.semibold,
             lineHeight: 28,
           }}
         >
@@ -242,6 +244,7 @@ function QuestionCard({
                     color:
                       selected === option.value ? Colors.white : Colors.textMuted,
                     fontWeight: FontWeight.bold,
+                    fontFamily: Fonts.bold,
                     fontSize: Typography.sm,
                   }}
                 >
@@ -252,6 +255,7 @@ function QuestionCard({
                 style={{
                   color: Colors.textPrimary,
                   fontSize: Typography.base,
+                  fontFamily: Fonts.regular,
                   flex: 1,
                 }}
               >
@@ -301,6 +305,7 @@ function QuestionCard({
                         : Colors.error
                       : Colors.textPrimary,
                   fontWeight: FontWeight.bold,
+                  fontFamily: Fonts.bold,
                   fontSize: Typography.lg,
                 }}
               >
@@ -329,11 +334,12 @@ function QuestionCard({
               padding: Spacing[4],
               color: Colors.textPrimary,
               fontSize: Typography.base,
+              fontFamily: Fonts.regular,
               minHeight: 100,
               textAlignVertical: 'top',
             }}
           />
-          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 4, textAlign: 'right' }}>
+          <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular, marginTop: 4, textAlign: 'right' }}>
             {textAnswer.length} chars
           </Text>
         </View>
@@ -375,19 +381,19 @@ function CompletionView({
   return (
     <ScrollView contentContainerStyle={{ alignItems: 'center', paddingVertical: Spacing[12], paddingHorizontal: Spacing[6] }}>
       <Text style={{ fontSize: 72, marginBottom: Spacing[4] }}>🎉</Text>
-      <Text style={{ fontSize: Typography['3xl'], fontWeight: FontWeight.extrabold, color: Colors.textPrimary, textAlign: 'center', marginBottom: Spacing[2] }}>
+      <Text style={{ fontSize: Typography['3xl'], fontWeight: FontWeight.extrabold, fontFamily: Fonts.extrabold, color: Colors.textPrimary, textAlign: 'center', marginBottom: Spacing[2] }}>
         Sprint Complete!
       </Text>
-      <Text style={{ fontSize: Typography.base, color: Colors.textMuted, textAlign: 'center', marginBottom: Spacing[8] }}>
+      <Text style={{ fontSize: Typography.base, fontFamily: Fonts.regular, color: Colors.textMuted, textAlign: 'center', marginBottom: Spacing[8] }}>
         {correctCount}/{totalQuestions} correct · {score}% accuracy
       </Text>
 
       {/* XP Badge */}
       <LinearGradient
-        colors={[Colors.gold, '#D97706']}
+        colors={[Colors.gold, '#B45309']}
         style={{ borderRadius: Radius['2xl'], paddingHorizontal: Spacing[8], paddingVertical: Spacing[4], marginBottom: Spacing[5] }}
       >
-        <Text style={{ color: Colors.white, fontSize: Typography['2xl'], fontWeight: FontWeight.extrabold, textAlign: 'center' }}>
+        <Text style={{ color: Colors.white, fontSize: Typography['2xl'], fontWeight: FontWeight.extrabold, fontFamily: Fonts.extrabold, textAlign: 'center' }}>
           +{xpEarned} XP ⚡
         </Text>
       </LinearGradient>
@@ -395,7 +401,7 @@ function CompletionView({
       {/* Streak badge */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing[2], marginBottom: Spacing[8] }}>
         <Text style={{ fontSize: 24 }}>🔥</Text>
-        <Text style={{ color: Colors.coral, fontSize: Typography.xl, fontWeight: FontWeight.bold }}>
+        <Text style={{ color: Colors.coral, fontSize: Typography.xl, fontWeight: FontWeight.bold, fontFamily: Fonts.bold }}>
           {newStreak} day streak!
         </Text>
       </View>
@@ -519,11 +525,11 @@ export default function SprintScreen() {
               justifyContent: 'space-between',
             }}
           >
-            <Text style={{ color: Colors.textPrimary, fontWeight: FontWeight.bold, fontSize: Typography.lg }}>
+            <Text style={{ color: Colors.textPrimary, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.lg }}>
               Daily Sprint ⚡
             </Text>
             <View style={{ backgroundColor: Colors.gold + '20', borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 4 }}>
-              <Text style={{ color: Colors.gold, fontWeight: FontWeight.bold, fontSize: Typography.sm }}>
+              <Text style={{ color: Colors.gold, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.sm }}>
                 {currentIndex + 1}/{questions.length}
               </Text>
             </View>
@@ -569,10 +575,10 @@ export default function SprintScreen() {
         }}
       >
         <Text style={{ fontSize: 64, marginBottom: Spacing[4] }}>⚡</Text>
-        <Text style={{ fontSize: Typography['3xl'], fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: Spacing[2], textAlign: 'center' }}>
+        <Text style={{ fontSize: Typography['3xl'], fontWeight: FontWeight.bold, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: Spacing[2], textAlign: 'center' }}>
           Daily Sprint
         </Text>
-        <Text style={{ fontSize: Typography.base, color: Colors.textMuted, textAlign: 'center', marginBottom: Spacing[8] }}>
+        <Text style={{ fontSize: Typography.base, fontFamily: Fonts.regular, color: Colors.textMuted, textAlign: 'center', marginBottom: Spacing[8] }}>
           {isCompleted
             ? "You've completed today's sprint! Come back tomorrow."
             : '5 focused questions to reinforce your learning'}
@@ -583,24 +589,24 @@ export default function SprintScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 24, marginBottom: 4 }}>🔥</Text>
-              <Text style={{ fontSize: Typography.xl, fontWeight: FontWeight.bold, color: Colors.coral }}>
+              <Text style={{ fontSize: Typography.xl, fontWeight: FontWeight.bold, fontFamily: Fonts.extrabold, color: Colors.coral }}>
                 {status?.streak_count ?? 0}
               </Text>
-              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>Streak</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular }}>Streak</Text>
             </View>
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 24, marginBottom: 4 }}>⚡</Text>
-              <Text style={{ fontSize: Typography.xl, fontWeight: FontWeight.bold, color: Colors.gold }}>
+              <Text style={{ fontSize: Typography.xl, fontWeight: FontWeight.bold, fontFamily: Fonts.extrabold, color: Colors.gold }}>
                 {status?.xp_earned_today ?? 0}
               </Text>
-              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>XP Today</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular }}>XP Today</Text>
             </View>
             <View style={{ alignItems: 'center' }}>
               <Text style={{ fontSize: 24, marginBottom: 4 }}>🎯</Text>
-              <Text style={{ fontSize: Typography.xl, fontWeight: FontWeight.bold, color: Colors.indigo }}>
+              <Text style={{ fontSize: Typography.xl, fontWeight: FontWeight.bold, fontFamily: Fonts.extrabold, color: Colors.indigo }}>
                 {status?.total_xp ?? 0}
               </Text>
-              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>Total XP</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular }}>Total XP</Text>
             </View>
           </View>
         </Card>

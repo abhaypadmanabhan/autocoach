@@ -4,7 +4,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Colors, Spacing, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Typography, FontWeight } from '../../constants/theme';
 
 type Tab = {
   name: string;
@@ -74,15 +74,29 @@ function BlurTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               }}
               activeOpacity={0.7}
             >
-              <Ionicons
-                name={isFocused ? tab.activeIcon : tab.icon}
-                size={24}
-                color={isFocused ? Colors.coral : Colors.textMuted}
-              />
+              <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center' }}>
+                {isFocused && (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      backgroundColor: Colors.coral + '20',
+                      borderRadius: 14,
+                      width: 44,
+                      height: 28,
+                    }}
+                  />
+                )}
+                <Ionicons
+                  name={isFocused ? tab.activeIcon : tab.icon}
+                  size={24}
+                  color={isFocused ? Colors.coral : Colors.textMuted}
+                />
+              </View>
               <Text
                 style={{
                   fontSize: 10,
                   color: isFocused ? Colors.coral : Colors.textMuted,
+                  fontFamily: isFocused ? Fonts.semibold : Fonts.regular,
                   fontWeight: isFocused ? FontWeight.semibold : FontWeight.normal,
                 }}
               >

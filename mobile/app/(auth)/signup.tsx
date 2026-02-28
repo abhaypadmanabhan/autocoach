@@ -15,7 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { analytics } from '../../lib/analytics';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 
 function PasswordStrengthBar({ password }: { password: string }) {
   const strength = (() => {
@@ -47,7 +47,7 @@ function PasswordStrengthBar({ password }: { password: string }) {
         ))}
       </View>
       {password.length > 0 && (
-        <Text style={{ color: colors[strength], fontSize: 11, marginTop: 4 }}>
+        <Text style={{ color: colors[strength], fontSize: 11, marginTop: 4, fontFamily: Fonts.regular }}>
           {labels[strength]}
         </Text>
       )}
@@ -107,6 +107,7 @@ export default function SignupScreen() {
           style={{
             fontSize: Typography['2xl'],
             fontWeight: FontWeight.bold,
+            fontFamily: Fonts.bold,
             color: Colors.textPrimary,
             textAlign: 'center',
             marginBottom: Spacing[3],
@@ -117,6 +118,7 @@ export default function SignupScreen() {
         <Text
           style={{
             fontSize: Typography.base,
+            fontFamily: Fonts.regular,
             color: Colors.textMuted,
             textAlign: 'center',
             marginBottom: Spacing[8],
@@ -127,7 +129,7 @@ export default function SignupScreen() {
         <TouchableOpacity
           onPress={() => router.replace('/(auth)/login')}
           style={{
-            backgroundColor: Colors.indigo,
+            backgroundColor: Colors.coral,
             borderRadius: Radius.lg,
             paddingVertical: Spacing[3],
             paddingHorizontal: Spacing[6],
@@ -137,6 +139,7 @@ export default function SignupScreen() {
             style={{
               color: Colors.white,
               fontWeight: FontWeight.bold,
+              fontFamily: Fonts.bold,
               fontSize: Typography.base,
             }}
           >
@@ -171,6 +174,7 @@ export default function SignupScreen() {
             style={{
               fontSize: Typography['3xl'],
               fontWeight: FontWeight.bold,
+              fontFamily: Fonts.bold,
               color: Colors.textPrimary,
               marginBottom: Spacing[1],
             }}
@@ -180,6 +184,7 @@ export default function SignupScreen() {
           <Text
             style={{
               fontSize: Typography.base,
+              fontFamily: Fonts.regular,
               color: Colors.textMuted,
               marginBottom: Spacing[8],
             }}
@@ -198,7 +203,7 @@ export default function SignupScreen() {
                 marginBottom: Spacing[4],
               }}
             >
-              <Text style={{ color: Colors.error, fontSize: Typography.sm }}>{error}</Text>
+              <Text style={{ color: Colors.error, fontSize: Typography.sm, fontFamily: Fonts.regular }}>{error}</Text>
             </View>
           )}
 
@@ -211,6 +216,7 @@ export default function SignupScreen() {
                   fontSize: Typography.sm,
                   marginBottom: Spacing[1],
                   fontWeight: FontWeight.medium,
+                  fontFamily: Fonts.semibold,
                 }}
               >
                 Full Name
@@ -230,6 +236,7 @@ export default function SignupScreen() {
                   paddingVertical: Spacing[3],
                   color: Colors.textPrimary,
                   fontSize: Typography.base,
+                  fontFamily: Fonts.regular,
                 }}
               />
             </View>
@@ -242,6 +249,7 @@ export default function SignupScreen() {
                   fontSize: Typography.sm,
                   marginBottom: Spacing[1],
                   fontWeight: FontWeight.medium,
+                  fontFamily: Fonts.semibold,
                 }}
               >
                 Email
@@ -263,6 +271,7 @@ export default function SignupScreen() {
                   paddingVertical: Spacing[3],
                   color: Colors.textPrimary,
                   fontSize: Typography.base,
+                  fontFamily: Fonts.regular,
                 }}
               />
             </View>
@@ -275,6 +284,7 @@ export default function SignupScreen() {
                   fontSize: Typography.sm,
                   marginBottom: Spacing[1],
                   fontWeight: FontWeight.medium,
+                  fontFamily: Fonts.semibold,
                 }}
               >
                 Password
@@ -294,6 +304,7 @@ export default function SignupScreen() {
                   paddingVertical: Spacing[3],
                   color: Colors.textPrimary,
                   fontSize: Typography.base,
+                  fontFamily: Fonts.regular,
                 }}
               />
               <PasswordStrengthBar password={password} />
@@ -319,6 +330,7 @@ export default function SignupScreen() {
                     color: Colors.white,
                     fontSize: Typography.base,
                     fontWeight: FontWeight.bold,
+                    fontFamily: Fonts.bold,
                   }}
                 >
                   Create Account
@@ -334,7 +346,7 @@ export default function SignupScreen() {
               marginTop: Spacing[6],
             }}
           >
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontFamily: Fonts.regular }}>
               Already have an account?{' '}
             </Text>
             <Link href="/(auth)/login" asChild>
@@ -344,6 +356,7 @@ export default function SignupScreen() {
                     color: Colors.indigo,
                     fontSize: Typography.sm,
                     fontWeight: FontWeight.semibold,
+                    fontFamily: Fonts.semibold,
                   }}
                 >
                   Sign In

@@ -12,7 +12,7 @@ interface ProgressBarProps {
 
 export function ProgressBar({
   progress,
-  color = Colors.indigo,
+  color = Colors.coral,
   height = 6,
   style,
   animated = true,

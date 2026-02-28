@@ -1,6 +1,6 @@
 import { View, Text } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { Colors, FontWeight, Typography } from '../../constants/theme';
+import { Colors, Fonts, FontWeight, Typography } from '../../constants/theme';
 
 interface ProgressRingProps {
   progress: number; // 0-100
@@ -16,7 +16,7 @@ export function ProgressRing({
   progress,
   size = 60,
   strokeWidth = 4,
-  color = Colors.indigo,
+  color = Colors.coral,
   backgroundColor = Colors.border,
   children,
   label,
@@ -58,6 +58,7 @@ export function ProgressRing({
             fontSize: size < 50 ? Typography.xs : Typography.sm,
             color: Colors.textPrimary,
             fontWeight: FontWeight.bold,
+            fontFamily: Fonts.bold,
           }}
         >
           {label ?? `${Math.round(progress)}%`}

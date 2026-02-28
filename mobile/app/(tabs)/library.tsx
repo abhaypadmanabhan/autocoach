@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { ProgressBar } from '../../components/ui/ProgressBar';
@@ -30,7 +30,7 @@ function FileIcon({ fileType }: { fileType: string }) {
         width: 44,
         height: 44,
         borderRadius: Radius.md,
-        backgroundColor: isPDF ? '#EF4444' + '20' : '#6366F1' + '20',
+        backgroundColor: isPDF ? '#EF4444' + '20' : Colors.indigo + '20',
         alignItems: 'center',
         justifyContent: 'center',
       }}
@@ -94,6 +94,7 @@ function DocumentCard({
         style={{
           color: Colors.textPrimary,
           fontWeight: FontWeight.semibold,
+          fontFamily: Fonts.semibold,
           fontSize: Typography.sm,
           marginBottom: Spacing[2],
         }}
@@ -105,15 +106,15 @@ function DocumentCard({
       {doc.status === 'ready' && (
         <View style={{ marginTop: 'auto' }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>Mastery</Text>
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>{mastery}%</Text>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular }}>Mastery</Text>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular }}>{mastery}%</Text>
           </View>
           <ProgressBar progress={mastery / 100} color={Colors.indigo} height={4} />
         </View>
       )}
 
       {doc.status === 'processing' && (
-        <Text style={{ color: Colors.warning, fontSize: Typography.xs, marginTop: Spacing[2] }}>
+        <Text style={{ color: Colors.warning, fontSize: Typography.xs, fontFamily: Fonts.regular, marginTop: Spacing[2] }}>
           Processing...
         </Text>
       )}
@@ -129,6 +130,7 @@ function EmptyState({ onUpload }: { onUpload: () => void }) {
         style={{
           fontSize: Typography.xl,
           fontWeight: FontWeight.bold,
+          fontFamily: Fonts.bold,
           color: Colors.textPrimary,
           textAlign: 'center',
           marginBottom: Spacing[2],
@@ -139,6 +141,7 @@ function EmptyState({ onUpload }: { onUpload: () => void }) {
       <Text
         style={{
           fontSize: Typography.base,
+          fontFamily: Fonts.regular,
           color: Colors.textMuted,
           textAlign: 'center',
           marginBottom: Spacing[6],
@@ -155,7 +158,7 @@ function EmptyState({ onUpload }: { onUpload: () => void }) {
           paddingHorizontal: Spacing[6],
         }}
       >
-        <Text style={{ color: Colors.white, fontWeight: FontWeight.bold, fontSize: Typography.base }}>
+        <Text style={{ color: Colors.white, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.base }}>
           Upload Document
         </Text>
       </TouchableOpacity>
@@ -214,7 +217,7 @@ export default function LibraryScreen() {
     <View style={{ flex: 1, backgroundColor: Colors.navy }}>
       {/* Header */}
       <View style={{ paddingTop: insets.top + Spacing[4], paddingHorizontal: Spacing[5], paddingBottom: Spacing[3] }}>
-        <Text style={{ fontSize: Typography['2xl'], fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: Spacing[4] }}>
+        <Text style={{ fontSize: Typography['2xl'], fontWeight: FontWeight.bold, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: Spacing[4] }}>
           Library
         </Text>
 
@@ -237,7 +240,7 @@ export default function LibraryScreen() {
             onChangeText={setSearch}
             placeholder="Search documents..."
             placeholderTextColor={Colors.textMuted}
-            style={{ flex: 1, color: Colors.textPrimary, fontSize: Typography.base, paddingVertical: Spacing[3], paddingHorizontal: Spacing[2] }}
+            style={{ flex: 1, color: Colors.textPrimary, fontSize: Typography.base, fontFamily: Fonts.regular, paddingVertical: Spacing[3], paddingHorizontal: Spacing[2] }}
           />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch('')}>
@@ -265,6 +268,7 @@ export default function LibraryScreen() {
                 style={{
                   color: filter === f.value ? Colors.white : Colors.textMuted,
                   fontSize: Typography.sm,
+                  fontFamily: filter === f.value ? Fonts.semibold : Fonts.regular,
                   fontWeight: filter === f.value ? FontWeight.semibold : FontWeight.normal,
                 }}
               >
@@ -289,7 +293,7 @@ export default function LibraryScreen() {
           <EmptyState onUpload={handleUpload} />
         ) : (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.base }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.base, fontFamily: Fonts.regular }}>
               No documents match your filter
             </Text>
           </View>

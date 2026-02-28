@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 import { Card } from '../../components/ui/Card';
 import { ProgressRing } from '../../components/ui/ProgressRing';
 import { ProgressBar } from '../../components/ui/ProgressBar';
@@ -48,7 +48,7 @@ function SprintHeroCard({
 
   return (
     <LinearGradient
-      colors={isCompleted ? ['#10B981', '#059669'] : [Colors.indigo, '#8B5CF6']}
+      colors={isCompleted ? ['#10B981', '#059669'] : [Colors.coral, '#C2410C']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{
@@ -67,13 +67,14 @@ function SprintHeroCard({
                 style={{
                   fontSize: Typography.lg,
                   fontWeight: FontWeight.bold,
+                  fontFamily: Fonts.bold,
                   color: Colors.white,
                 }}
               >
                 Sprint Complete!
               </Text>
             </View>
-            <Text style={{ color: 'rgba(255,255,255,0.8)', marginTop: 4, fontSize: Typography.sm }}>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', marginTop: 4, fontSize: Typography.sm, fontFamily: Fonts.regular }}>
               +{sprintStatus?.xp_earned_today ?? 0} XP earned today
             </Text>
           </View>
@@ -85,7 +86,7 @@ function SprintHeroCard({
               paddingVertical: 6,
             }}
           >
-            <Text style={{ color: Colors.white, fontWeight: FontWeight.bold, fontSize: Typography.sm }}>
+            <Text style={{ color: Colors.white, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.sm }}>
               🔥 {sprintStatus?.streak_count ?? 0}
             </Text>
           </View>
@@ -97,26 +98,27 @@ function SprintHeroCard({
               style={{
                 fontSize: Typography.xl,
                 fontWeight: FontWeight.bold,
+                fontFamily: Fonts.bold,
                 color: Colors.white,
                 marginBottom: 4,
               }}
             >
               Today's Sprint ⚡
             </Text>
-            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: Typography.sm }}>
+            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: Typography.sm, fontFamily: Fonts.regular }}>
               5 questions · ~3 min
             </Text>
           </View>
           <TouchableOpacity
             onPress={() => router.push('/(tabs)/sprint')}
             style={{
-              backgroundColor: Colors.coral,
+              backgroundColor: 'rgba(255,255,255,0.2)',
               borderRadius: Radius.lg,
               paddingHorizontal: Spacing[4],
               paddingVertical: Spacing[2],
             }}
           >
-            <Text style={{ color: Colors.white, fontWeight: FontWeight.bold, fontSize: Typography.sm }}>
+            <Text style={{ color: Colors.white, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.sm }}>
               Start →
             </Text>
           </TouchableOpacity>
@@ -151,6 +153,7 @@ function DocumentCard({ doc }: { doc: Document }) {
         style={{
           color: Colors.textPrimary,
           fontWeight: FontWeight.semibold,
+          fontFamily: Fonts.semibold,
           fontSize: Typography.sm,
           textAlign: 'center',
           marginBottom: Spacing[3],
@@ -160,7 +163,7 @@ function DocumentCard({ doc }: { doc: Document }) {
         {displayName}
       </Text>
       <View style={{ alignItems: 'center' }}>
-        <Text style={{ color: Colors.coral, fontSize: Typography.xs, fontWeight: FontWeight.semibold }}>
+        <Text style={{ color: Colors.coral, fontSize: Typography.xs, fontWeight: FontWeight.semibold, fontFamily: Fonts.semibold }}>
           Continue →
         </Text>
       </View>
@@ -222,6 +225,7 @@ export default function HomeScreen() {
             style={{
               fontSize: Typography['2xl'],
               fontWeight: FontWeight.bold,
+              fontFamily: Fonts.bold,
               color: Colors.textPrimary,
               flex: 1,
             }}
@@ -244,7 +248,7 @@ export default function HomeScreen() {
             >
               <Text style={{ fontSize: 12 }}>⚡</Text>
               <Text
-                style={{ color: Colors.gold, fontWeight: FontWeight.bold, fontSize: Typography.xs }}
+                style={{ color: Colors.gold, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.xs }}
               >
                 {totalXp.toLocaleString()} XP
               </Text>
@@ -263,7 +267,7 @@ export default function HomeScreen() {
             >
               <Text style={{ fontSize: 12 }}>🔥</Text>
               <Text
-                style={{ color: Colors.coral, fontWeight: FontWeight.bold, fontSize: Typography.xs }}
+                style={{ color: Colors.coral, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, fontSize: Typography.xs }}
               >
                 {streak}
               </Text>
@@ -280,6 +284,7 @@ export default function HomeScreen() {
             style={{
               fontSize: Typography.lg,
               fontWeight: FontWeight.bold,
+              fontFamily: Fonts.bold,
               color: Colors.textPrimary,
               paddingHorizontal: Spacing[5],
               marginBottom: Spacing[3],
@@ -307,7 +312,7 @@ export default function HomeScreen() {
               }}
             >
               <Text style={{ fontSize: 32, marginBottom: Spacing[2] }}>📚</Text>
-              <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, textAlign: 'center' }}>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontFamily: Fonts.regular, textAlign: 'center' }}>
                 No documents yet. Upload your first document to start learning.
               </Text>
             </TouchableOpacity>
@@ -330,6 +335,7 @@ export default function HomeScreen() {
               style={{
                 fontSize: Typography.lg,
                 fontWeight: FontWeight.bold,
+                fontFamily: Fonts.bold,
                 color: Colors.textPrimary,
                 marginBottom: Spacing[3],
               }}
@@ -344,6 +350,7 @@ export default function HomeScreen() {
                       style={{
                         color: Colors.textPrimary,
                         fontWeight: FontWeight.medium,
+                        fontFamily: Fonts.medium,
                         fontSize: Typography.sm,
                         marginBottom: 6,
                       }}
@@ -355,7 +362,7 @@ export default function HomeScreen() {
                       color={Colors.coral}
                       height={4}
                     />
-                    <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: 4 }}>
+                    <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular, marginTop: 4 }}>
                       {concept.mastery_percentage}% mastery
                     </Text>
                   </View>
@@ -378,6 +385,7 @@ export default function HomeScreen() {
                         color: Colors.coral,
                         fontSize: Typography.xs,
                         fontWeight: FontWeight.semibold,
+                        fontFamily: Fonts.semibold,
                       }}
                     >
                       Practice
@@ -409,12 +417,13 @@ export default function HomeScreen() {
                 style={{
                   fontSize: Typography.lg,
                   fontWeight: FontWeight.bold,
+                  fontFamily: Fonts.extrabold,
                   color: Colors.textPrimary,
                 }}
               >
                 {stat.value}
               </Text>
-              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>{stat.label}</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular }}>{stat.label}</Text>
             </Card>
           ))}
         </View>

@@ -9,7 +9,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 import { Card } from '../../components/ui/Card';
 import { ProgressRing } from '../../components/ui/ProgressRing';
 import { Button } from '../../components/ui/Button';
@@ -87,7 +87,7 @@ export default function ResultsScreen() {
         <TouchableOpacity onPress={() => router.replace('/(tabs)/library')}>
           <Ionicons name="close" size={24} color={Colors.textMuted} />
         </TouchableOpacity>
-        <Text style={{ flex: 1, fontSize: Typography.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary, textAlign: 'center' }}>
+        <Text style={{ flex: 1, fontSize: Typography.lg, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, color: Colors.textPrimary, textAlign: 'center' }}>
           Results
         </Text>
         <View style={{ width: 24 }} />
@@ -108,6 +108,7 @@ export default function ResultsScreen() {
             style={{
               fontSize: Typography['2xl'],
               fontWeight: FontWeight.bold,
+              fontFamily: Fonts.bold,
               color: grade.color,
               marginTop: Spacing[4],
               marginBottom: Spacing[1],

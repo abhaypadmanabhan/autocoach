@@ -1,6 +1,6 @@
 import { View, Text, Image, ImageStyle, ViewStyle, StyleProp } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Colors, Typography, FontWeight, Radius } from '../../constants/theme';
+import { Colors, Fonts, Typography, FontWeight, Radius } from '../../constants/theme';
 
 interface AvatarProps {
   name?: string | null;
@@ -44,7 +44,7 @@ export function Avatar({ name, imageUrl, size = 44, style }: AvatarProps) {
         style,
       ]}
     >
-      <Text style={{ color: Colors.white, fontSize, fontWeight: FontWeight.bold }}>
+      <Text style={{ color: Colors.white, fontSize, fontWeight: FontWeight.bold, fontFamily: Fonts.bold }}>
         {getInitials(name)}
       </Text>
     </LinearGradient>

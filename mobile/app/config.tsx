@@ -9,7 +9,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../constants/theme';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useCreateSession } from '../hooks/useQuiz';
@@ -336,7 +336,7 @@ export default function ConfigScreen() {
         <TouchableOpacity onPress={handleBack} style={{ marginRight: Spacing[3] }}>
           <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={{ fontSize: Typography.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary }}>
+        <Text style={{ fontSize: Typography.lg, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, color: Colors.textPrimary }}>
           Configure Quiz
         </Text>
       </View>

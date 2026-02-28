@@ -21,14 +21,14 @@ export function Skeleton({ width = '100%', height = 16, borderRadius = Radius.md
     ).start();
   }, []);
 
-  const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
+  const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.15, 0.35] });
 
   return (
     <View style={[{ width: width as any, height, borderRadius, overflow: 'hidden' }, style]}>
       <Animated.View
         style={{
           flex: 1,
-          backgroundColor: Colors.textMuted,
+          backgroundColor: Colors.surface,
           opacity,
         }}
       />

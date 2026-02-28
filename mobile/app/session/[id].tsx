@@ -13,7 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useRef, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ProgressBar } from '../../components/ui/ProgressBar';
@@ -55,9 +55,9 @@ function FeedbackOverlay({
     >
       <View
         style={{
-          backgroundColor: result.is_correct ? '#0A1F14' : '#1F0A0A',
+          backgroundColor: Colors.card,
           borderTopWidth: 1,
-          borderTopColor: result.is_correct ? Colors.success + '50' : Colors.error + '50',
+          borderTopColor: result.is_correct ? Colors.success + '80' : Colors.error + '80',
           borderTopLeftRadius: Radius['2xl'],
           borderTopRightRadius: Radius['2xl'],
           padding: Spacing[6],
@@ -70,6 +70,7 @@ function FeedbackOverlay({
             style={{
               fontSize: Typography.xl,
               fontWeight: FontWeight.bold,
+              fontFamily: Fonts.bold,
               color: result.is_correct ? Colors.success : Colors.error,
               flex: 1,
             }}
@@ -236,6 +237,7 @@ export default function SessionScreen() {
                     color: Colors.textPrimary,
                     fontSize: Typography.lg,
                     fontWeight: FontWeight.semibold,
+                    fontFamily: Fonts.semibold,
                     lineHeight: 28,
                   }}
                 >

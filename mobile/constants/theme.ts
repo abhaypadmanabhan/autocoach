@@ -1,20 +1,30 @@
 export const Colors = {
-  navy: '#0A0E1A',
-  card: 'rgba(255,255,255,0.04)',
+  navy: '#100F0D',
+  card: '#1C1A17',
   border: 'rgba(255,255,255,0.08)',
-  coral: '#FF6B6B',
-  indigo: '#6366F1',
-  indigoDark: '#4F46E5',
-  gold: '#F59E0B',
-  textPrimary: '#F1F5F9',
-  textMuted: '#64748B',
-  success: '#10B981',
+  borderStrong: 'rgba(255,255,255,0.14)',
+  coral: '#F97316',
+  indigo: '#0D9488',
+  indigoDark: '#0F766E',
+  gold: '#FBBF24',
+  textPrimary: '#FAF5ED',
+  textMuted: '#8A8278',
+  textSubtle: '#5C5854',
+  success: '#22C55E',
   error: '#EF4444',
   warning: '#F59E0B',
-  surface: 'rgba(255,255,255,0.06)',
-  surfaceHover: 'rgba(255,255,255,0.10)',
+  surface: '#252220',
+  surfaceHover: '#2D2A26',
   white: '#FFFFFF',
   black: '#000000',
+};
+
+export const Fonts = {
+  regular: 'Outfit_400Regular',
+  medium: 'Outfit_500Medium',
+  semibold: 'Outfit_600SemiBold',
+  bold: 'Outfit_700Bold',
+  extrabold: 'Outfit_800ExtraBold',
 };
 
 export const Typography = {

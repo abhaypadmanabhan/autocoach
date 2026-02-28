@@ -6,16 +6,17 @@ interface CardProps {
   style?: StyleProp<ViewStyle>;
   padding?: number;
   noPadding?: boolean;
+  glow?: boolean;
 }
 
-export function Card({ children, style, padding = Spacing[4], noPadding = false }: CardProps) {
+export function Card({ children, style, padding = Spacing[4], noPadding = false, glow = false }: CardProps) {
   return (
     <View
       style={[
         {
           backgroundColor: Colors.card,
           borderWidth: 1,
-          borderColor: Colors.border,
+          borderColor: glow ? Colors.gold + '40' : Colors.border,
           borderRadius: Radius['2xl'],
           padding: noPadding ? 0 : padding,
           overflow: 'hidden',

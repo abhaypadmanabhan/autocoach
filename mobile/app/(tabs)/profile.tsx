@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 import { Card } from '../../components/ui/Card';
 import { Avatar } from '../../components/ui/Avatar';
 import { ProgressRing } from '../../components/ui/ProgressRing';
@@ -28,13 +28,13 @@ function XPLevelRing({ totalXp }: { totalXp: number }) {
     <View style={{ alignItems: 'center' }}>
       <ProgressRing progress={progress} size={100} strokeWidth={8} color={Colors.gold}>
         <View style={{ alignItems: 'center' }}>
-          <Text style={{ color: Colors.gold, fontWeight: FontWeight.extrabold, fontSize: Typography.xl }}>
+          <Text style={{ color: Colors.gold, fontWeight: FontWeight.extrabold, fontFamily: Fonts.extrabold, fontSize: Typography.xl }}>
             {level}
           </Text>
-          <Text style={{ color: Colors.textMuted, fontSize: 9 }}>LEVEL</Text>
+          <Text style={{ color: Colors.textMuted, fontSize: 9, fontFamily: Fonts.regular }}>LEVEL</Text>
         </View>
       </ProgressRing>
-      <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, marginTop: Spacing[1] }}>
+      <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular, marginTop: Spacing[1] }}>
         {xpToNext} XP to next level
       </Text>
     </View>
@@ -86,7 +86,7 @@ export default function ProfileScreen() {
         }}
       >
         {/* Header */}
-        <Text style={{ fontSize: Typography['2xl'], fontWeight: FontWeight.bold, color: Colors.textPrimary }}>
+        <Text style={{ fontSize: Typography['2xl'], fontWeight: FontWeight.bold, fontFamily: Fonts.bold, color: Colors.textPrimary }}>
           Profile
         </Text>
 
@@ -101,10 +101,10 @@ export default function ProfileScreen() {
           ) : (
             <>
               <Avatar name={profile?.full_name} size={80} style={{ marginBottom: Spacing[3] }} />
-              <Text style={{ fontSize: Typography.xl, fontWeight: FontWeight.bold, color: Colors.textPrimary, marginBottom: 4 }}>
+              <Text style={{ fontSize: Typography.xl, fontWeight: FontWeight.bold, fontFamily: Fonts.bold, color: Colors.textPrimary, marginBottom: 4 }}>
                 {profile?.full_name ?? 'AutoCoach User'}
               </Text>
-              <Text style={{ fontSize: Typography.sm, color: Colors.textMuted }}>
+              <Text style={{ fontSize: Typography.sm, fontFamily: Fonts.regular, color: Colors.textMuted }}>
                 {profile?.email ?? ''}
               </Text>
             </>
@@ -113,7 +113,7 @@ export default function ProfileScreen() {
 
         {/* XP Level Ring */}
         <Card style={{ alignItems: 'center', paddingVertical: Spacing[5] }}>
-          <Text style={{ fontSize: Typography.base, fontWeight: FontWeight.semibold, color: Colors.textPrimary, marginBottom: Spacing[4] }}>
+          <Text style={{ fontSize: Typography.base, fontWeight: FontWeight.semibold, fontFamily: Fonts.semibold, color: Colors.textPrimary, marginBottom: Spacing[4] }}>
             Learning Level ⚡
           </Text>
           <XPLevelRing totalXp={totalXp} />
@@ -133,10 +133,10 @@ export default function ProfileScreen() {
               }}
             >
               <Text style={{ fontSize: 24 }}>{stat.icon}</Text>
-              <Text style={{ fontSize: Typography.lg, fontWeight: FontWeight.bold, color: Colors.textPrimary }}>
+              <Text style={{ fontSize: Typography.lg, fontWeight: FontWeight.bold, fontFamily: Fonts.extrabold, color: Colors.textPrimary }}>
                 {stat.value}
               </Text>
-              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs }}>{stat.label}</Text>
+              <Text style={{ color: Colors.textMuted, fontSize: Typography.xs, fontFamily: Fonts.regular }}>{stat.label}</Text>
             </Card>
           ))}
         </View>
@@ -144,10 +144,10 @@ export default function ProfileScreen() {
         {/* Experience level */}
         {profile?.experience_level && (
           <Card>
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, marginBottom: Spacing[1] }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontFamily: Fonts.regular, marginBottom: Spacing[1] }}>
               Experience Level
             </Text>
-            <Text style={{ color: Colors.textPrimary, fontWeight: FontWeight.semibold, fontSize: Typography.base, textTransform: 'capitalize' }}>
+            <Text style={{ color: Colors.textPrimary, fontWeight: FontWeight.semibold, fontFamily: Fonts.semibold, fontSize: Typography.base, textTransform: 'capitalize' }}>
               {profile.experience_level}
             </Text>
           </Card>

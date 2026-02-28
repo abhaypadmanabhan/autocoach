@@ -16,7 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../lib/supabase';
 import { analytics } from '../../lib/analytics';
-import { Colors, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Spacing, Radius, Typography, FontWeight } from '../../constants/theme';
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -51,7 +51,7 @@ export default function LoginScreen() {
     <View style={{ flex: 1, backgroundColor: Colors.navy }}>
       <StatusBar style="light" />
       <LinearGradient
-        colors={[Colors.indigo + '40', Colors.navy]}
+        colors={[Colors.coral + '25', Colors.navy]}
         style={{
           position: 'absolute',
           top: 0,
@@ -80,7 +80,7 @@ export default function LoginScreen() {
                 width: 72,
                 height: 72,
                 borderRadius: Radius.xl,
-                backgroundColor: Colors.indigo,
+                backgroundColor: Colors.coral,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginBottom: Spacing[4],
@@ -92,6 +92,7 @@ export default function LoginScreen() {
               style={{
                 fontSize: Typography['3xl'],
                 fontWeight: FontWeight.bold,
+                fontFamily: Fonts.bold,
                 color: Colors.textPrimary,
                 marginBottom: Spacing[1],
               }}
@@ -101,6 +102,7 @@ export default function LoginScreen() {
             <Text
               style={{
                 fontSize: Typography.base,
+                fontFamily: Fonts.regular,
                 color: Colors.textMuted,
               }}
             >
@@ -120,7 +122,7 @@ export default function LoginScreen() {
                 marginBottom: Spacing[4],
               }}
             >
-              <Text style={{ color: Colors.error, fontSize: Typography.sm }}>
+              <Text style={{ color: Colors.error, fontSize: Typography.sm, fontFamily: Fonts.regular }}>
                 {error}
               </Text>
             </View>
@@ -135,6 +137,7 @@ export default function LoginScreen() {
                   fontSize: Typography.sm,
                   marginBottom: Spacing[1],
                   fontWeight: FontWeight.medium,
+                  fontFamily: Fonts.semibold,
                 }}
               >
                 Email
@@ -156,6 +159,7 @@ export default function LoginScreen() {
                   paddingVertical: Spacing[3],
                   color: Colors.textPrimary,
                   fontSize: Typography.base,
+                  fontFamily: Fonts.regular,
                 }}
               />
             </View>
@@ -167,6 +171,7 @@ export default function LoginScreen() {
                   fontSize: Typography.sm,
                   marginBottom: Spacing[1],
                   fontWeight: FontWeight.medium,
+                  fontFamily: Fonts.semibold,
                 }}
               >
                 Password
@@ -187,6 +192,7 @@ export default function LoginScreen() {
                   paddingVertical: Spacing[3],
                   color: Colors.textPrimary,
                   fontSize: Typography.base,
+                  fontFamily: Fonts.regular,
                 }}
               />
             </View>
@@ -211,6 +217,7 @@ export default function LoginScreen() {
                     color: Colors.white,
                     fontSize: Typography.base,
                     fontWeight: FontWeight.bold,
+                    fontFamily: Fonts.bold,
                   }}
                 >
                   Sign In
@@ -227,16 +234,17 @@ export default function LoginScreen() {
               marginTop: Spacing[6],
             }}
           >
-            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm }}>
+            <Text style={{ color: Colors.textMuted, fontSize: Typography.sm, fontFamily: Fonts.regular }}>
               Don't have an account?{' '}
             </Text>
             <Link href="/(auth)/signup" asChild>
               <TouchableOpacity>
                 <Text
                   style={{
-                    color: Colors.indigo,
+                    color: Colors.coral,
                     fontSize: Typography.sm,
                     fontWeight: FontWeight.semibold,
+                    fontFamily: Fonts.semibold,
                   }}
                 >
                   Sign Up

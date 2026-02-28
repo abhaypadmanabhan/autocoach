@@ -1,5 +1,5 @@
 import { View, Text, ViewStyle, StyleProp } from 'react-native';
-import { Colors, Radius, Typography, FontWeight } from '../../constants/theme';
+import { Colors, Fonts, Radius, Typography, FontWeight } from '../../constants/theme';
 
 type Status = 'ready' | 'processing' | 'pending' | 'failed' | 'success' | 'warning' | 'info';
 
@@ -39,6 +39,7 @@ export function Badge({ status = 'info', label, style }: BadgeProps) {
           color: config.text,
           fontSize: Typography.xs,
           fontWeight: FontWeight.semibold,
+          fontFamily: Fonts.semibold,
         }}
       >
         {label ?? config.label}
