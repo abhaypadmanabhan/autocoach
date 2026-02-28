@@ -2,6 +2,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, getErrorMessage } from '../lib/api';
 import { analytics } from '../lib/analytics';
 
+export interface SessionQuestionDetail {
+  question_id: string;
+  question_number: number;
+  question_type: string;
+  question_text: string;
+  user_answer?: string | null;
+  is_correct?: boolean | null;
+  correct_answer: string;
+  explanation?: string | null;
+}
+
 export interface QuizSession {
   session_id: string;
   document_id: string;
@@ -10,6 +21,7 @@ export interface QuizSession {
   correct_answers: number;
   current_question_number: number;
   time_taken_seconds?: number;
+  questions?: SessionQuestionDetail[];
 }
 
 export interface QuestionOption {

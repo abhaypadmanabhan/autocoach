@@ -15,8 +15,6 @@ import { ProgressRing } from '../../components/ui/ProgressRing';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { useQuizSession } from '../../hooks/useQuiz';
-import { apiFetch } from '../../lib/api';
-import { useQuery } from '@tanstack/react-query';
 
 interface QuestionReview {
   question_id: string;
@@ -42,11 +40,16 @@ export default function ResultsScreen() {
 
   const { session, isLoading: sessionLoading } = useQuizSession(sessionId);
 
-  const { data: questions, isLoading: questionsLoading } = useQuery<QuestionReview[]>({
-    queryKey: ['sessionQuestions', sessionId],
-    queryFn: () => apiFetch<QuestionReview[]>(`/quiz/sessions/${sessionId}/questions`),
-    enabled: !!sessionId,
-  });
+  const questions: QuestionReview[] | undefined = session?.questions?.map((q) => ({
+    question_id: q.question_id,
+    question_text: q.question_text,
+    question_type: q.question_type,
+    user_answer: q.user_answer,
+    correct_answer: q.correct_answer,
+    is_correct: q.is_correct ?? false,
+    explanation: q.explanation,
+  }));
+  const questionsLoading = sessionLoading;
 
   if (sessionLoading) {
     return (
