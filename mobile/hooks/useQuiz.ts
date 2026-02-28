@@ -17,6 +17,16 @@ export interface QuestionOption {
   value: string;
 }
 
+// Backend returns options as plain strings; normalize to {label, value}
+function normalizeOptions(raw: (string | QuestionOption)[] | undefined): QuestionOption[] | undefined {
+  if (!raw) return undefined;
+  return raw.map((opt, i) =>
+    typeof opt === 'string'
+      ? { label: opt, value: opt || String(i) }
+      : opt
+  );
+}
+
 export interface CurrentQuestion {
   question_id: string;
   question_number: number;
@@ -70,7 +80,8 @@ export function useCurrentQuestion(sessionId: string | null) {
     queryKey: ['currentQuestion', sessionId],
     queryFn: async () => {
       try {
-        return await apiFetch<CurrentQuestion>(`/quiz/sessions/${sessionId}/current`);
+        const q = await apiFetch<CurrentQuestion>(`/quiz/sessions/${sessionId}/current`);
+        return { ...q, options: normalizeOptions(q.options as any) };
       } catch (err: any) {
         if (err?.status === 404 || err?.status === 410) return null;
         throw err;
@@ -112,11 +123,16 @@ export function useCreateSession() {
 export function useAnswerQuestion(sessionId: string | null) {
   const queryClient = useQueryClient();
   const mutation = useMutation({
-    mutationFn: ({ questionId, answer }: { questionId: string; answer: string }) =>
-      apiFetch<AnswerResponse>(
+    mutationFn: async ({ questionId, answer }: { questionId: string; answer: string }) => {
+      const res = await apiFetch<AnswerResponse>(
         `/quiz/sessions/${sessionId}/answer?question_id=${questionId}`,
         { method: 'POST', body: { answer, input_method: 'tapped' } }
-      ),
+      );
+      if (res.next_question) {
+        res.next_question = { ...res.next_question, options: normalizeOptions(res.next_question.options as any) };
+      }
+      return res;
+    },
     onSuccess: (response, variables) => {
       queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
       analytics.capture('question_answered', {

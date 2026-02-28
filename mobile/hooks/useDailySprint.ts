@@ -42,10 +42,22 @@ export interface CompleteSprintResponse {
 
 const SPRINT_KEY = ['/sprint/today'];
 
+function normalizeSprintOptions(questions?: SprintQuestion[]): SprintQuestion[] | undefined {
+  return questions?.map((q) => ({
+    ...q,
+    options: (q.options as any[])?.map((opt, i) =>
+      typeof opt === 'string' ? { label: opt, value: opt || String(i) } : opt
+    ),
+  }));
+}
+
 export function useDailySprintStatus() {
   const { data, isLoading, error, refetch } = useQuery<SprintStatusResponse>({
     queryKey: SPRINT_KEY,
-    queryFn: () => apiFetch<SprintStatusResponse>('/sprint/today'),
+    queryFn: async () => {
+      const res = await apiFetch<SprintStatusResponse>('/sprint/today');
+      return { ...res, questions: normalizeSprintOptions(res.questions) };
+    },
     staleTime: 30_000,
     refetchOnWindowFocus: false,
   });
@@ -79,11 +91,13 @@ export function useUserStats() {
 export function useStartSprint() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
-    mutationFn: () =>
-      apiFetch<{ session_id: string; questions: SprintQuestion[] }>('/sprint/start', {
+    mutationFn: async () => {
+      const res = await apiFetch<{ session_id: string; questions: SprintQuestion[] }>('/sprint/start', {
         method: 'POST',
         body: {},
-      }),
+      });
+      return { ...res, questions: normalizeSprintOptions(res.questions) ?? [] };
+    },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: SPRINT_KEY });
       analytics.capture('sprint_started', { session_id: data.session_id });
