@@ -67,11 +67,17 @@ export async function apiFetch<T>(path: string, options: FetchOptions = {}): Pro
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+    // FastAPI 422s return detail as an array of validation error objects
     const detail =
-      typeof errorData.detail === 'string' ? errorData.detail : undefined;
+      typeof errorData.detail === 'string'
+        ? errorData.detail
+        : Array.isArray(errorData.detail)
+        ? errorData.detail.map((e: any) => `${e.loc?.join('.')}: ${e.msg}`).join('; ')
+        : undefined;
     const message =
       typeof errorData.message === 'string' ? errorData.message : undefined;
     const errorMessage = detail || message || `HTTP ${response.status} Error`;
+    console.error(`[apiFetch] ${response.status} ${response.url ?? path}:`, errorMessage);
     throw new ApiError(errorMessage, response.status);
   }
 

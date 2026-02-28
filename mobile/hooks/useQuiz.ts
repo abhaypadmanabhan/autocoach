@@ -126,7 +126,7 @@ export function useAnswerQuestion(sessionId: string | null) {
     mutationFn: async ({ questionId, answer }: { questionId: string; answer: string }) => {
       const res = await apiFetch<AnswerResponse>(
         `/quiz/sessions/${sessionId}/answer?question_id=${questionId}`,
-        { method: 'POST', body: { answer, input_method: 'tapped' } }
+        { method: 'POST', body: { answer, input_method: 'click' } }
       );
       if (res.next_question) {
         res.next_question = { ...res.next_question, options: normalizeOptions(res.next_question.options as any) };
