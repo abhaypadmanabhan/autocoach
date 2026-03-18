@@ -10,10 +10,6 @@ import {
   AlertCircle,
   Home,
   RotateCcw,
-  BarChart3,
-  Trophy,
-  Sparkles,
-  Target,
 } from "lucide-react";
 import { useSession } from "@/hooks/useQuiz";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -74,7 +70,6 @@ function ResultsContent() {
 
   const total = hasQuestions ? questions.length : sessionTotal;
   const correct = hasQuestions ? correctFromQuestions : sessionCorrect;
-  const incorrect = Math.max(total - correct, 0);
   const scorePercent = total > 0 ? Math.round((correct / total) * 100) : 0;
   const hasAnyAnswers = total > 0;
 
@@ -143,17 +138,7 @@ function ResultsContent() {
               <div className="flex flex-col items-center gap-6">
                 <Skeleton className="w-12 h-12 rounded-full" />
                 <Skeleton className="w-[200px] h-[180px] rounded-xl" />
-                <Skeleton className="h-8 w-48 rounded-full" />
-                <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
-                  <Skeleton className="h-20 rounded-xl" />
-                  <Skeleton className="h-20 rounded-xl" />
-                  <Skeleton className="h-20 rounded-xl" />
-                </div>
-                <div className="flex gap-1.5">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Skeleton key={i} className="w-3 h-3 rounded-full" />
-                  ))}
-                </div>
+                <Skeleton className="h-4 w-28 rounded-full mt-3" />
               </div>
             </div>
           </Section>
@@ -191,16 +176,6 @@ function ResultsContent() {
     );
   }
 
-  const getPerformanceMessage = () => {
-    if (scorePercent >= 80) return { message: "Outstanding!", color: "#22c55e", icon: Trophy };
-    if (scorePercent >= 60) return { message: "Great job!", color: "#c18c5d", icon: Sparkles };
-    if (scorePercent >= 40) return { message: "Good effort!", color: "#eab308", icon: Target };
-    return { message: "Keep practicing!", color: "#ef4444", icon: BarChart3 };
-  };
-
-  const performance = getPerformanceMessage();
-  const PerformanceIcon = performance.icon;
-
   return (
     <PageContainer size="xl">
       <motion.div
@@ -213,42 +188,25 @@ function ResultsContent() {
         <Section spacing="sm">
           <motion.div
             variants={slideUpItem}
-            className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-darker)] border border-[var(--surface-border)] p-8 md:p-10"
+            className="rounded-3xl bg-gradient-to-br from-[var(--surface-card)] to-[var(--surface-darker)] border border-[var(--surface-border)] p-8 md:p-10"
           >
-            {/* Background decoration */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--brand-primary)]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-48 h-48 bg-[var(--brand-secondary)]/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-
-            <div className="relative flex flex-col items-center text-center">
-              {/* Mascot + performance badge */}
+            <div className="flex flex-col items-center text-center">
+              {/* Mascot */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
-                className="flex flex-col items-center mb-4"
+                className="mb-4"
               >
                 <MascotStage mode="results" scorePercent={scorePercent} />
-                <div
-                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold mt-2"
-                  style={{
-                    backgroundColor: `${performance.color}15`,
-                    color: performance.color,
-                    border: `1px solid ${performance.color}30`,
-                  }}
-                >
-                  <PerformanceIcon size={16} />
-                  {performance.message}
-                </div>
               </motion.div>
 
-              {/* Score gauge + stats + dots */}
+              {/* Score gauge + stats */}
               {hasAnyAnswers ? (
                 <ScoreHero
                   scorePercent={scorePercent}
                   correct={correct}
-                  incorrect={incorrect}
                   total={total}
-                  questions={questions.map((q) => ({ is_correct: q.is_correct ?? false }))}
                 />
               ) : (
                 <div className="py-12">

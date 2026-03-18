@@ -11,8 +11,6 @@ import {
     Flame,
     Share2,
     CheckCircle2,
-    Target,
-    Sparkles,
     Home,
     AlertCircle
 } from "lucide-react";
@@ -29,43 +27,6 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { SprintQuestion, SprintAnswerResult } from "@/lib/types";
 import confetti from "canvas-confetti";
-
-// Progress bar component
-function ProgressBar({ current, total }: { current: number; total: number }) {
-    const progress = Math.min((current / total) * 100, 100);
-
-    return (
-        <div className="w-full">
-            <div className="flex justify-between text-xs text-muted-foreground mb-2">
-                <span>Question {current} of {total}</span>
-                <span>{Math.round(progress)}%</span>
-            </div>
-            <div className="w-full bg-surface-border/30 rounded-full h-2.5 overflow-hidden">
-                <motion.div
-                    className="h-full bg-gradient-to-r from-brand-primary to-brand-secondary rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                />
-            </div>
-        </div>
-    );
-}
-
-// Segmented progress (dots)
-function SegmentedProgress({ current, total }: { current: number; total: number }) {
-    return (
-        <div className="flex gap-1.5 h-1.5">
-            {Array.from({ length: total }).map((_, i) => (
-                <div key={i} className={cn(
-                    "h-full flex-1 rounded-full transition-all duration-500",
-                    i < current ? "bg-brand-primary" :
-                        i === current ? "bg-brand-primary/50 animate-pulse" : "bg-surface-border"
-                )} />
-            ))}
-        </div>
-    );
-}
 
 // Sprint Completion Screen
 function SprintCompletion({
@@ -256,7 +217,6 @@ function SprintContent() {
         streak: number;
         message: string;
     } | null>(null);
-    const [targetsWeak, setTargetsWeak] = useState<boolean>(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -279,7 +239,6 @@ function SprintContent() {
                 let sprintQuestions: SprintQuestion[] = [];
                 if (status.questions && status.questions.length > 0) {
                     sprintQuestions = status.questions;
-                    setTargetsWeak(status.targets_weak_concepts ?? false);
                     setIsComplete(false);
                     setQuestions(sprintQuestions);
 
@@ -446,32 +405,13 @@ function SprintContent() {
     if (submittingAnswer) mascotVariant = "thinking";
     else if (showFeedback) mascotVariant = lastResult?.is_correct ? "smiling" : "wrong";
 
-    // Focus messaging
-    const focusLabel = targetsWeak
-        ? { text: "Focused on weak spots", icon: Target, color: "text-orange-400 bg-orange-400/10 border-orange-400/20" }
-        : { text: "Core concepts today", icon: Sparkles, color: "text-blue-400 bg-blue-400/10 border-blue-400/20" };
-
-    const FocusIcon = focusLabel.icon;
-
     return (
         <div className="max-w-4xl mx-auto px-4 py-6 md:py-10 min-h-screen flex flex-col">
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-                <div className="flex flex-col gap-1">
-                    <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-                        Daily Sprint
-                    </span>
-
-                    {/* Focus Label */}
-                    <span className={cn(
-                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium w-fit",
-                        "border",
-                        focusLabel.color
-                    )}>
-                        <FocusIcon className="w-3 h-3" />
-                        {focusLabel.text}
-                    </span>
-                </div>
+                <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
+                    Daily Sprint
+                </span>
 
                 <Button
                     variant="ghost"
@@ -483,14 +423,21 @@ function SprintContent() {
                 </Button>
             </div>
 
-            {/* Progress Bar */}
-            <div className="mb-6">
-                <ProgressBar current={currentQuestionIndex + 1} total={totalQuestions} />
-            </div>
-
-            {/* Segmented Progress */}
-            <div className="mb-8">
-                <SegmentedProgress current={currentQuestionIndex} total={totalQuestions} />
+            {/* Single progress — one signal only */}
+            <div className="flex gap-1 mb-8">
+                {Array.from({ length: totalQuestions }).map((_, i) => (
+                    <div
+                        key={i}
+                        className={cn(
+                            "h-1 flex-1 rounded-full transition-all duration-500",
+                            i < currentQuestionIndex
+                                ? "bg-brand-primary"
+                                : i === currentQuestionIndex
+                                ? "bg-brand-primary/50 animate-pulse"
+                                : "bg-surface-border/40"
+                        )}
+                    />
+                ))}
             </div>
 
             {/* Mascot */}

@@ -31,19 +31,6 @@ export function QuestionCard({
   isCorrect,
   className = "",
 }: QuestionCardProps) {
-  const getQuestionTypeLabel = (t: QuestionType) => {
-    switch (t) {
-      case "mcq":
-        return "Multiple Choice";
-      case "true_false":
-        return "True or False";
-      case "free_text":
-        return "Free Response";
-      default:
-        return "Unknown Type";
-    }
-  };
-
   // Render content based on question type
   const renderQuestionContent = () => {
     switch (type) {
@@ -128,30 +115,6 @@ export function QuestionCard({
       transition={{ duration: 0.5, ease: [0.33, 1, 0.68, 1] }}
       className={`relative ${className}`}
     >
-      {/* Decorative number */}
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.1 }}
-        className="mb-6"
-      >
-        <span className="text-7xl font-serif font-light text-brand-primary/20">
-          .{String(number).padStart(2, "0")}
-        </span>
-      </motion.div>
-
-      {/* Question type badge */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.15 }}
-        className="mb-4"
-      >
-        <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-surface-card border border-surface-border text-brand-secondary">
-          {getQuestionTypeLabel(type)}
-        </span>
-      </motion.div>
-
       {/* Question text */}
       <motion.h2
         initial={{ opacity: 0, y: 10 }}

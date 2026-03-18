@@ -262,14 +262,8 @@ function SessionContent() {
         <PageContainer size="lg">
           <div className="py-8">
             {/* Skeleton Progress Header */}
-            <div className="mb-8">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                <div>
-                  <div className="h-8 w-48 bg-surface-border/50 rounded animate-pulse mb-2" />
-                  <div className="h-5 w-32 bg-surface-border/50 rounded animate-pulse" />
-                </div>
-              </div>
-              <div className="w-full bg-surface-border/30 rounded-full h-2" />
+            <div className="mb-6">
+              <div className="w-full bg-surface-border/30 rounded-full h-1" />
             </div>
             {/* Skeleton Question Card */}
             <QuestionCardSkeleton />
@@ -369,29 +363,9 @@ function SessionContent() {
           </motion.div>
 
           {/* Progress Header */}
-          <motion.div variants={slideUpItem} className="mb-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-              <div>
-                <h1 className="text-h2 font-serif text-text-primary">
-                  Question {question?.question_number} of {question?.total_questions}
-                </h1>
-                <p className="text-text-muted mt-1">
-                  {session?.correct_answers || 0} correct so far
-                </p>
-              </div>
-
-              {initialTimerSeconds && timeRemaining !== null && (
-                <div className="flex items-center gap-3 bg-surface-card px-4 py-2 rounded-xl border border-surface-border">
-                  <Timer size={20} className={timeRemaining <= 10 ? "text-semantic-error" : "text-brand-secondary"} />
-                  <span className={`font-mono text-xl font-bold ${timeRemaining <= 10 ? "text-semantic-error" : "text-text-primary"}`}>
-                    {formatTime(timeRemaining)}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Progress bar */}
-            <div className="w-full bg-surface-border/30 rounded-full h-2 overflow-hidden">
+          <motion.div variants={slideUpItem} className="mb-6">
+            {/* Single progress bar — no text labels */}
+            <div className="w-full bg-surface-border/30 rounded-full h-1 overflow-hidden">
               <motion.div
                 className="h-full bg-brand-primary rounded-full"
                 initial={{ width: 0 }}
@@ -399,6 +373,18 @@ function SessionContent() {
                 transition={{ duration: 0.5 }}
               />
             </div>
+
+            {/* Timer only — shown in timed mode */}
+            {initialTimerSeconds && timeRemaining !== null && (
+              <div className="flex justify-end mt-3">
+                <div className="flex items-center gap-2 bg-surface-card px-3 py-1.5 rounded-xl border border-surface-border">
+                  <Timer size={16} className={timeRemaining <= 10 ? "text-semantic-error" : "text-brand-secondary"} />
+                  <span className={`font-mono text-base font-bold ${timeRemaining <= 10 ? "text-semantic-error" : "text-text-primary"}`}>
+                    {formatTime(timeRemaining)}
+                  </span>
+                </div>
+              </div>
+            )}
           </motion.div>
 
           {/* Question Card */}

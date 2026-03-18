@@ -2,7 +2,6 @@
 
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { CheckCircle2, XCircle, CircleDot } from "lucide-react";
 import { scoreCircleVariants, scoreTextVariants, satelliteVariants } from "@/lib/motions";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
@@ -30,29 +29,20 @@ function getScoreTierBg(percent: number) {
 // ScoreHero — the new centered results display
 // ============================================
 
-interface QuestionResult {
-  is_correct: boolean;
-}
-
 interface ScoreHeroProps {
   scorePercent: number;
   correct: number;
-  incorrect: number;
   total: number;
-  questions: QuestionResult[];
   className?: string;
 }
 
 export function ScoreHero({
   scorePercent,
   correct,
-  incorrect,
   total,
-  questions,
   className = "",
 }: ScoreHeroProps) {
   const [displayScore, setDisplayScore] = useState(0);
-  const [countingDone, setCountingDone] = useState(false);
   const color = getScoreColor(scorePercent);
 
   // Animate score counting up
@@ -67,7 +57,6 @@ export function ScoreHero({
       if (current >= scorePercent) {
         setDisplayScore(scorePercent);
         clearInterval(timer);
-        setCountingDone(true);
       } else {
         setDisplayScore(Math.round(current));
       }
@@ -109,15 +98,6 @@ export function ScoreHero({
     <div className={cn("flex flex-col items-center", className)}>
       {/* Gauge + score number */}
       <div className="relative w-[200px] h-[180px] mb-2">
-        {/* Subtle glow */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.12 }}
-          transition={{ duration: 1.2, delay: 0.3 }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 rounded-full blur-3xl"
-          style={{ backgroundColor: color }}
-        />
-
         <svg
           viewBox={`0 0 ${viewSize} ${viewSize}`}
           className="w-full h-full"
@@ -146,24 +126,6 @@ export function ScoreHero({
             transition={{ duration: 1.5, ease: [0.33, 1, 0.68, 1], delay: 0.2 }}
           />
 
-          {/* Tick marks at 0%, 50%, 100% positions */}
-          {[0, 0.5, 1].map((pct) => {
-            const angle = startAngle + sweepAngle * pct;
-            const inner = polarToCartFn(cx, cy, arcRadius - 14, angle);
-            const outer = polarToCartFn(cx, cy, arcRadius - 18, angle);
-            return (
-              <line
-                key={pct}
-                x1={inner.x}
-                y1={inner.y}
-                x2={outer.x}
-                y2={outer.y}
-                stroke="var(--surface-border)"
-                strokeWidth={1.5}
-                opacity={0.4}
-              />
-            );
-          })}
         </svg>
 
         {/* Center number */}
@@ -183,75 +145,22 @@ export function ScoreHero({
           </motion.span>
         </motion.div>
 
-        {/* Pulse ring on count complete */}
-        {countingDone && (
-          <motion.div
-            initial={{ opacity: 0.4, scale: 0.85 }}
-            animate={{ opacity: 0, scale: 1.05 }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-36 h-36 rounded-full border"
-            style={{ borderColor: color }}
-          />
-        )}
       </div>
 
-      {/* Stat cards row */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
+      {/* Inline stat line */}
+      <motion.p
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.6, duration: 0.5 }}
-        className="grid grid-cols-3 gap-3 w-full max-w-sm mb-5"
+        transition={{ delay: 0.8, duration: 0.4 }}
+        className="text-sm text-[var(--text-muted)] mt-3 tracking-wide"
       >
-        <div className="flex flex-col items-center gap-1 p-3 rounded-xl bg-[var(--semantic-success)]/8 border border-[var(--semantic-success)]/20">
-          <CheckCircle2 size={16} className="text-[var(--semantic-success)] opacity-70" />
-          <span className="text-xl font-bold text-[var(--semantic-success)]">{correct}</span>
-          <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Correct</span>
-        </div>
-        <div className="flex flex-col items-center gap-1 p-3 rounded-xl bg-[var(--semantic-error)]/8 border border-[var(--semantic-error)]/20">
-          <XCircle size={16} className="text-[var(--semantic-error)] opacity-70" />
-          <span className="text-xl font-bold text-[var(--semantic-error)]">{incorrect}</span>
-          <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Wrong</span>
-        </div>
-        <div className="flex flex-col items-center gap-1 p-3 rounded-xl bg-[var(--brand-primary)]/8 border border-[var(--brand-primary)]/20">
-          <CircleDot size={16} className="text-[var(--brand-primary)] opacity-70" />
-          <span className="text-xl font-bold text-[var(--text-primary)]">{total}</span>
-          <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Total</span>
-        </div>
-      </motion.div>
-
-      {/* Question result dots */}
-      {questions.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.9 }}
-          className="flex items-center gap-1.5 flex-wrap justify-center"
-        >
-          {questions.map((q, i) => (
-            <motion.div
-              key={i}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 1.0 + i * 0.08, type: "spring", stiffness: 400, damping: 20 }}
-              className={cn(
-                "w-3 h-3 rounded-full",
-                q.is_correct
-                  ? "bg-[var(--semantic-success)]"
-                  : "bg-[var(--semantic-error)]"
-              )}
-              title={`Q${i + 1}: ${q.is_correct ? "Correct" : "Wrong"}`}
-            />
-          ))}
-        </motion.div>
-      )}
+        <span className="font-semibold text-[var(--semantic-success)]">{correct}</span>
+        <span className="mx-1.5 opacity-40">/</span>
+        <span className="font-semibold text-[var(--text-primary)]">{total}</span>
+        <span className="ml-1.5 opacity-70">correct</span>
+      </motion.p>
     </div>
   );
-}
-
-// Helper for tick marks
-function polarToCartFn(cx: number, cy: number, r: number, angleDeg: number) {
-  const rad = (angleDeg * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
 // ============================================
