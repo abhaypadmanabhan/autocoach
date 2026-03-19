@@ -17,6 +17,7 @@ import {
 
 import { useDailySprint } from "@/hooks/useDailySprint";
 import { apiFetch } from "@/lib/api";
+import { analytics } from "@/lib/analytics";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
 import { QuestionCard } from "@/components/quiz/QuestionCard";
@@ -27,6 +28,17 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { SprintQuestion, SprintAnswerResult } from "@/lib/types";
 import confetti from "canvas-confetti";
+
+const STUDY_TIPS = [
+  "Spacing out your study sessions improves long-term retention.",
+  "Testing yourself is more effective than re-reading notes.",
+  "Short breaks between sessions help consolidate memory.",
+  "Teaching a concept to someone else is one of the most powerful ways to learn it.",
+  "Connecting new ideas to things you already know makes them stick.",
+  "Getting a good night's sleep after studying strengthens memory consolidation.",
+  "Interleaving different topics in a single session sharpens your ability to apply knowledge.",
+  "Mistakes aren't failures — they're signals that tell you exactly where to focus next.",
+];
 
 // Sprint Completion Screen
 function SprintCompletion({
@@ -227,6 +239,17 @@ function SprintContent() {
     const questionsAnsweredRef = useRef(0);
     const totalQuestionsRef = useRef(0);
 
+    const [tipIndex, setTipIndex] = useState(0);
+    const seenQuestionsRef = useRef<Set<string>>(new Set());
+
+    useEffect(() => {
+        if (!loading && !fetchingQuestions && questions.length > 0) return;
+        const id = setInterval(() => {
+            setTipIndex(prev => (prev + 1) % STUDY_TIPS.length);
+        }, 2500);
+        return () => clearInterval(id);
+    }, [loading, fetchingQuestions, questions.length]);
+
     // Fetch questions on mount
     useEffect(() => {
         const loadQuestions = async () => {
@@ -265,6 +288,7 @@ function SprintContent() {
                             });
                         });
                     } else if (completedCount >= sprintQuestions.length) {
+                        sessionCompleteRef.current = true;
                         setIsComplete(true);
                     }
                 } else {
@@ -293,6 +317,21 @@ function SprintContent() {
         };
         checkAuth();
     }, [router]);
+
+    useEffect(() => {
+        if (!questions.length || !sessionId) return;
+        const currentQuestion = questions[currentQuestionIndex];
+        if (!currentQuestion) return;
+        const eventKey = `${sessionId}:${currentQuestion.question_id}`;
+        if (seenQuestionsRef.current.has(eventKey)) return;
+        seenQuestionsRef.current.add(eventKey);
+        analytics.capture("quiz_question_seen", {
+            session_id: sessionId,
+            document_id: documentId,
+            question_id: currentQuestion.question_id,
+            question_number: currentQuestionIndex + 1,
+        });
+    }, [currentQuestionIndex, questions, sessionId, documentId]);
 
     // Track quiz_abandoned on unmount if session not complete
     useEffect(() => {
@@ -418,8 +457,20 @@ function SprintContent() {
     // Loading state
     if (loading || fetchingQuestions || questions.length === 0) {
         return (
-            <div className="h-screen flex items-center justify-center">
-                <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+            <div className="h-screen flex flex-col items-center justify-center gap-6 px-6">
+                <SentinelMascot variant="thinking" className="w-32 h-32 md:w-40 md:h-40" />
+                <AnimatePresence mode="wait">
+                    <motion.p
+                        key={tipIndex}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.35 }}
+                        className="text-sm text-muted-foreground text-center max-w-xs"
+                    >
+                        {STUDY_TIPS[tipIndex]}
+                    </motion.p>
+                </AnimatePresence>
             </div>
         );
     }
@@ -433,7 +484,12 @@ function SprintContent() {
     else if (showFeedback) mascotVariant = lastResult?.is_correct ? "smiling" : "wrong";
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-6 md:py-10 min-h-screen flex flex-col">
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className="max-w-4xl mx-auto px-4 py-6 md:py-10 min-h-screen flex flex-col"
+        >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <span className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
@@ -520,7 +576,7 @@ function SprintContent() {
                     />
                 )}
             </AnimatePresence>
-        </div>
+        </motion.div>
     );
 }
 
