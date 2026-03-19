@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Loader2,
@@ -193,7 +193,9 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
 function SprintContent() {
     const router = useRouter();
     const params = useParams();
+    const searchParams = useSearchParams();
     const sessionId = params.sessionId as string;
+    const documentId = searchParams.get("doc") ?? undefined;
 
     const {
         submitAnswer: submitSprintAnswer,
@@ -220,6 +222,11 @@ function SprintContent() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Refs for quiz_abandoned cleanup (avoid stale closures)
+    const sessionCompleteRef = useRef(false);
+    const questionsAnsweredRef = useRef(0);
+    const totalQuestionsRef = useRef(0);
+
     // Fetch questions on mount
     useEffect(() => {
         const loadQuestions = async () => {
@@ -239,6 +246,7 @@ function SprintContent() {
                 let sprintQuestions: SprintQuestion[] = [];
                 if (status.questions && status.questions.length > 0) {
                     sprintQuestions = status.questions;
+                    totalQuestionsRef.current = sprintQuestions.length;
                     setIsComplete(false);
                     setQuestions(sprintQuestions);
 
@@ -286,6 +294,23 @@ function SprintContent() {
         checkAuth();
     }, [router]);
 
+    // Track quiz_abandoned on unmount if session not complete
+    useEffect(() => {
+        return () => {
+            if (!sessionCompleteRef.current) {
+                import("@/lib/analytics").then(({ analytics }) => {
+                    analytics.capture("quiz_abandoned", {
+                        session_id: sessionId,
+                        document_id: documentId,
+                        questions_answered: questionsAnsweredRef.current,
+                        total_questions: totalQuestionsRef.current,
+                    });
+                });
+            }
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     // Handle Quit
     const handleQuit = () => {
         if (confirm("Quit Daily Sprint? Your progress will be saved.")) {
@@ -311,9 +336,11 @@ function SprintContent() {
                 setCorrectCount(prev => prev + 1);
             }
 
+            questionsAnsweredRef.current += 1;
             setShowFeedback(true);
 
             if (result.session_complete || currentQuestionIndex >= questions.length - 1) {
+                sessionCompleteRef.current = true;
                 setIsComplete(true);
             }
         } catch (e) {

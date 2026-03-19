@@ -49,11 +49,12 @@ export function ActivationBanner({ documentId, sessionId, precreatedSessionId, p
     if (precreatedSessionId) {
       analytics.capture("quiz_session_started", {
         session_id: precreatedSessionId,
+        document_id: documentId,
         mode: "sprint",
         source: "pre_created",
         wait_ms: 0,
       });
-      router.push(`/daily-sprint/${precreatedSessionId}`);
+      router.push(`/daily-sprint/${precreatedSessionId}?doc=${documentId}`);
       return;
     }
 
@@ -62,7 +63,7 @@ export function ActivationBanner({ documentId, sessionId, precreatedSessionId, p
     try {
       const result = await startSprintWithFallback();
       if (result.sessionId) {
-        router.push(`/daily-sprint/${result.sessionId}`);
+        router.push(`/daily-sprint/${result.sessionId}?doc=${documentId}`);
       }
     } catch {
       setLoading(false);

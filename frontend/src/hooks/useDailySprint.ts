@@ -76,7 +76,7 @@ export function useDailySprint() {
     }, []);
 
     const markQuizSessionStarted = useCallback(
-        (sessionId: string, source: SessionStartSource, waitMs: number) => {
+        (sessionId: string, source: SessionStartSource, waitMs: number, documentId?: string) => {
             if (startedEventSessionsRef.current.has(sessionId)) {
                 return;
             }
@@ -84,6 +84,7 @@ export function useDailySprint() {
             startedEventSessionsRef.current.add(sessionId);
             analytics.capture("quiz_session_started", {
                 session_id: sessionId,
+                document_id: documentId,
                 mode: "sprint",
                 source,
                 wait_ms: waitMs,
@@ -92,7 +93,7 @@ export function useDailySprint() {
         []
     );
 
-    const pollForReadySession = useCallback(async (): Promise<StartSprintFallbackResult> => {
+    const pollForReadySession = useCallback(async (documentId?: string): Promise<StartSprintFallbackResult> => {
         if (activeTimerRef.current) {
             clearTimeout(activeTimerRef.current);
             activeTimerRef.current = null;
@@ -128,7 +129,8 @@ export function useDailySprint() {
                     markQuizSessionStarted(
                         latestStatus.session_id as string,
                         "polling_fallback",
-                        waitMs
+                        waitMs,
+                        documentId
                     );
 
                     if (isMountedRef.current && activePollRunRef.current === runId) {
@@ -219,14 +221,14 @@ export function useDailySprint() {
         }
 
         if (startedSprint?.session_id && (startedSprint.questions?.length ?? 0) > 0) {
-            markQuizSessionStarted(startedSprint.session_id, "direct_start", 0);
+            markQuizSessionStarted(startedSprint.session_id, "direct_start", 0, startedSprint.document_id);
             return {
                 sessionId: startedSprint.session_id,
                 timedOut: false,
             };
         }
 
-        return pollForReadySession();
+        return pollForReadySession(startedSprint?.document_id);
     }, [markQuizSessionStarted, pollForReadySession, startSprint]);
 
     const retryPrepareSprint = useCallback(async (): Promise<StartSprintFallbackResult> => {

@@ -76,10 +76,14 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                 console.log("Document ready but no concepts, triggering refetch...");
                 refetch();
             } else if (!conceptsTrackedRef.current) {
-                analytics.capture("concepts_extracted", {
-                    document_id: documentId,
-                    concept_count: concepts.length,
-                });
+                const CONCEPTS_TRACKED_KEY = `concepts_extracted_${documentId}`;
+                if (!sessionStorage.getItem(CONCEPTS_TRACKED_KEY)) {
+                    sessionStorage.setItem(CONCEPTS_TRACKED_KEY, "1");
+                    analytics.capture("concepts_extracted", {
+                        document_id: documentId,
+                        concept_count: concepts.length,
+                    });
+                }
                 conceptsTrackedRef.current = true;
             }
         }

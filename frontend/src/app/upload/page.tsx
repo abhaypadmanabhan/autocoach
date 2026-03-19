@@ -2,7 +2,8 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { analytics } from "@/lib/analytics";
 import {
   CloudUpload,
   FolderOpen,
@@ -31,7 +32,23 @@ export default function Upload() {
   const { upload, error: uploadError, uploading, stage, progress } = useUploadDocument();
   const { document } = usePollDocumentStatus(documentId);
   const documentReady = document?.status === "ready" && !!documentId;
-  const { precreatedSessionId, precreateLoading } = usePrecreateSprint(documentReady);
+  const { precreatedSessionId, precreateLoading } = usePrecreateSprint(documentReady, documentId);
+  const conceptsExtractedRef = useRef(false);
+
+  useEffect(() => {
+    if (
+      document?.status === "ready" &&
+      documentId &&
+      document.concept_count != null &&
+      !conceptsExtractedRef.current
+    ) {
+      conceptsExtractedRef.current = true;
+      analytics.capture("concepts_extracted", {
+        document_id: documentId,
+        concept_count: document.concept_count,
+      });
+    }
+  }, [document?.status, document?.concept_count, documentId]);
 
   const handleReset = useCallback(() => {
     setUploadedFile(null);

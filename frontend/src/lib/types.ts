@@ -13,6 +13,7 @@ export interface Document {
   ai_title?: string;
   progress?: number;
   session_id?: string;
+  concept_count?: number;
 }
 
 export interface DocumentListResponse {
@@ -125,6 +126,7 @@ export interface SprintStatusResponse {
   document_title?: string;
   progress?: { current: number; total: number };
   quiz_credits?: number;
+  questions?: SprintQuestion[];
 }
 
 export interface StartSprintResponse {

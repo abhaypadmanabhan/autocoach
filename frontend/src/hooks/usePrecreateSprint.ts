@@ -10,7 +10,7 @@ type PrecreateState = {
   precreateLoading: boolean;
 };
 
-export function usePrecreateSprint(shouldFire: boolean): PrecreateState {
+export function usePrecreateSprint(shouldFire: boolean, documentId: string | null): PrecreateState {
   const hasFiredRef = useRef(false);
   const [precreatedSessionId, setPrecreatedSessionId] = useState<string | null>(null);
   const [precreateLoading, setPrecreateLoading] = useState(false);
@@ -30,6 +30,7 @@ export function usePrecreateSprint(shouldFire: boolean): PrecreateState {
           setPrecreatedSessionId(res.session_id);
           analytics.capture("quiz_session_created", {
             session_id: res.session_id,
+            document_id: documentId,
             source: "pre_create",
           });
         }
@@ -43,7 +44,7 @@ export function usePrecreateSprint(shouldFire: boolean): PrecreateState {
 
     run();
     return () => { cancelled = true; };
-  }, [shouldFire]);
+  }, [shouldFire, documentId]);
 
   return { precreatedSessionId, precreateLoading };
 }

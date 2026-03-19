@@ -120,6 +120,7 @@ export function useUploadDocument() {
         await mutate("/documents/");
 
         analytics.capture("document_uploaded", {
+          document_id: document.id,
           file_type: document.file_type,
           file_size: document.file_size,
         });

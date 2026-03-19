@@ -14,6 +14,7 @@ class DocumentResponse(BaseModel):
     status: str
     ai_title: str | None = None
     session_id: str | None = None
+    concept_count: int | None = None
     created_at: datetime
 
 

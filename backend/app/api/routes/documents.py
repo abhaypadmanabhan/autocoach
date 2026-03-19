@@ -431,6 +431,19 @@ async def get_document(
         if session_response.data:
             session_id = session_response.data[0]["id"]
 
+        # Count concepts for this document
+        concept_count = None
+        try:
+            concepts_count_response = (
+                supabase_admin.table("concepts")
+                .select("id", count="exact")
+                .eq("document_id", str(document_id))
+                .execute()
+            )
+            concept_count = concepts_count_response.count
+        except Exception:
+            pass
+
         return DocumentResponse(
             id=UUID(doc["id"]),
             filename=doc["filename"],
@@ -440,6 +453,7 @@ async def get_document(
             created_at=doc["created_at"],
             ai_title=doc.get("ai_title"),
             session_id=session_id,
+            concept_count=concept_count,
         )
     except HTTPException:
         raise
