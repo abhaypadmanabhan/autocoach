@@ -2,11 +2,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Rocket } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useDailySprint } from "@/hooks/useDailySprint";
 import { analytics } from "@/lib/analytics";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/primitives/Modal";
 
 interface ActivationBannerProps {
   documentId: string;
@@ -18,7 +25,8 @@ const STORAGE_KEY = (id: string) => `activation_cta_shown_${id}`;
 export function ActivationBanner({ documentId, sessionId }: ActivationBannerProps) {
   const router = useRouter();
   const { startSprintWithFallback } = useDailySprint();
-  const [ready, setReady] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -26,42 +34,55 @@ export function ActivationBanner({ documentId, sessionId }: ActivationBannerProp
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "true");
     analytics.capture("activation_cta_shown", { document_id: documentId, session_id: sessionId });
-    setReady(true);
+    setOpen(true);
   }, [documentId, sessionId]);
 
   const handleStartSprint = async () => {
     analytics.capture("activation_cta_clicked", { document_id: documentId, session_id: sessionId });
+    setLoading(true);
     try {
       const result = await startSprintWithFallback();
       if (result.sessionId) {
         router.push(`/daily-sprint/${result.sessionId}`);
       }
     } catch {
-      // Silent fail - user can still use existing redirect
+      setLoading(false);
     }
   };
 
-  if (!ready) return null;
+  const handleBack = () => {
+    analytics.capture("activation_cta_skipped", { document_id: documentId, session_id: sessionId });
+    router.push("/dashboard");
+  };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }}
-        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
+    <Dialog open={open} onOpenChange={() => {}}>
+      <DialogContent
+        onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
+        className="sm:max-w-md [&>button]:hidden"
       >
-        <div className="flex items-center gap-4 bg-surface-card border border-surface-border px-6 py-4 rounded-2xl shadow-lg">
-          <Rocket className="text-brand-primary" size={24} />
-          <p className="text-text-primary font-medium">Your first sprint is ready</p>
+        <DialogHeader>
+          <DialogTitle>Your document is ready</DialogTitle>
+          <DialogDescription>What would you like to do next?</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex-col sm:flex-row gap-3 sm:gap-2">
+          <button
+            onClick={handleBack}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl border border-surface-border text-text-primary font-medium hover:bg-surface-card transition-colors"
+          >
+            Back to documents
+          </button>
           <button
             onClick={handleStartSprint}
-            className="px-4 py-2 bg-brand-primary text-white rounded-xl font-semibold hover:bg-brand-primary/90 transition-colors"
+            disabled={loading}
+            className="w-full sm:w-auto px-4 py-2 bg-brand-primary text-white rounded-xl font-semibold hover:bg-brand-primary/90 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
           >
-            Start Sprint
+            {loading && <Loader2 size={16} className="animate-spin" />}
+            Start your first sprint
           </button>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

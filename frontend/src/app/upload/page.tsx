@@ -47,20 +47,6 @@ export default function Upload() {
     checkAuth();
   }, [router]);
 
-  // Redirect when ready
-  useEffect(() => {
-    if (document?.status === "ready") {
-      const timeout = setTimeout(() => {
-        if (document.session_id) {
-          router.push(`/session?session_id=${document.session_id}`);
-        } else {
-          router.push(`/config?document_id=${document.id}`);
-        }
-      }, 1500);
-      return () => clearTimeout(timeout);
-    }
-  }, [document?.status, document?.id, document?.session_id, router]);
-
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -119,7 +105,7 @@ export default function Upload() {
       case "processing":
         return "Analyzing your document...";
       case "ready":
-        return "Ready! Redirecting...";
+        return "Ready!";
       case "failed":
         return "Processing failed";
       default:
