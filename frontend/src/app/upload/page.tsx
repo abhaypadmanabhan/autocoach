@@ -21,6 +21,7 @@ import { DiamondSpinner } from "@/components/ui/DiamondButton";
 import { ProgressDots, ProgressBar } from "@/components/ui/StatusBadge";
 import { staggerContainer, slideUpItem, dropZoneVariants, circularRevealVariants } from "@/lib/motions";
 import { ActivationBanner } from "@/components/activation/ActivationBanner";
+import { usePrecreateSprint } from "@/hooks/usePrecreateSprint";
 
 export default function Upload() {
   const router = useRouter();
@@ -29,6 +30,8 @@ export default function Upload() {
   const [documentId, setDocumentId] = useState<string | null>(null);
   const { upload, error: uploadError, uploading, stage, progress } = useUploadDocument();
   const { document } = usePollDocumentStatus(documentId);
+  const documentReady = document?.status === "ready" && !!documentId;
+  const { precreatedSessionId, precreateLoading } = usePrecreateSprint(documentReady);
 
   const handleReset = useCallback(() => {
     setUploadedFile(null);
@@ -334,7 +337,12 @@ export default function Upload() {
 
           {/* Activation CTA - show once per document */}
           {document?.status === "ready" && documentId && (
-            <ActivationBanner documentId={documentId} sessionId={document.session_id} />
+            <ActivationBanner
+              documentId={documentId}
+              sessionId={document.session_id}
+              precreatedSessionId={precreatedSessionId}
+              precreateLoading={precreateLoading}
+            />
           )}
         </motion.div>
       </PageContainer>
