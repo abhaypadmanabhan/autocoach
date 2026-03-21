@@ -2,19 +2,20 @@
 
 :root {
   /* ============================================
-     AUTOCOACH DESIGN SYSTEM v2.0
-     Dark Mode First - Based on Video Design Spec
+     AUTOCOACH DESIGN SYSTEM v3.0
+     OLED Dark Mode - Landing Page Aesthetic
      ============================================ */
 
   /* Brand Colors */
   --brand-primary: #cd776a;      /* Dusty Rose */
   --brand-secondary: #c18c5d;    /* Toasted Almond */
 
-  /* Surface Colors */
-  --surface-dark: #34344a;       /* Space Indigo (main bg) */
-  --surface-darker: #2a2a3e;     /* Darker shade for bottom bars */
-  --surface-card: #3a3a52;       /* Elevated surfaces */
-  --surface-border: #495867;     /* Blue Slate (borders) */
+  /* Surface Colors - OLED Dark */
+  --surface-dark: #0f0f14;       /* OLED Black (main bg) */
+  --surface-darker: #16161f;     /* Elevated surfaces */
+  --surface-card: #16161f;       /* Card surfaces */
+  --surface-border: rgba(255, 255, 255, 0.06);  /* Subtle borders */
+  --surface-hover: rgba(255, 255, 255, 0.04);  /* Hover states */
 
   /* Semantic Colors */
   --semantic-success: #22c55e;
@@ -25,6 +26,16 @@
   --text-primary: #f2f5de;       /* Light cream text */
   --text-secondary: rgba(242, 245, 222, 0.7);
   --text-muted: rgba(242, 245, 222, 0.5);
+  --text-disabled: rgba(242, 245, 222, 0.3);
+
+  /* Landing page OLED surfaces */
+  --surface-oled: #0f0f14;
+  --surface-deep: #16161f;
+
+  /* Popping accent colors — amplified from brand palette */
+  --pop-coral: #ff6b47;  /* Electric Coral */
+  --pop-gold: #fbbf24;   /* Warm Gold */
+  --pop-teal: #00c9a7;   /* Electric Teal */
 
   /* Legacy colors (kept for compatibility) */
   --primary: #cd776a;
@@ -48,17 +59,8 @@
   --slate-text: #8a625c;
 
   /* Default theme (Dark Mode First) */
-  --background: #34344a;
+  --background: #0f0f14;
   --foreground: #f2f5de;
-
-  /* Landing page OLED surfaces (scoped to landing page components only) */
-  --surface-oled: #0f0f14;
-  --surface-deep: #16161f;
-
-  /* Popping accent colors — derived from brand palette */
-  --pop-coral: #ff6b47;  /* Electric Coral — intensified dusty rose */
-  --pop-gold: #fbbf24;   /* Warm Gold — amplified toasted almond */
-  --pop-teal: #00c9a7;   /* Electric Teal — cool complement pop */
 }
 
 @theme inline {
@@ -66,11 +68,12 @@
   --color-brand-primary: var(--brand-primary);
   --color-brand-secondary: var(--brand-secondary);
 
-  /* Surface Colors */
+  /* Surface Colors - OLED */
   --color-surface-dark: var(--surface-dark);
   --color-surface-darker: var(--surface-darker);
   --color-surface-card: var(--surface-card);
   --color-surface-border: var(--surface-border);
+  --color-surface-hover: var(--surface-hover);
 
   /* Semantic Colors */
   --color-semantic-success: var(--semantic-success);
@@ -81,6 +84,7 @@
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-text-muted: var(--text-muted);
+  --color-text-disabled: var(--text-disabled);
 
   /* Legacy colors */
   --color-primary: var(--primary);
@@ -104,12 +108,12 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  /* Typography — Rubik as primary, Inter/Jakarta as fallback */
+  /* Typography — Rubik as primary */
   --font-sans: var(--font-rubik), var(--font-inter), 'DM Sans', system-ui, sans-serif;
   --font-serif: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
   --font-heading: var(--font-rubik), var(--font-jakarta), sans-serif;
 
-  /* New color tokens */
+  /* Pop accent colors */
   --color-surface-oled: var(--surface-oled);
   --color-surface-deep: var(--surface-deep);
   --color-pop-coral: var(--pop-coral);
@@ -195,7 +199,7 @@ html {
 
 body {
   font-family: var(--font-rubik), var(--font-inter), 'DM Sans', system-ui, sans-serif;
-  background: var(--surface-dark);
+  background: var(--surface-oled);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -540,11 +544,20 @@ body {
    DESIGN SYSTEM UTILITIES
    ============================================ */
 
-/* Glass effect */
+/* Glass effect - OLED dark */
 .glass {
-  background: rgba(58, 58, 82, 0.8);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: rgba(22, 22, 31, 0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Glass card - darker variant */
+.glass-card {
+  background: rgba(22, 22, 31, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* Gradient text */
@@ -572,6 +585,25 @@ body {
     var(--surface-oled);
 }
 
+/* Dashboard aurora - subtler version */
+.warm-aurora-bg-subtle {
+  background:
+    radial-gradient(ellipse 50% 40% at 20% 20%, rgba(255, 107, 71, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 50% at 80% 80%, rgba(0, 201, 167, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse 30% 30% at 60% 10%, rgba(251, 191, 36, 0.05) 0%, transparent 45%),
+    var(--surface-oled);
+}
+
+/* Gradient mesh for dashboard */
+.gradient-mesh-dashboard {
+  background:
+    radial-gradient(at 30% 20%, rgba(255, 107, 71, 0.08) 0px, transparent 50%),
+    radial-gradient(at 70% 0%, rgba(193, 140, 93, 0.06) 0px, transparent 50%),
+    radial-gradient(at 0% 50%, rgba(255, 107, 71, 0.05) 0px, transparent 50%),
+    radial-gradient(at 80% 60%, rgba(0, 201, 167, 0.04) 0px, transparent 50%),
+    var(--surface-oled);
+}
+
 /* Section padding utility */
 .section-oled {
   background: var(--surface-oled);
@@ -592,14 +624,47 @@ body {
   animation: shimmer 1.5s infinite;
 }
 
-/* Hover lift effect */
+/* Hover lift effect - with pop color glow */
 .hover-lift {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .hover-lift:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 24px -8px rgba(205, 119, 106, 0.25);
+  box-shadow: 0 12px 32px -8px rgba(255, 107, 71, 0.2);
+}
+
+/* Dashboard stat numeral - extra large for impact */
+.text-stat-numeral {
+  font-size: clamp(40px, 5vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-stat-numeral.coral {
+  background: linear-gradient(135deg, var(--pop-coral) 0%, var(--pop-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-stat-numeral.teal {
+  background: linear-gradient(135deg, var(--pop-teal) 0%, var(--pop-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-stat-numeral.gold {
+  background: linear-gradient(135deg, var(--pop-gold) 0%, var(--pop-coral) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* Button press effect */
@@ -616,13 +681,14 @@ body {
   ring-offset-color: var(--surface-dark);
 }
 
-/* Card hover glow */
+/* Card hover glow - OLED optimized */
 .card-glow {
-  transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease;
 }
 
 .card-glow:hover {
-  box-shadow: 0 0 30px rgba(205, 119, 106, 0.15);
+  box-shadow: 0 0 40px rgba(255, 107, 71, 0.12);
+  border-color: rgba(255, 107, 71, 0.2);
 }
 
 /* Smooth transitions */

@@ -1,7 +1,6 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Flame, Trophy, Loader2, Zap, Calendar, Gamepad2 } from "lucide-react";
@@ -30,46 +29,68 @@ interface AppShellProps {
   showStatsHUD?: boolean;
 }
 
-// Animated Background Component
+// Animated Background Component - OLED warm aurora style
 function AnimatedBackground() {
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-      {/* Primary gradient orb - top */}
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0 warm-aurora-bg-subtle">
+      {/* Coral orb — brand-derived, upper-left */}
       <motion.div
-        className="absolute w-[60vw] h-[60vw] max-w-[800px] max-h-[800px] rounded-full opacity-[0.08]"
+        className="absolute w-[800px] h-[800px] rounded-full animate-warm-drift"
         style={{
-          background: "radial-gradient(circle, var(--brand-primary) 0%, transparent 70%)",
-          top: "-20%",
-          left: "50%",
-          x: "-50%",
+          background: "radial-gradient(circle, var(--pop-coral) 0%, transparent 70%)",
+          opacity: 0.05,
+          top: "-15%",
+          left: "-10%",
         }}
         animate={{
-          scale: [1, 1.1, 1],
-          x: ["-50%", "-48%", "-52%", "-50%"],
-          y: [0, 20, -10, 0],
+          scale: [1, 1.08, 1],
+          x: [0, 35, -20, 0],
+          y: [0, -25, 18, 0],
         }}
         transition={{
-          duration: 15,
+          duration: 22,
           repeat: Infinity,
           ease: "easeInOut",
         }}
       />
 
-      {/* Secondary gradient orb - bottom */}
+      {/* Gold orb — lower-right */}
       <motion.div
-        className="absolute w-[40vw] h-[40vw] max-w-[600px] max-h-[600px] rounded-full opacity-[0.05]"
+        className="absolute w-[600px] h-[600px] rounded-full animate-warm-drift-slow"
         style={{
-          background: "radial-gradient(circle, var(--brand-secondary) 0%, transparent 70%)",
+          background: "radial-gradient(circle, var(--pop-gold) 0%, transparent 70%)",
+          opacity: 0.04,
           bottom: "-10%",
-          right: "-5%",
+          right: "-8%",
+        }}
+        animate={{
+          scale: [1, 1.1, 1],
+          x: [0, -30, 20, 0],
+          y: [0, 20, -15, 0],
+        }}
+        transition={{
+          duration: 25,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+
+      {/* Teal orb — cool complement, center-right */}
+      <motion.div
+        className="absolute w-[500px] h-[500px] rounded-full animate-mesh-orb-1"
+        style={{
+          background: "radial-gradient(circle, var(--pop-teal) 0%, transparent 70%)",
+          opacity: 0.03,
+          top: "30%",
+          right: "25%",
         }}
         animate={{
           scale: [1, 1.15, 1],
-          x: [0, -30, 20, 0],
-          y: [0, -20, 30, 0],
+          x: [0, -25, 15, 0],
+          y: [0, 15, -20, 0],
         }}
         transition={{
-          duration: 20,
+          duration: 18,
           repeat: Infinity,
           ease: "easeInOut",
         }}
@@ -77,13 +98,13 @@ function AnimatedBackground() {
 
       {/* Subtle grid pattern */}
       <div
-        className="absolute inset-0 opacity-[0.02]"
+        className="absolute inset-0 opacity-[0.015]"
         style={{
           backgroundImage: `
-            linear-gradient(var(--surface-border) 1px, transparent 1px),
-            linear-gradient(90deg, var(--surface-border) 1px, transparent 1px)
+            linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
           `,
-          backgroundSize: '60px 60px',
+          backgroundSize: '80px 80px',
         }}
       />
     </div>
@@ -321,13 +342,13 @@ export function AppShell({
 
   return (
     <ToastProvider>
-      <div className="flex h-screen w-full bg-[var(--surface-dark)] text-[var(--text-primary)] overflow-hidden relative">
+      <div className="flex h-screen w-full bg-[var(--surface-oled)] text-[var(--text-primary)] overflow-hidden relative">
         {/* Animated Background */}
         <AnimatedBackground />
 
         {/* Sidebar (Left, Full Height) */}
         {sidebar && (
-          <aside className="hidden lg:flex w-64 flex-col flex-shrink-0 border-r border-[var(--surface-border)]/50 bg-[var(--surface-darker)]/80 backdrop-blur-xl h-full z-20 relative">
+          <aside className="hidden lg:flex w-64 flex-col flex-shrink-0 border-r border-[var(--surface-border)] bg-[var(--surface-deep)]/80 backdrop-blur-xl h-full z-20 relative">
             {sidebar}
           </aside>
         )}
@@ -341,7 +362,7 @@ export function AppShell({
               initial={{ y: -20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-              className="h-16 shrink-0 w-full backdrop-blur-xl bg-[var(--surface-dark)]/80 border-b border-[var(--surface-border)]/50 flex flex-col justify-center z-30 relative"
+              className="h-16 shrink-0 w-full backdrop-blur-xl bg-[var(--surface-oled)]/80 border-b border-[var(--surface-border)] flex flex-col justify-center z-30 relative"
             >
               <div className="w-full px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between">

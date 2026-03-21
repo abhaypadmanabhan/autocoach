@@ -4,7 +4,6 @@ import { useDailySprint } from "@/hooks/useDailySprint";
 import { SentinelMascot } from "@/components/brand/SentinelMascot";
 import { SprintPreparingFallback } from "@/components/dashboard/SprintPreparingFallback";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/useToast";
@@ -26,34 +25,27 @@ export function DailySprintCard() {
     const { showToast } = useToast();
     const [limitReached, setLimitReached] = useState(false);
 
-    // Determine sprint state
     const isCompleted = status?.status === "completed";
     const isActive = status?.status === "active";
-    // User stats
     const streak = status?.streak_count ?? 0;
     const xp = status?.total_xp ?? 0;
     const xpEarnedToday = status?.xp_earned_today ?? 0;
 
-    // Progress for active sprint
     const progressCurrent = status?.progress?.current ?? 0;
     const progressTotal = status?.progress?.total ?? 5;
 
-    // Focus messaging (only show for non-completed states)
     const targetsWeak = status?.targets_weak_concepts;
     const focusLabel = targetsWeak
-        ? { text: "Focused on weak spots", icon: Target, color: "text-orange-400 bg-orange-400/10" }
-        : { text: "Core concepts today", icon: Sparkles, color: "text-blue-400 bg-blue-400/10" };
+        ? { text: "Weak spots", icon: Target, color: "text-orange-400 bg-orange-400/10" }
+        : { text: "Core concepts", icon: Sparkles, color: "text-blue-400 bg-blue-400/10" };
     const FocusIcon = focusLabel.icon;
 
-    // Handle CTA click
     const handleStart = async () => {
-        // If there's an active session, resume it
         if (isActive && status?.session_id) {
             router.push(`/daily-sprint/${status.session_id}`);
             return;
         }
 
-        // Otherwise start a new sprint
         try {
             const result = await startSprintWithFallback();
             if (result.sessionId) {
@@ -61,7 +53,6 @@ export function DailySprintCard() {
             }
         } catch (err: unknown) {
             console.error("Failed to start sprint", err);
-            // Check for 429 limit reached
             const typedErr = err as { status?: number; response?: { status?: number }; message?: string };
             if (
                 typedErr?.status === 429 ||
@@ -91,52 +82,39 @@ export function DailySprintCard() {
         }
     };
 
-    // Get title based on state
     const getTitle = () => {
         if (limitReached) return "Daily limit reached";
-        if (preparing) return "Preparing your sprint...";
+        if (preparing) return "Preparing sprint...";
         if (prepareTimedOut) return "Sprint preparation delayed";
-        if (isCompleted) return "Daily Goal Achieved!";
-        if (isActive) return `Resume Sprint (${progressCurrent}/${progressTotal})`;
-        return "Start Today's Sprint (5Q)";
+        if (isCompleted) return "Goal Achieved!";
+        if (isActive) return `Resume (${progressCurrent}/${progressTotal})`;
+        return "Today's Sprint";
     };
 
-    // Get subtitle based on state
     const getSubtitle = () => {
-        if (limitReached) {
-            return "Come back tomorrow to continue your streak.";
-        }
-        if (preparing) {
-            return "Hang tight while we finish setting up your questions.";
-        }
-        if (prepareTimedOut) {
-            return "We are still preparing your quiz session. Retry to check again.";
-        }
-        if (isCompleted) {
-            return `You've earned ${xpEarnedToday} XP today. Come back tomorrow to keep your streak alive!`;
-        }
-        if (isActive) {
-            return `You have a sprint in progress. Finish it to keep your streak!`;
-        }
-        return "Sharpen your mind with 5 quick questions. Daily consistency builds lasting knowledge.";
+        if (limitReached) return "Come back tomorrow to continue your streak.";
+        if (preparing) return "Setting up your questions...";
+        if (prepareTimedOut) return "Still preparing. Retry to check.";
+        if (isCompleted) return `${xpEarnedToday} XP earned. Keep the streak going!`;
+        if (isActive) return "Continue where you left off.";
+        return "5 quick questions to sharpen your mind.";
     };
 
-    // Get CTA button config
     const getCtaConfig = () => {
         if (limitReached) {
             return {
-                text: "Come back tomorrow",
-                icon: <Clock className="mr-2 h-5 w-5" />,
+                text: "Tomorrow",
+                icon: <Clock className="mr-2 h-4 w-4" />,
                 disabled: true,
                 variant: "outline" as const
             };
         }
-        if (isCompleted) return null; // No CTA for completed state
+        if (isCompleted) return null;
 
         if (starting || preparing) {
             return {
-                text: preparing ? "Preparing..." : isActive ? "Resuming..." : "Starting...",
-                icon: <Loader2 className="mr-2 h-5 w-5 animate-spin" />,
+                text: preparing ? "Preparing..." : "Starting...",
+                icon: <Loader2 className="mr-2 h-4 w-4 animate-spin" />,
                 disabled: true,
                 variant: "default" as const
             };
@@ -144,16 +122,16 @@ export function DailySprintCard() {
 
         if (isActive) {
             return {
-                text: "Resume Sprint",
-                icon: <Play className="mr-2 h-5 w-5" />,
+                text: "Resume",
+                icon: <Play className="mr-2 h-4 w-4" />,
                 disabled: false,
                 variant: "default" as const
             };
         }
 
         return {
-            text: "Start Sprint",
-            icon: <Zap className="mr-2 h-5 w-5" />,
+            text: "Start",
+            icon: <Zap className="mr-2 h-4 w-4" />,
             disabled: false,
             variant: "default" as const
         };
@@ -162,33 +140,59 @@ export function DailySprintCard() {
     const ctaConfig = getCtaConfig();
     const showPreparingFallback = preparing || prepareTimedOut;
 
-    return isLoading ? (
-        <Card className="relative overflow-hidden border-none bg-gradient-to-br from-card to-background shadow-lg p-6 h-[200px] flex items-center justify-center">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </Card>
-    ) : (
-        <Card className={cn(
-            "relative overflow-hidden border-none shadow-lg transition-all duration-300",
-            "bg-gradient-to-br from-[#1a1b1e] to-[#121214] hover:shadow-xl",
-            isCompleted ? "border-green-500/20" : "border-primary/20"
-        )}>
-            <div className="flex flex-col md:flex-row items-center justify-between p-6 md:p-8 gap-6">
+    if (isLoading) {
+        return (
+            <div className="relative overflow-hidden rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)]/50 backdrop-blur-sm p-8 h-[180px] flex items-center justify-center">
+                <div className="absolute inset-0 warm-aurora-bg-subtle" />
+                <Loader2 className="w-6 h-6 animate-spin text-[var(--pop-coral)] relative z-10" />
+            </div>
+        );
+    }
 
-                {/* Left Content */}
-                <div className="flex-1 space-y-4 text-center md:text-left z-10">
-                    <div className="space-y-2">
-                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
-                            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-wider">
+    return (
+        <div className={cn(
+            "relative overflow-hidden rounded-2xl border border-[var(--surface-border)]",
+            "bg-[var(--surface-card)]/40 backdrop-blur-sm",
+            "transition-all duration-300 group",
+            isCompleted ? "border-green-500/20" : "hover:border-[var(--pop-coral)]/30"
+        )}>
+            {/* Warm aurora background */}
+            <div className="absolute inset-0 warm-aurora-bg-subtle" />
+
+            {/* Accent gradient line at top */}
+            <div
+                className="absolute top-0 left-0 right-0 h-px"
+                style={{
+                    background: isCompleted
+                        ? "linear-gradient(90deg, transparent, var(--semantic-success), transparent)"
+                        : "linear-gradient(90deg, transparent, var(--pop-coral), var(--pop-gold), transparent)"
+                }}
+            />
+
+            {/* Glow effect on hover */}
+            <div
+                className={cn(
+                    "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none",
+                    "bg-gradient-to-br from-[var(--pop-coral)]/5 via-transparent to-[var(--pop-gold)]/5"
+                )}
+            />
+
+            <div className="relative z-10 p-6">
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+
+                    {/* Left Content */}
+                    <div className="flex-1 space-y-4">
+                        {/* Badges */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-3 py-1 rounded-full bg-[var(--pop-coral)]/10 text-[var(--pop-coral)] text-xs font-bold uppercase tracking-wider">
                                 Daily Sprint
                             </span>
 
-                            {/* Streak Badge */}
                             <div className="flex items-center gap-1 text-orange-500">
-                                <Flame className="w-4 h-4 fill-orange-500" />
-                                <span className="text-xs font-bold">{streak} Day Streak</span>
+                                <Flame className="w-3.5 h-3.5 fill-orange-500" />
+                                <span className="text-xs font-bold">{streak}</span>
                             </div>
 
-                            {/* Focus Label - hide when completed */}
                             {!isCompleted && (
                                 <span className={cn(
                                     "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
@@ -200,86 +204,79 @@ export function DailySprintCard() {
                             )}
                         </div>
 
-                        <h2 className="text-3xl font-bold tracking-tight text-white">
-                            {getTitle()}
-                        </h2>
+                        {/* Title & Subtitle */}
+                        <div className="space-y-1">
+                            <h2 className="text-2xl font-bold text-[var(--text-primary)] font-heading">
+                                {getTitle()}
+                            </h2>
+                            <p className="text-sm text-[var(--text-secondary)]">
+                                {getSubtitle()}
+                            </p>
+                        </div>
 
-                        <p className="text-muted-foreground max-w-md">
-                            {getSubtitle()}
-                        </p>
-                    </div>
+                        {/* Actions */}
+                        <div className="flex flex-wrap items-center gap-4 pt-2">
+                            {showPreparingFallback && (
+                                <SprintPreparingFallback
+                                    timedOut={prepareTimedOut}
+                                    elapsedMs={prepareElapsedMs}
+                                    retrying={preparing}
+                                    onRetry={handleRetry}
+                                />
+                            )}
 
-                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-2">
-                        {showPreparingFallback && (
-                            <SprintPreparingFallback
-                                timedOut={prepareTimedOut}
-                                elapsedMs={prepareElapsedMs}
-                                retrying={preparing}
-                                onRetry={handleRetry}
-                            />
-                        )}
-
-                        {/* CTA Button */}
-                        {!isCompleted && ctaConfig && !showPreparingFallback && (
-                            <Button
-                                size="lg"
-                                onClick={handleStart}
-                                disabled={ctaConfig.disabled}
-                                variant={ctaConfig.variant}
-                                className={cn(
-                                    "font-semibold px-8 transition-all",
-                                    ctaConfig.disabled
-                                        ? "opacity-60 cursor-not-allowed bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground"
-                                        : "bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 hover:scale-105 active:scale-95"
-                                )}
-                            >
-                                {ctaConfig.icon}
-                                {ctaConfig.text}
-                            </Button>
-                        )}
-
-                        {/* Completed State */}
-                        {isCompleted && (
-                            <div className="flex flex-col sm:flex-row gap-3">
+                            {!isCompleted && ctaConfig && !showPreparingFallback && (
                                 <Button
-                                    variant="outline"
-                                    className="border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-400 cursor-default"
+                                    size="sm"
+                                    onClick={handleStart}
+                                    disabled={ctaConfig.disabled}
+                                    variant={ctaConfig.variant}
+                                    className={cn(
+                                        "font-semibold transition-all",
+                                        ctaConfig.disabled
+                                            ? "opacity-50 cursor-not-allowed"
+                                            : "bg-gradient-to-r from-[var(--pop-coral)] to-[var(--pop-gold)] text-white hover:shadow-lg hover:shadow-[var(--pop-coral)]/20"
+                                    )}
                                 >
-                                    <CheckCircle2 className="mr-2 h-5 w-5" /> Sprint Complete
+                                    {ctaConfig.icon}
+                                    {ctaConfig.text}
                                 </Button>
+                            )}
 
-                                {/* XP Earned Today Badge */}
-                                {xpEarnedToday > 0 && (
-                                    <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-500">
-                                        <Trophy className="w-4 h-4" />
-                                        <span className="text-sm font-semibold">+{xpEarnedToday} XP today</span>
-                                    </div>
-                                )}
+                            {isCompleted && (
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                                    <span className="text-sm text-green-500 font-medium">Complete</span>
+                                    {xpEarnedToday > 0 && (
+                                        <span className="text-sm text-[var(--pop-gold)] font-medium">
+                                            +{xpEarnedToday} XP
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                                <Trophy className="w-3.5 h-3.5 text-[var(--pop-gold)]" />
+                                <span>{xp.toLocaleString()} XP</span>
                             </div>
-                        )}
-
-                        {/* Total XP */}
-                        <div className="flex items-center gap-2 text-sm text-zinc-500 font-medium">
-                            <Trophy className="w-4 h-4 text-yellow-500" />
-                            <span>{xp.toLocaleString()} Total XP</span>
                         </div>
                     </div>
-                </div>
 
-                {/* Mascot / Right Visual */}
-                <div className="relative w-40 h-40 md:w-56 md:h-56 flex-shrink-0 flex items-center justify-center">
-                    {/* Background Glow */}
-                    <div className={cn(
-                        "absolute inset-0 rounded-full blur-[60px] opacity-20",
-                        isCompleted ? "bg-green-500" : isActive ? "bg-orange-500" : "bg-primary"
-                    )} />
-
-                    <SentinelMascot
-                        variant={isCompleted ? "smiling" : isActive ? "thinking" : "neutral"}
-                        className="w-full h-full drop-shadow-2xl"
-                    />
+                    {/* Mascot */}
+                    <div className="relative w-28 h-28 flex-shrink-0">
+                        <div
+                            className={cn(
+                                "absolute inset-0 rounded-full blur-[40px] opacity-20",
+                                isCompleted ? "bg-green-500" : isActive ? "bg-orange-500" : "bg-[var(--pop-coral)]"
+                            )}
+                        />
+                        <SentinelMascot
+                            variant={isCompleted ? "smiling" : isActive ? "thinking" : "neutral"}
+                            className="w-full h-full"
+                        />
+                    </div>
                 </div>
             </div>
-        </Card>
+        </div>
     );
 }

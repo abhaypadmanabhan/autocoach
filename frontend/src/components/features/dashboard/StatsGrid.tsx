@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { BookOpen, Sparkles, Clock } from "lucide-react";
+import { BookOpen, Sparkles, Clock, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { AnimatedNumber } from "@/components/ui/animated-number";
 import {
   staggerContainer,
   slideUpItem,
@@ -14,34 +14,57 @@ interface StatsGridProps {
   totalDocuments: number;
   readyDocuments: number;
   processingDocuments: number;
+  streak?: number;
 }
 
-const stats = [
+interface StatConfig {
+  key: string;
+  label: string;
+  icon: React.ElementType;
+  iconBg: string;
+  iconColor: string;
+  numeralClass?: string;
+  getValue: (p: StatsGridProps) => number;
+}
+
+const stats: StatConfig[] = [
   {
     key: "total",
-    label: "Documents",
+    label: "Total Docs",
     icon: BookOpen,
-    iconBg: "bg-brand-primary/10",
-    iconColor: "text-brand-primary",
-    getValue: (p: StatsGridProps) => p.totalDocuments,
+    iconBg: "bg-[var(--pop-coral)]/10",
+    iconColor: "text-[var(--pop-coral)]",
+    numeralClass: "text-stat-numeral coral",
+    getValue: (p) => p.totalDocuments,
   },
   {
     key: "ready",
-    label: "Ready",
+    label: "Ready to Study",
     icon: Sparkles,
-    iconBg: "bg-semantic-success/10",
-    iconColor: "text-semantic-success",
-    getValue: (p: StatsGridProps) => p.readyDocuments,
+    iconBg: "bg-[var(--pop-teal)]/10",
+    iconColor: "text-[var(--pop-teal)]",
+    numeralClass: "text-stat-numeral teal",
+    getValue: (p) => p.readyDocuments,
   },
   {
     key: "processing",
     label: "Processing",
     icon: Clock,
-    iconBg: "bg-brand-secondary/10",
-    iconColor: "text-brand-secondary",
-    getValue: (p: StatsGridProps) => p.processingDocuments,
+    iconBg: "bg-[var(--pop-gold)]/10",
+    iconColor: "text-[var(--pop-gold)]",
+    numeralClass: "text-stat-numeral gold",
+    getValue: (p) => p.processingDocuments,
   },
-] as const;
+  {
+    key: "streak",
+    label: "Day Streak",
+    icon: Flame,
+    iconBg: "bg-orange-500/10",
+    iconColor: "text-orange-500",
+    numeralClass: "text-stat-numeral",
+    getValue: (p) => p.streak ?? 0,
+  },
+];
 
 export function StatsGrid(props: StatsGridProps) {
   return (
@@ -49,10 +72,11 @@ export function StatsGrid(props: StatsGridProps) {
       variants={staggerContainer}
       initial="hidden"
       animate="show"
-      className="grid grid-cols-1 md:grid-cols-3 gap-6"
+      className="grid grid-cols-2 lg:grid-cols-4 gap-4"
     >
       {stats.map((stat) => {
         const Icon = stat.icon;
+        const value = stat.getValue(props);
         return (
           <motion.div
             key={stat.key}
@@ -62,36 +86,46 @@ export function StatsGrid(props: StatsGridProps) {
             animate="rest"
           >
             <motion.div variants={cardHoverVariants}>
-              <Card
+              <div
                 className={cn(
-                  "border-surface-border bg-surface-card",
-                  "rounded-2xl"
+                  "relative p-5 rounded-2xl border border-[var(--surface-border)]",
+                  "bg-[var(--surface-card)]/50 backdrop-blur-sm",
+                  "transition-all duration-300 hover-lift card-glow",
+                  "group overflow-hidden"
                 )}
               >
-                <CardHeader className="pb-0">
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={cn(
-                        "w-12 h-12 rounded-xl flex items-center justify-center",
-                        stat.iconBg,
-                        stat.iconColor
-                      )}
-                    >
-                      <Icon size={24} />
-                    </div>
-                    <div>
-                      <p className="text-3xl font-bold text-text-primary">
-                        {stat.getValue(props)}
-                      </p>
-                    </div>
+                {/* Subtle gradient overlay on hover */}
+                <div
+                  className={cn(
+                    "absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300",
+                    "bg-gradient-to-br from-[var(--pop-coral)]/5 via-transparent to-[var(--pop-gold)]/5"
+                  )}
+                />
+
+                <div className="relative z-10">
+                  {/* Icon */}
+                  <div
+                    className={cn(
+                      "w-10 h-10 rounded-xl flex items-center justify-center mb-4",
+                      stat.iconBg
+                    )}
+                  >
+                    <Icon size={20} className={stat.iconColor} />
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-text-muted uppercase tracking-wider">
+
+                  {/* Animated Number */}
+                  <div className="mb-2">
+                    <span className={cn(stat.numeralClass)}>
+                      <AnimatedNumber value={value} stiffness={100} damping={20} />
+                    </span>
+                  </div>
+
+                  {/* Label */}
+                  <p className="text-sm text-[var(--text-muted)] uppercase tracking-wider font-medium">
                     {stat.label}
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         );

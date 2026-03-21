@@ -18,6 +18,7 @@
     "@shadcraft": "https://free.shadcraft.com/r/{name}.json",
     "@formcn": "https://formcn.dev/r/{name}.json",
     "@animbits": "https://animbits.dev/r/{name}.json",
-    "@cult-ui": "https://cult-ui.com/r/{name}.json"
+    "@cult-ui": "https://cult-ui.com/r/{name}.json",
+    "@agents-ui": "https://livekit.com/ui/r/{name}.json"
   }
 }
