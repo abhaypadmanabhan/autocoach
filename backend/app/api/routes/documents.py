@@ -3,6 +3,7 @@ import math
 
 from fastapi import (
     APIRouter,
+    Request,
     UploadFile,
     File,
     HTTPException,
@@ -84,12 +85,13 @@ async def get_user_id_from_token(authorization: str = Header(...)) -> UUID:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=401, detail=f"Token validation failed: {str(e)}"
+            status_code=401, detail="Token validation failed"
         )
 
 
 @router.post("/upload", response_model=DocumentResponse)
 async def upload_document(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user_id: UUID = Depends(get_user_id_from_token),
@@ -119,11 +121,18 @@ async def upload_document(
     # Enforce document quota before reading file
     enforce_max_documents(user_id, settings.max_documents_per_user)
 
+    # Reject oversized uploads early using Content-Length header (before reading body)
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(
+            status_code=413, detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit."
+        )
+
     # Read file bytes
     file_bytes = await file.read()
     file_size = len(file_bytes)
 
-    # Validate file size
+    # Validate actual file size (second defence, catches missing Content-Length)
     if file_size > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
             status_code=413, detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit."
@@ -155,7 +164,7 @@ async def upload_document(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to upload file to storage: {str(e)}"
+            status_code=500, detail="Failed to upload file to storage"
         )
 
     try:
@@ -195,7 +204,7 @@ async def upload_document(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to create document record: {str(e)}"
+            status_code=500, detail="Failed to create document record"
         )
 
 
@@ -317,7 +326,7 @@ async def register_document(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to register document: {str(e)}"
+            status_code=500, detail="Failed to register document"
         )
 
 
@@ -382,7 +391,7 @@ async def list_documents(user_id: UUID = Depends(get_user_id_from_token)):
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch documents: {str(e)}"
+            status_code=500, detail="Failed to fetch documents"
         )
 
 
@@ -459,7 +468,7 @@ async def get_document(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to fetch document: {str(e)}"
+            status_code=500, detail="Failed to fetch document"
         )
 
 
@@ -524,7 +533,7 @@ async def get_document_concepts_endpoint(
     except Exception as e:
         logger.error(f"[documents/concepts] Unexpected error: {type(e).__name__}: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to get document concepts: {str(e)}"
+            status_code=500, detail="Failed to get document concepts"
         )
 
 
@@ -598,7 +607,7 @@ async def search_document(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to search document: {str(e)}"
+            status_code=500, detail="Failed to search document"
         )
 
 
@@ -758,7 +767,7 @@ async def delete_document(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to delete document: {str(e)}"
+            status_code=500, detail="Failed to delete document"
         )
 
 
@@ -854,7 +863,7 @@ async def get_progress_summary(user_id: UUID = Depends(get_user_id_from_token)):
     except Exception as e:
         logger.error(f"[documents/progress] Failed to get summary: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to get progress summary: {str(e)}"
+            status_code=500, detail="Failed to get progress summary"
         )
 
 
@@ -914,7 +923,7 @@ async def get_document_progress(
     except Exception as e:
         logger.error(f"[documents/progress] Failed to get progress: {e}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to get document progress: {str(e)}"
+            status_code=500, detail="Failed to get document progress"
         )
 
 
@@ -986,4 +995,4 @@ def get_document_summary(
         raise
     except Exception as e:
         logger.error(f"[documents/summary] Failed to get summary: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get summary: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to get summary")

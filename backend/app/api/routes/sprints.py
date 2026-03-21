@@ -676,8 +676,8 @@ async def get_sprint_status(user_id: UUID = Depends(get_user_id_from_token)):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Error fetching sprint status: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error fetching sprint status: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch sprint status")
 
 
 def get_session_creator():
@@ -725,8 +725,8 @@ async def start_sprint(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Error starting sprint: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error starting sprint: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to start sprint")
 
 
 @router.post("/answer", response_model=SprintAnswerResponse)
@@ -753,5 +753,5 @@ async def complete_sprint(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("Error completing sprint: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error completing sprint: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to complete sprint")

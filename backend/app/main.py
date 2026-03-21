@@ -57,18 +57,15 @@ app = FastAPI(
 # =============================================================================
 # This ensures OPTIONS preflight requests are handled before any auth
 # dependencies can intercept and return 400/401 errors.
-#
-# Using allow_headers=["*"] and allow_methods=["*"] ensures browsers
-# can send any header (including Authorization) and any method.
 # =============================================================================
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=settings.cors_allow_credentials,
-    allow_methods=["*"],  # Allows all methods including OPTIONS
-    allow_headers=["*"],  # Allows all headers including Authorization
-    expose_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    expose_headers=["Content-Length"],
     max_age=600,  # Cache preflight for 10 minutes
 )
 

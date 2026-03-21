@@ -112,6 +112,7 @@ async def generate_quiz(
         raise
     except Exception as e:
         logger.error(f"Unexpected error generating quiz: {e}")
+        logger.error("Unexpected error generating quiz: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to generate quiz: {str(e)}"
+            status_code=500, detail="Failed to generate quiz"
         )

@@ -129,13 +129,14 @@ async def create_quiz_session(
         raise
     except Exception as e:
         logger.error(f"Failed to create quiz session: {e}")
+        logger.error("Failed to create quiz session: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to create quiz session: {str(e)}"
+            status_code=500, detail="Failed to create quiz session"
         )
 
 
 @router.get("/{session_id}", response_model=SessionStatus)
-async def get_session_status(session_id: str, user_id=Depends(enforce_quiz_rate_limit)):
+async def get_session_status(session_id: UUID, user_id=Depends(enforce_quiz_rate_limit)):
     """
     Get the status of a quiz session.
 
@@ -150,7 +151,7 @@ async def get_session_status(session_id: str, user_id=Depends(enforce_quiz_rate_
         HTTPException: 404 if session not found.
     """
     try:
-        session = get_session(session_id, str(user_id))
+        session = get_session(str(session_id), str(user_id))
 
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -173,14 +174,15 @@ async def get_session_status(session_id: str, user_id=Depends(enforce_quiz_rate_
         raise
     except Exception as e:
         logger.error(f"Failed to get session status: {e}")
+        logger.error("Failed to get session status: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to get session status: {str(e)}"
+            status_code=500, detail="Failed to get session status"
         )
 
 
 @router.get("/{session_id}/current", response_model=QuestionResponse)
 async def get_current_quiz_question(
-    session_id: str, user_id=Depends(enforce_quiz_rate_limit)
+    session_id: UUID, user_id=Depends(enforce_quiz_rate_limit)
 ):
     """
     Get the current (next unanswered) question in a session.
@@ -200,7 +202,7 @@ async def get_current_quiz_question(
         session_response = (
             supabase_admin.table("quiz_sessions")
             .select("*")
-            .eq("id", session_id)
+            .eq("id", str(session_id))
             .eq("user_id", str(user_id))
             .execute()
         )
@@ -216,7 +218,7 @@ async def get_current_quiz_question(
                 detail=f"Session is not active (status: {session['status']})",
             )
 
-        question = get_current_question(session_id, str(user_id))
+        question = get_current_question(str(session_id), str(user_id))
 
         if not question:
             raise HTTPException(
@@ -236,16 +238,16 @@ async def get_current_quiz_question(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get current question: {e}")
+        logger.error("Failed to get current question: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to get current question: {str(e)}"
+            status_code=500, detail="Failed to get current question"
         )
 
 
 @router.post("/{session_id}/answer", response_model=AnswerResponse)
 async def submit_quiz_answer(
-    session_id: str,
-    question_id: str,
+    session_id: UUID,
+    question_id: UUID,
     answer_data: AnswerSubmit,
     user_id=Depends(enforce_quiz_rate_limit),
 ):
@@ -266,9 +268,9 @@ async def submit_quiz_answer(
     """
     try:
         result = submit_answer(
-            session_id=session_id,
+            session_id=str(session_id),
             user_id=str(user_id),
-            question_id=question_id,
+            question_id=str(question_id),
             answer=answer_data.answer,
             input_method=answer_data.input_method,
         )
@@ -305,7 +307,7 @@ async def submit_quiz_answer(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to submit answer: {e}")
+        logger.error("Failed to submit answer: %s", e, exc_info=True)
         raise HTTPException(
-            status_code=500, detail=f"Failed to submit answer: {str(e)}"
+            status_code=500, detail="Failed to submit answer"
         )

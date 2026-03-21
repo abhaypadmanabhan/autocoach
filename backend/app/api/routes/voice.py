@@ -89,8 +89,8 @@ async def transcribe_voice(
         logger.error(f"Validation error during transcription: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logger.error(f"Transcription failed: {e}")
+        logger.error("Transcription failed: %s", e, exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to transcribe audio: {str(e)}"
+            detail="Failed to transcribe audio"
         )
