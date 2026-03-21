@@ -52,6 +52,46 @@ export function HeroBackground({ className }: { className?: string }) {
   );
 }
 
+// Warm aurora background — OLED dark with brand-derived coral/gold/teal orbs
+// Used exclusively on the landing page to keep other pages unaffected
+export function WarmAuroraBackground({ className }: { className?: string }) {
+  return (
+    <div className={cn("absolute inset-0 overflow-hidden warm-aurora-bg pointer-events-none", className)}>
+      {/* Coral orb — brand-derived, upper-left */}
+      <div
+        className="absolute w-[800px] h-[800px] rounded-full animate-warm-drift"
+        style={{
+          background: "radial-gradient(circle, var(--pop-coral) 0%, transparent 70%)",
+          opacity: 0.06,
+          top: "-15%",
+          left: "-10%",
+        }}
+      />
+      {/* Gold orb — brand-derived, lower-right */}
+      <div
+        className="absolute w-[600px] h-[600px] rounded-full animate-warm-drift-slow"
+        style={{
+          background: "radial-gradient(circle, var(--pop-gold) 0%, transparent 70%)",
+          opacity: 0.05,
+          bottom: "-10%",
+          right: "-8%",
+        }}
+      />
+      {/* Teal orb — cool complement, center */}
+      <div
+        className="absolute w-[500px] h-[500px] rounded-full animate-mesh-orb-1"
+        style={{
+          background: "radial-gradient(circle, var(--pop-teal) 0%, transparent 70%)",
+          opacity: 0.04,
+          top: "30%",
+          right: "25%",
+        }}
+      />
+      <GradientMesh />
+    </div>
+  );
+}
+
 // Section background - minimal, follows design system
 export function SectionBackground({
   className,

@@ -15,33 +15,57 @@ type GuideMessage = {
 const guideMessages: GuideMessage[] = [
   {
     id: "welcome",
-    message: "Hey there! Ready to learn smarter?",
+    message: "Hi! I'm Uto — your AI study partner!",
     variant: "smiling",
     showFor: 0,
   },
   {
+    id: "problem",
+    message: "That's actually true... but I can fix that.",
+    variant: "thinking",
+    showFor: 12,
+  },
+  {
     id: "features",
-    message: "Check out what I can do for you!",
-    variant: "thinking",
-    showFor: 25,
+    message: "Here's what I bring to the table.",
+    variant: "proud",
+    showFor: 28,
   },
   {
-    id: "how-it-works",
-    message: "It's super simple. Three steps!",
+    id: "how-step-1",
+    message: "Drop your files right here. I'll do the rest.",
     variant: "neutral",
-    showFor: 50,
+    showFor: 42,
   },
   {
-    id: "demo",
-    message: "Watch me in action...",
+    id: "how-step-2",
+    message: "I read everything. Every. Single. Line.",
     variant: "thinking",
-    showFor: 70,
+    showFor: 54,
+  },
+  {
+    id: "how-step-3",
+    message: "Then I quiz you. Relentlessly. It's science.",
+    variant: "proud",
+    showFor: 64,
+  },
+  {
+    id: "stats",
+    message: "These numbers are real. Real students. Real results.",
+    variant: "smiling",
+    showFor: 74,
+  },
+  {
+    id: "testimonials",
+    message: "Don't just take my word for it...",
+    variant: "neutral",
+    showFor: 84,
   },
   {
     id: "cta",
-    message: "Let's start your journey!",
-    variant: "smiling",
-    showFor: 90,
+    message: "Come on... one quiz won't hurt. It might just change everything.",
+    variant: "pleading",
+    showFor: 93,
   },
 ];
 
@@ -124,7 +148,7 @@ export function MascotGuide({ className, enabled = true }: MascotGuideProps) {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -10 }}
               transition={{ duration: 0.3 }}
-              className="relative bg-[var(--surface-card)] border border-[var(--surface-border)] rounded-2xl px-5 py-4 shadow-xl max-w-[220px] lg:max-w-[260px] mb-4"
+              className="relative bg-[var(--surface-card)] border border-[var(--brand-primary)]/30 rounded-2xl px-5 py-4 shadow-xl shadow-[var(--pop-coral)]/10 max-w-[260px] lg:max-w-[300px] mb-4"
             >
               <p className="text-base text-[var(--text-primary)] font-medium leading-relaxed">
                 {currentMessage.message}

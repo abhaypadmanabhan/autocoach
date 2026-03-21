@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
+import { useState, useEffect, useRef, useCallback } from "react";
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+  useSpring,
+  useReducedMotion,
+  useInView,
+} from "framer-motion";
 import Link from "next/link";
 import {
-  PlayCircle,
-  Sparkles,
-  LogIn,
-  Menu,
-  X,
+  ArrowRight,
   FileText,
   Brain,
-  CheckCircle,
   BarChart3,
   FileUp,
   Zap,
@@ -20,1172 +23,1465 @@ import {
   Twitter,
   Linkedin,
   Github,
-  Upload,
-  Loader2,
   Check,
-  ArrowRight,
   Lightbulb,
   Target,
   Clock,
-  Award,
-  MessageCircle,
+  BookOpen,
+  Layers,
+  TrendingUp,
+  Menu,
+  X,
+  Sparkles,
 } from "lucide-react";
 
-// Shadcn components
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-
-// Animated backgrounds
-import { HeroBackground, SectionBackground } from "@/components/ui/animated-background";
-
-// Brand components
-import { Logo, LogoFull } from "@/components/brand/Logo";
-import { HeroMascot, MascotGuide } from "@/components/brand/MascotGuide";
+import { WarmAuroraBackground } from "@/components/ui/animated-background";
+import { Logo } from "@/components/brand/Logo";
+import { MascotGuide } from "@/components/brand/MascotGuide";
+import { SentinelMascot } from "@/components/brand/SentinelMascot";
+import { BgAnimateButton } from "@/components/ui/bg-animate-button";
+import { AnimatedNumber } from "@/components/ui/animated-number";
+import { Typewriter } from "@/components/ui/typewriter";
 import { cn } from "@/lib/utils";
 
-// ============================================
-// NAVIGATION COMPONENT
-// ============================================
+// ─────────────────────────────────────────────
+// INLINE HELPERS
+// ─────────────────────────────────────────────
+
+function SpotlightCard({
+  children,
+  className,
+  glowColor = "var(--brand-primary)",
+}: {
+  children: React.ReactNode;
+  className?: string;
+  glowColor?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [hovered, setHovered] = useState(false);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    setPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      onMouseMove={handleMouseMove}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={cn("relative overflow-hidden", className)}
+    >
+      {hovered && (
+        <div
+          className="absolute inset-0 pointer-events-none transition-opacity duration-500 z-10"
+          style={{
+            background: `radial-gradient(300px circle at ${pos.x}px ${pos.y}px, ${glowColor}18, transparent 70%)`,
+          }}
+        />
+      )}
+      {children}
+    </div>
+  );
+}
+
+function DirectionCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [dir, setDir] = useState<"top" | "bottom" | "left" | "right">("bottom");
+
+  const getDir = (
+    e: React.MouseEvent,
+    el: HTMLDivElement
+  ): "top" | "bottom" | "left" | "right" => {
+    const { width, height, left, top } = el.getBoundingClientRect();
+    const angle =
+      (Math.atan2(e.clientY - top - height / 2, e.clientX - left - width / 2) *
+        180) /
+      Math.PI;
+    if (angle > -45 && angle <= 45) return "right";
+    if (angle > 45 && angle <= 135) return "bottom";
+    if (angle > 135 || angle <= -135) return "left";
+    return "top";
+  };
+
+  const slideFrom: Record<string, { x?: string; y?: string }> = {
+    top: { y: "-100%" },
+    bottom: { y: "100%" },
+    left: { x: "-100%" },
+    right: { x: "100%" },
+  };
+
+  return (
+    <div
+      ref={ref}
+      onMouseEnter={(e) => {
+        if (ref.current) setDir(getDir(e, ref.current));
+      }}
+      className={cn("relative overflow-hidden group", className)}
+    >
+      <motion.div
+        className="absolute inset-0 bg-gradient-to-br from-[var(--pop-coral)]/10 to-[var(--pop-teal)]/10 z-0"
+        initial={{ ...slideFrom[dir], opacity: 0 }}
+        whileHover={{ x: 0, y: 0, opacity: 1 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      />
+      {children}
+    </div>
+  );
+}
+
+type UtoVariant =
+  | "neutral"
+  | "smiling"
+  | "proud"
+  | "pleading"
+  | "thinking"
+  | "timesUp"
+  | "wrong";
+
+function UtoBubble({
+  message,
+  side,
+}: {
+  message: string;
+  side: "left" | "right";
+}) {
+  return (
+    <div className="relative bg-[var(--surface-card)] border border-[var(--brand-primary)]/30 rounded-2xl px-5 py-4 shadow-lg shadow-[var(--pop-coral)]/10 max-w-[280px]">
+      <p className="text-sm text-[var(--text-primary)] font-medium leading-relaxed">
+        {message}
+      </p>
+      <div
+        className={cn(
+          "absolute top-1/2 -translate-y-1/2 w-0 h-0 border-y-[8px] border-y-transparent",
+          side === "right"
+            ? "-right-2 border-l-[8px] border-l-[var(--surface-card)]"
+            : "-left-2 border-r-[8px] border-r-[var(--surface-card)]"
+        )}
+      />
+    </div>
+  );
+}
+
+function UtoWithBubble({
+  variant,
+  message,
+  position = "right",
+  size = "md",
+}: {
+  variant: UtoVariant;
+  message: string;
+  position?: "left" | "right";
+  size?: "sm" | "md" | "lg" | "xl";
+}) {
+  const sizes = {
+    sm: "w-24 h-24",
+    md: "w-32 h-32",
+    lg: "w-44 h-44",
+    xl: "w-64 h-64",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: position === "right" ? 30 : -30 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true, margin: "-80px" }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(
+        "flex items-end gap-4 mt-8",
+        position === "right" ? "justify-end" : "justify-start"
+      )}
+    >
+      {position === "right" && <UtoBubble message={message} side="right" />}
+      <div className={cn("relative shrink-0", sizes[size])}>
+        <div className="absolute inset-0 bg-[var(--pop-coral)] opacity-15 blur-2xl rounded-full" />
+        <SentinelMascot variant={variant} className="w-full h-full" />
+      </div>
+      {position === "left" && <UtoBubble message={message} side="left" />}
+    </motion.div>
+  );
+}
+
+function AnimatedStat({
+  value,
+  numericValue,
+  label,
+  sublabel,
+  delay = 0,
+  inView,
+}: {
+  value: string;
+  numericValue?: number;
+  label: string;
+  sublabel: string;
+  delay?: number;
+  inView: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 40 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ delay, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className="text-center"
+    >
+      <div className="text-numeral gradient-text-warm font-extrabold leading-none mb-3">
+        {numericValue !== undefined && inView ? (
+          <AnimatedNumber
+            value={numericValue}
+            stiffness={60}
+            damping={20}
+          />
+        ) : (
+          value
+        )}
+        {numericValue !== undefined && value.endsWith("%") && inView && (
+          <span>%</span>
+        )}
+        {numericValue !== undefined && value.endsWith("+") && inView && (
+          <span>+</span>
+        )}
+      </div>
+      <div className="text-lg font-semibold text-[var(--text-primary)] mb-1">
+        {label}
+      </div>
+      <div className="text-sm text-[var(--text-secondary)]">{sublabel}</div>
+    </motion.div>
+  );
+}
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 40 },
+  visible: (i: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: i * 0.1,
+      duration: 0.6,
+      ease: [0.22, 1, 0.36, 1] as const,
+    },
+  }),
+};
+
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.1 } },
+};
+
+// ─────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────
+
 function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
+    const onScroll = () => setIsScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   const navLinks = [
     { href: "#features", label: "Features" },
     { href: "#how-it-works", label: "How It Works" },
-    { href: "#testimonials", label: "Testimonials" },
     { href: "#pricing", label: "Pricing" },
   ];
 
   return (
     <>
       <motion.nav
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+        initial={{ y: -80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
         className={cn(
           "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-          isScrolled 
-            ? "glass border-b border-[var(--surface-border)]" 
+          isScrolled
+            ? "border-b"
             : "bg-transparent"
         )}
+        style={
+          isScrolled
+            ? {
+                background: "rgba(15,15,20,0.92)",
+                backdropFilter: "blur(20px)",
+                borderColor: "transparent",
+                borderImage:
+                  "linear-gradient(90deg, var(--brand-primary), var(--pop-coral), transparent) 1",
+              }
+            : {}
+        }
       >
         <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
           <div className="flex h-16 lg:h-20 items-center justify-between">
-            {/* Logo with Mascot */}
             <Link href="/" className="flex items-center">
               <Logo size="lg" animated />
             </Link>
 
-            {/* Desktop Navigation */}
-            <div className="hidden lg:flex flex-1 items-center justify-center">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="flex items-center gap-8"
-              >
-                {navLinks.map((link) => (
-                  <a
-                    key={link.href}
-                    href={link.href}
-                    className="relative text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors py-2 group"
-                  >
-                    {link.label}
-                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[var(--brand-primary)] transition-all duration-300 group-hover:w-full" />
-                  </a>
-                ))}
-              </motion.div>
+            <div className="hidden lg:flex items-center gap-8">
+              {navLinks.map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors duration-200"
+                >
+                  {link.label}
+                </a>
+              ))}
             </div>
 
-            {/* Desktop Auth Buttons */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.4 }}
-              className="hidden lg:flex items-center gap-3"
-            >
-              <Button variant="ghost" asChild>
-                <Link href="/login" className="flex items-center gap-2">
-                  <LogIn className="w-4 h-4" />
-                  Log In
-                </Link>
-              </Button>
-              <Button asChild className="shadow-lg shadow-[var(--brand-primary)]/20">
-                <Link href="/signup">
-                  Sign Up
-                </Link>
-              </Button>
-            </motion.div>
+            <div className="hidden lg:flex items-center gap-3">
+              <Link href="/login">
+                <Button variant="ghost" size="sm" className="text-[var(--text-secondary)]">
+                  Sign In
+                </Button>
+              </Link>
+              <Link href="/register">
+                <BgAnimateButton
+                  gradient="sunset"
+                  animation="spin"
+                  rounded="full"
+                  size="sm"
+                  shadow="soft"
+                >
+                  Get Started Free
+                </BgAnimateButton>
+              </Link>
+            </div>
 
-            {/* Mobile Menu Button */}
             <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 rounded-lg hover:bg-[var(--surface-card)] transition-colors"
+              className="lg:hidden text-[var(--text-secondary)] p-2"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Toggle menu"
             >
-              <Menu size={24} className="text-[var(--text-primary)]" />
+              {mobileOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           </div>
         </div>
       </motion.nav>
 
-      {/* Mobile Menu Overlay */}
       <AnimatePresence>
-        {mobileMenuOpen && (
+        {mobileOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Mobile Menu Panel */}
-      <motion.div
-        initial={{ x: "100%" }}
-        animate={{ x: mobileMenuOpen ? 0 : "100%" }}
-        transition={{ type: "spring", damping: 25, stiffness: 200 }}
-        className="fixed top-0 right-0 bottom-0 w-80 max-w-[85vw] bg-[var(--surface-dark)] z-50 lg:hidden shadow-2xl"
-      >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-8">
-            <Logo size="sm" animated={false} />
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className="p-2 rounded-lg hover:bg-[var(--surface-card)] transition-colors"
-            >
-              <X size={24} className="text-[var(--text-primary)]" />
-            </button>
-          </div>
-
-          <nav className="flex flex-col gap-2">
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.25 }}
+            className="fixed top-16 inset-x-0 z-40 p-6 flex flex-col gap-4 border-b border-[var(--surface-border)]"
+            style={{ background: "rgba(15,15,20,0.97)", backdropFilter: "blur(20px)" }}
+          >
             {navLinks.map((link) => (
               <a
                 key={link.href}
                 href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-lg font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-card)] transition-all py-3 px-4 rounded-xl"
+                className="text-[var(--text-primary)] font-medium py-2"
+                onClick={() => setMobileOpen(false)}
               >
                 {link.label}
               </a>
             ))}
-          </nav>
-
-          <div className="mt-8 pt-8 border-t border-[var(--surface-border)] flex flex-col gap-3">
-            <Button variant="outline" asChild className="w-full justify-center">
-              <Link href="/login">
-                <LogIn className="w-4 h-4 mr-2" />
-                Log In
+            <div className="pt-4 flex flex-col gap-3 border-t border-[var(--surface-border)]">
+              <Link href="/login" onClick={() => setMobileOpen(false)}>
+                <Button variant="outline" className="w-full">Sign In</Button>
               </Link>
-            </Button>
-            <Button asChild className="w-full justify-center">
-              <Link href="/signup">Sign Up</Link>
-            </Button>
-          </div>
-        </div>
-      </motion.div>
+              <Link href="/register" onClick={() => setMobileOpen(false)}>
+                <BgAnimateButton gradient="sunset" animation="spin" rounded="full" className="w-full">
+                  Get Started Free
+                </BgAnimateButton>
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }
 
-// ============================================
+// ─────────────────────────────────────────────
 // HERO SECTION
-// ============================================
+// ─────────────────────────────────────────────
+
 function HeroSection() {
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLElement>(null);
+  const shouldReduceMotion = useReducedMotion();
   const { scrollYProgress } = useScroll({
     target: containerRef,
     offset: ["start start", "end start"],
   });
-  
-  const y = useTransform(scrollYProgress, [0, 1], [0, 150]);
-  const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001,
+  });
+  const y = useTransform(smoothProgress, [0, 1], [0, shouldReduceMotion ? 0 : 100]);
+  const opacity = useTransform(smoothProgress, [0, 0.6], [1, 0]);
+
+  const wordVariants = {
+    hidden: { opacity: 0, y: "60%", skewY: 4 },
+    visible: (i: number) => ({
+      opacity: 1,
+      y: 0,
+      skewY: 0,
+      transition: {
+        delay: 0.1 + i * 0.08,
+        duration: 0.7,
+        ease: [0.22, 1, 0.36, 1] as const,
+      },
+    }),
+  };
+
+  const line1 = "Drop a document.".split(" ");
+  const line2 = "Become unstoppable.".split(" ");
 
   return (
-    <section 
+    <section
       ref={containerRef}
-      className="relative min-h-screen pt-24 lg:pt-32 pb-16 lg:pb-24 overflow-hidden"
+      className="relative min-h-screen flex items-center overflow-hidden pt-20"
+      style={{ background: "var(--surface-oled)" }}
     >
-      {/* Animated Background */}
-      <HeroBackground />
+      <WarmAuroraBackground />
 
-      <motion.div 
-        className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8"
+      <motion.div
         style={{ y, opacity }}
+        className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8 w-full py-20 lg:py-32"
       >
-        <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
-          {/* Left Content */}
-          <div className="flex flex-col items-start gap-6">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          {/* LEFT */}
+          <div>
+            {/* Badge */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: 0.5, delay: 0.05 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-[var(--pop-coral)]/30 bg-[var(--pop-coral)]/5 mb-8"
             >
-              <Badge variant="outline" className="px-4 py-1.5 text-sm font-medium border-[var(--brand-primary)]/30 bg-[var(--surface-card)]/50 backdrop-blur-sm">
-                <motion.span
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="flex h-2 w-2 rounded-full bg-[var(--brand-primary)] mr-2"
-                />
-                AI-Powered Learning Platform
-              </Badge>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--pop-coral)] opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--pop-coral)]" />
+              </span>
+              <span className="text-xs font-semibold text-[var(--pop-coral)] tracking-wider uppercase">
+                Now powered by Kimi K2.5 AI
+              </span>
             </motion.div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.1 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-[var(--text-primary)] font-heading"
-            >
-              Master Any Topic with{" "}
-              <span className="gradient-text">AI-Generated</span> Quizzes
-            </motion.h1>
+            {/* Headline */}
+            <h1 className="text-hero font-extrabold mb-6 overflow-hidden">
+              <div className="flex flex-wrap gap-x-[0.25em] overflow-hidden mb-1">
+                {line1.map((word, i) => (
+                  <motion.span
+                    key={i}
+                    custom={i}
+                    initial="hidden"
+                    animate="visible"
+                    variants={wordVariants}
+                    className="inline-block text-[var(--text-primary)]"
+                  >
+                    {word}
+                  </motion.span>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-[0.25em] overflow-hidden">
+                {line2.map((word, i) => (
+                  <motion.span
+                    key={i}
+                    custom={line1.length + i}
+                    initial="hidden"
+                    animate="visible"
+                    variants={wordVariants}
+                    className="inline-block gradient-text-warm"
+                  >
+                    {word}
+                  </motion.span>
+                ))}
+              </div>
+            </h1>
 
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-lg lg:text-xl text-[var(--text-secondary)] leading-relaxed max-w-lg"
-            >
-              Transform your documents, notes, and lectures into interactive learning
-              experiences. AutoCoach adapts to your pace and helps you retain more.
-            </motion.p>
-
-            {/* Trust Indicators */}
+            {/* Subtext */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.25 }}
-              className="flex flex-wrap items-center gap-6 text-sm text-[var(--text-secondary)]"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="text-lg text-[var(--text-secondary)] mb-10 leading-relaxed h-8"
             >
-              <div className="flex items-center gap-2">
-                <div className="flex -space-x-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div
-                      key={i}
-                      className="w-7 h-7 rounded-full bg-gradient-to-br from-[var(--brand-primary)]/30 to-[var(--brand-secondary)]/30 border-2 border-[var(--surface-dark)] flex items-center justify-center text-xs font-medium text-[var(--text-primary)]"
-                    >
-                      {String.fromCharCode(64 + i)}
-                    </div>
-                  ))}
-                </div>
-                <span className="font-medium text-[var(--text-primary)]">10,000+ students</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <Star
-                      key={i}
-                      size={14}
-                      className="text-yellow-400 fill-yellow-400"
-                    />
-                  ))}
-                </div>
-                <span className="font-medium text-[var(--text-primary)]">98% satisfaction</span>
-              </div>
+              <Typewriter
+                delay={0.03}
+                baseText="Study smarter, not harder."
+                texts={[
+                  "Remember 10× more.",
+                  "Ace your next exam.",
+                  "Built on spaced repetition.",
+                  "Study smarter, not harder.",
+                ]}
+              />
             </motion.div>
 
             {/* CTA Buttons */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto mt-2"
+              transition={{ delay: 0.85, duration: 0.5 }}
+              className="flex flex-wrap items-center gap-4"
             >
-              <Button size="lg" asChild className="text-base shadow-xl shadow-[var(--brand-primary)]/20 animate-pulse-subtle">
-                <Link href="/signup">
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Create Your First Quiz
-                </Link>
+              <Link href="/register">
+                <BgAnimateButton
+                  gradient="sunset"
+                  animation="pulse"
+                  rounded="full"
+                  size="lg"
+                  shadow="deep"
+                >
+                  <span className="flex items-center gap-2">
+                    Create Your First Quiz
+                    <ArrowRight size={16} />
+                  </span>
+                </BgAnimateButton>
+              </Link>
+              <Button
+                variant="outline"
+                size="lg"
+                className="rounded-full border-[var(--surface-border)] hover:border-[var(--brand-primary)]/50 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              >
+                Watch Demo
               </Button>
-              <Button size="lg" variant="outline" asChild className="text-base border-[var(--surface-border)]">
-                <Link href="#demo">
-                  <PlayCircle className="w-5 h-5 mr-2" />
-                  Watch Demo
-                </Link>
-              </Button>
+            </motion.div>
+
+            {/* Social proof */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1.1 }}
+              className="flex items-center gap-3 mt-8"
+            >
+              <div className="flex -space-x-2">
+                {["A", "B", "C", "D"].map((l, i) => (
+                  <div
+                    key={l}
+                    className="w-8 h-8 rounded-full border-2 border-[var(--surface-oled)] flex items-center justify-center text-xs font-bold text-white"
+                    style={{
+                      background: `linear-gradient(135deg, var(--pop-coral), var(--pop-gold))`,
+                      zIndex: 4 - i,
+                    }}
+                  >
+                    {l}
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div className="flex gap-px">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} size={12} className="fill-[var(--pop-gold)] text-[var(--pop-gold)]" />
+                  ))}
+                </div>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  10,000+ students learning smarter
+                </p>
+              </div>
             </motion.div>
           </div>
 
-          {/* Right Content - Hero Mascot + Demo Preview */}
-          <motion.div
-            initial={{ opacity: 0, x: 50, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.3 }}
-            className="relative flex flex-col items-center gap-8"
-          >
-            {/* Large Hero Mascot */}
-            <HeroMascot />
+          {/* RIGHT — Uto + Demo */}
+          <div className="flex flex-col items-center gap-6">
+            {/* Uto speech bubble + mascot */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+              className="flex items-end gap-4"
+            >
+              <div className="relative bg-[var(--surface-card)] border border-[var(--brand-primary)]/30 rounded-2xl px-5 py-4 shadow-xl shadow-[var(--pop-coral)]/10 max-w-[240px]">
+                <p className="text-sm font-medium text-[var(--text-primary)] leading-relaxed">
+                  Hi! I&apos;m Uto — your AI study partner!
+                </p>
+                <div className="absolute top-1/2 -translate-y-1/2 -right-2 w-0 h-0 border-l-8 border-l-[var(--surface-card)] border-y-8 border-y-transparent" />
+              </div>
+              <div className="relative w-36 h-36 lg:w-44 lg:h-44 shrink-0">
+                <div className="absolute inset-0 bg-[var(--brand-primary)] opacity-20 blur-3xl rounded-full animate-glow-pulse-primary" />
+                <div className="absolute inset-0 bg-[var(--pop-gold)] opacity-10 blur-2xl rounded-full animate-glow-pulse-secondary" />
+                <SentinelMascot variant="smiling" className="w-full h-full" />
+              </div>
+            </motion.div>
 
-            {/* Demo Card below mascot */}
-            <div className="w-full max-w-md demo-window">
-              <div className="demo-window-header">
-                <div className="demo-window-dot red" />
-                <div className="demo-window-dot yellow" />
-                <div className="demo-window-dot green" />
-                <span className="ml-4 text-xs text-gray-500 font-medium">
-                  AutoCoach Dashboard
+            {/* Demo Preview Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+              className="w-full max-w-sm rounded-2xl border border-[var(--surface-border)] overflow-hidden shadow-2xl shadow-black/40"
+              style={{ background: "var(--surface-card)" }}
+            >
+              <div
+                className="px-4 py-3 flex items-center gap-3 border-b border-[var(--surface-border)]"
+                style={{ background: "rgba(255,255,255,0.03)" }}
+              >
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
+                </div>
+                <span className="text-xs text-[var(--text-secondary)] font-mono">
+                  autocoach.ai — Quiz Session
                 </span>
               </div>
-              <div className="p-6 bg-gradient-to-br from-[var(--background-light)] to-white min-h-[200px]">
-                {/* Mock Quiz Interface */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-[var(--brand-primary)]/10 flex items-center justify-center">
-                        <FileText size={16} className="text-[var(--brand-primary)]" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-[var(--indigo-space)]">
-                          Machine Learning Basics
-                        </p>
-                        <p className="text-xs text-[var(--slate-text)]">12 questions</p>
-                      </div>
-                    </div>
-                    <Badge className="bg-[var(--success)]/10 text-[var(--success)] hover:bg-[var(--success)]/20">
-                      In Progress
-                    </Badge>
-                  </div>
-
-                  <div className="bg-white rounded-xl p-4 border border-[var(--slate-border)]/50 shadow-sm">
-                    <p className="text-xs text-[var(--brand-primary)] font-medium mb-2">
-                      Question 3 of 12
-                    </p>
-                    <p className="text-sm font-medium text-[var(--indigo-space)] mb-4">
-                      What is the primary goal of supervised learning?
-                    </p>
-                    <div className="space-y-2">
-                      {[
-                        "Learn from labeled data",
-                        "Find hidden patterns",
-                        "Maximize rewards",
-                        "Reduce dimensions",
-                      ].map((option, i) => (
-                        <motion.div
-                          key={i}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.5 + i * 0.1 }}
-                          className={cn(
-                            "p-3 rounded-lg border text-sm cursor-pointer transition-all",
-                            i === 0
-                              ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/5 text-[var(--brand-primary)] font-medium"
-                              : "border-[var(--slate-border)]/50 text-slate-600 hover:border-[var(--brand-primary)]/30"
-                          )}
-                        >
-                          {option}
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Floating annotation */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1 }}
-              className="absolute -bottom-4 -left-4 lg:-left-8 bg-[var(--surface-card)] rounded-xl p-3 shadow-lg border border-[var(--surface-border)]"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-[var(--success)]/10 flex items-center justify-center">
-                  <Check size={16} className="text-[var(--success)]" />
-                </div>
+              <div className="p-5 space-y-4">
                 <div>
-                  <p className="text-xs font-medium text-[var(--text-primary)]">
-                    Instant Feedback
+                  <p className="text-xs text-[var(--pop-coral)] font-semibold uppercase tracking-wider mb-2">
+                    Question 3 of 10
                   </p>
-                  <p className="text-xs text-[var(--text-muted)]">AI evaluates your answers</p>
+                  <p className="text-sm font-semibold text-[var(--text-primary)] leading-snug">
+                    What is the primary mechanism of action for spaced repetition?
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {[
+                    { label: "A", text: "Active recall at increasing intervals", correct: true },
+                    { label: "B", text: "Passive re-reading of material" },
+                    { label: "C", text: "Highlighting key terms" },
+                  ].map((opt) => (
+                    <div
+                      key={opt.label}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl border text-xs transition-colors",
+                        opt.correct
+                          ? "border-[var(--pop-teal)]/50 bg-[var(--pop-teal)]/8 text-[var(--pop-teal)]"
+                          : "border-[var(--surface-border)] text-[var(--text-secondary)]"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                          opt.correct
+                            ? "bg-[var(--pop-teal)] text-white"
+                            : "bg-[var(--surface-border)] text-[var(--text-secondary)]"
+                        )}
+                      >
+                        {opt.correct ? <Check size={10} /> : opt.label}
+                      </span>
+                      {opt.text}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex gap-1">
+                    {[...Array(10)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "h-1 rounded-full transition-all",
+                          i < 3
+                            ? "w-4 bg-[var(--pop-coral)]"
+                            : i === 3
+                            ? "w-4 bg-[var(--pop-gold)]"
+                            : "w-2 bg-[var(--surface-border)]"
+                        )}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[10px] text-[var(--text-secondary)]">30% done</span>
                 </div>
               </div>
             </motion.div>
-          </motion.div>
+          </div>
         </div>
-      </motion.div>
 
-      {/* Scroll indicator */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.5 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
-      >
-        <span className="text-xs text-[var(--text-muted)]">Scroll to explore</span>
+        {/* Scroll indicator */}
         <motion.div
-          animate={{ y: [0, 8, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity }}
-          className="w-5 h-8 rounded-full border-2 border-[var(--surface-border)] flex justify-center pt-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
         >
-          <motion.div className="w-1 h-2 rounded-full bg-[var(--brand-primary)]" />
+          <span className="text-xs text-[var(--text-secondary)] uppercase tracking-widest">Scroll</span>
+          <motion.div
+            animate={{ y: [0, 8, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown size={18} className="text-[var(--pop-coral)]" />
+          </motion.div>
         </motion.div>
       </motion.div>
     </section>
   );
 }
 
-// ============================================
-// FEATURES SECTION
-// ============================================
-function FeaturesSection() {
-  const features = [
+// ─────────────────────────────────────────────
+// PROBLEM SECTION
+// ─────────────────────────────────────────────
+
+function ProblemSection() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
+
+  const painPoints = [
     {
-      icon: Brain,
-      title: "AI-Powered Quiz Generation",
-      description:
-        "Advanced AI analyzes your documents and creates relevant, challenging questions tailored to the content.",
+      icon: BookOpen,
+      title: "Passive reading doesn't encode",
+      desc: "Re-reading notes feels productive but barely moves the memory needle.",
     },
     {
-      icon: FileText,
-      title: "Multiple Question Types",
-      description:
-        "Support for MCQ, True/False, and Free Text questions to test different levels of understanding.",
+      icon: Clock,
+      title: "Cramming fades within 48 hours",
+      desc: "Without reinforcement, up to 70% of crammed content vanishes by the next morning.",
     },
     {
-      icon: CheckCircle,
-      title: "Smart Answer Evaluation",
-      description:
-        "AI evaluates free-text responses for semantic correctness, not just exact matches.",
-    },
-    {
-      icon: BarChart3,
-      title: "Progress Tracking",
-      description:
-        "Track your learning journey with detailed analytics on performance and areas for improvement.",
-    },
-    {
-      icon: FileUp,
-      title: "Document Processing",
-      description:
-        "Upload PDFs and PowerPoint files. Our system extracts and processes content automatically.",
-    },
-    {
-      icon: Zap,
-      title: "Adaptive Learning",
-      description:
-        "The system adapts to your performance, focusing on areas where you need more practice.",
+      icon: Target,
+      title: "Generic tools lack context",
+      desc: "Flashcard apps don't know your material. AutoCoach reads your actual documents.",
     },
   ];
 
   return (
-    <section id="features" className="section-padding relative">
-      {/* Animated Background */}
-      <SectionBackground variant="default" />
+    <section
+      ref={sectionRef}
+      className="relative py-24 lg:py-36 overflow-hidden section-deep"
+    >
+      <div className="absolute inset-0 pointer-events-none">
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full"
+          style={{
+            background: "radial-gradient(circle, var(--pop-coral) 0%, transparent 70%)",
+            opacity: 0.04,
+            top: "10%",
+            right: "-10%",
+          }}
+        />
+      </div>
 
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
+      <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
+        {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5 }}
+          className="flex justify-center mb-6"
         >
-          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
-            Features
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
-            Everything You Need to Learn Smarter
-          </h2>
-          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg">
-            Powerful features designed to transform how you study and retain information
-          </p>
+          <span className="px-4 py-1.5 rounded-full border border-[var(--pop-coral)]/30 text-xs font-bold text-[var(--pop-coral)] uppercase tracking-wider">
+            The Forgetting Curve
+          </span>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, i) => (
+        {/* Stat */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={isInView ? { opacity: 1, scale: 1 } : {}}
+          transition={{ duration: 0.7, delay: 0.1 }}
+          className="text-center mb-6"
+        >
+          <div className="text-numeral gradient-text-warm font-extrabold leading-none mb-3">
+            {isInView && <AnimatedNumber value={70} stiffness={50} damping={20} />}
+            <span>%</span>
+          </div>
+          <h2 className="text-h1 font-bold text-[var(--text-primary)] max-w-2xl mx-auto">
+            of what you learn is forgotten within a week.
+          </h2>
+        </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          className="text-center text-lg text-[var(--text-secondary)] max-w-2xl mx-auto mb-16 leading-relaxed"
+        >
+          The Ebbinghaus Forgetting Curve has been crushing students since 1885.
+          Most study tools do absolutely nothing about it.
+        </motion.p>
+
+        {/* Pain point cards */}
+        <motion.div
+          variants={containerVariants}
+          initial="hidden"
+          animate={isInView ? "visible" : "hidden"}
+          className="grid md:grid-cols-3 gap-6 mb-16"
+        >
+          {painPoints.map((point, i) => (
             <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
+              key={point.title}
+              variants={sectionVariants}
+              custom={i}
+              className="p-6 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)]/50 backdrop-blur-sm"
             >
-              <Card className="h-full bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[var(--brand-primary)]/5">
-                <CardHeader className="pb-3">
-                  <div className="feature-icon">
-                    <feature.icon size={24} className="text-[var(--brand-primary)]" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <h3 className="text-lg font-bold text-[var(--text-primary)] mb-3 font-heading">
-                    {feature.title}
-                  </h3>
-                  <p className="text-[var(--text-secondary)] leading-relaxed">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="w-10 h-10 rounded-xl bg-[var(--pop-coral)]/10 flex items-center justify-center mb-4">
+                <point.icon size={20} className="text-[var(--pop-coral)]" />
+              </div>
+              <h3 className="font-semibold text-[var(--text-primary)] mb-2">
+                {point.title}
+              </h3>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                {point.desc}
+              </p>
             </motion.div>
           ))}
+        </motion.div>
+
+        {/* Divider */}
+        <div className="relative flex items-center justify-center mb-12">
+          <div className="absolute inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--pop-coral)]/30 to-transparent" />
+          <div className="relative px-6 bg-[var(--surface-deep)] text-sm text-[var(--text-secondary)] font-medium">
+            The solution
+          </div>
         </div>
+
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="text-center text-xl text-[var(--text-primary)] font-medium max-w-2xl mx-auto mb-8 leading-relaxed"
+        >
+          AutoCoach is built on{" "}
+          <span className="gradient-text-warm font-bold">
+            active recall + spaced repetition
+          </span>{" "}
+          — the only scientifically proven methods to beat the curve.
+        </motion.p>
+
+        <UtoWithBubble
+          variant="thinking"
+          message="That's actually true... but I can fix that."
+          position="right"
+          size="md"
+        />
       </div>
     </section>
   );
 }
 
-// ============================================
+// ─────────────────────────────────────────────
+// FEATURES BENTO SECTION
+// ─────────────────────────────────────────────
+
+function FeaturesSection() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
+
+  const features = [
+    {
+      icon: Sparkles,
+      title: "AI Quiz Generation",
+      desc: "Kimi K2.5 reads your documents and generates targeted questions — MCQ, True/False, and free text.",
+      glow: "var(--pop-coral)",
+      span: "col-span-2 row-span-2",
+      hero: true,
+    },
+    {
+      icon: Layers,
+      title: "Multi-type Questions",
+      desc: "Three question formats to hit different memory pathways.",
+      glow: "var(--brand-primary)",
+      span: "col-span-1 row-span-1",
+    },
+    {
+      icon: Brain,
+      title: "Smart Evaluation",
+      desc: "Free-text answers are semantically evaluated by AI — not just keyword matched.",
+      glow: "var(--pop-teal)",
+      span: "col-span-1 row-span-1",
+    },
+    {
+      icon: FileUp,
+      title: "Drop Any File",
+      desc: "PDFs and PowerPoints processed in seconds.",
+      glow: "var(--brand-secondary)",
+      span: "col-span-1 row-span-1",
+    },
+    {
+      icon: TrendingUp,
+      title: "Progress Tracking",
+      desc: "Session analytics, accuracy trends, and weak-spot identification.",
+      glow: "var(--pop-gold)",
+      span: "col-span-2 row-span-1",
+    },
+    {
+      icon: Zap,
+      title: "Adaptive Difficulty",
+      desc: "Questions adapt based on your performance.",
+      glow: "var(--pop-coral)",
+      span: "col-span-1 row-span-1",
+    },
+  ];
+
+  return (
+    <section
+      ref={sectionRef}
+      id="features"
+      className="relative py-24 lg:py-36 overflow-hidden section-oled"
+    >
+      <WarmAuroraBackground />
+
+      <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
+        {/* Heading */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-16"
+        >
+          <span className="text-xs font-bold text-[var(--pop-teal)] uppercase tracking-wider mb-3 block">
+            Features
+          </span>
+          <h2 className="text-h1 font-bold text-[var(--text-primary)] mb-4">
+            Here&apos;s what I bring to the table.
+          </h2>
+          <p className="text-lg text-[var(--text-secondary)] max-w-xl mx-auto">
+            Every feature is built around the science of how memory actually works.
+          </p>
+        </motion.div>
+
+        {/* Bento grid */}
+        <div className="grid grid-cols-3 auto-rows-[200px] gap-4">
+          {features.map((feature, i) => (
+            <motion.div
+              key={feature.title}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={isInView ? { opacity: 1, scale: 1 } : {}}
+              transition={{ duration: 0.5, delay: i * 0.07 }}
+              className={cn(feature.span)}
+            >
+              <SpotlightCard
+                glowColor={feature.glow}
+                className={cn(
+                  "h-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)]/80 p-6 flex flex-col justify-between backdrop-blur-sm transition-all duration-300 hover:border-[var(--surface-border)]/80",
+                  feature.hero && "relative overflow-hidden"
+                )}
+              >
+                {feature.hero && (
+                  <div className="absolute top-4 right-4 w-20 h-20 opacity-90">
+                    <SentinelMascot variant="proud" className="w-full h-full" />
+                  </div>
+                )}
+                <div>
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center mb-4"
+                    style={{ background: `${feature.glow}18` }}
+                  >
+                    <feature.icon
+                      size={20}
+                      style={{ color: feature.glow }}
+                    />
+                  </div>
+                  <h3 className="font-bold text-[var(--text-primary)] text-lg mb-2">
+                    {feature.title}
+                  </h3>
+                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                    {feature.desc}
+                  </p>
+                </div>
+                <div
+                  className="h-px mt-4"
+                  style={{
+                    background: `linear-gradient(90deg, ${feature.glow}40, transparent)`,
+                  }}
+                />
+              </SpotlightCard>
+            </motion.div>
+          ))}
+        </div>
+
+        <UtoWithBubble
+          variant="proud"
+          message="Here's what I bring to the table."
+          position="right"
+          size="md"
+        />
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────
 // HOW IT WORKS SECTION
-// ============================================
+// ─────────────────────────────────────────────
+
 function HowItWorksSection() {
   const steps = [
     {
       number: "01",
-      title: "Upload Your Documents",
-      description:
-        "Simply drag and drop your PDF or PowerPoint files. Our system handles the rest.",
-      icon: Upload,
+      icon: FileText,
+      title: "Drop Your Files",
+      desc: "Upload a PDF or PowerPoint. AutoCoach extracts every sentence, every diagram caption, every footnote — nothing is skipped.",
+      mascotVariant: "neutral" as UtoVariant,
+      mascotMessage: "Drop your files right here. I'll do the rest.",
+      mascotSide: "right" as "left" | "right",
+      glow: "var(--pop-coral)",
     },
     {
       number: "02",
-      title: "AI Generates Quizzes",
-      description:
-        "Our AI analyzes your content and creates personalized quiz questions in seconds.",
       icon: Brain,
+      title: "I Analyze Everything",
+      desc: "Kimi K2.5 reads your material using RAG — deep semantic understanding, not surface-level keyword search.",
+      mascotVariant: "thinking" as UtoVariant,
+      mascotMessage: "I read everything. Every. Single. Line.",
+      mascotSide: "left" as "left" | "right",
+      glow: "var(--pop-teal)",
     },
     {
       number: "03",
-      title: "Practice and Master",
-      description:
-        "Take quizzes, get instant feedback, and track your progress as you learn.",
-      icon: CheckCircle,
+      icon: Zap,
+      title: "Then I Quiz You. Relentlessly.",
+      desc: "Adaptive questions across three formats, tuned to hit your weak spots. Spaced repetition built in from day one.",
+      mascotVariant: "proud" as UtoVariant,
+      mascotMessage: "Then I quiz you. Relentlessly. It's science.",
+      mascotSide: "right" as "left" | "right",
+      glow: "var(--pop-gold)",
     },
   ];
 
   return (
     <section
       id="how-it-works"
-      className="section-padding relative"
+      className="relative py-24 lg:py-36 overflow-hidden section-deep"
     >
-      {/* Animated Background */}
-      <SectionBackground variant="gradient" />
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
-          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
+      <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
+        {/* Heading */}
+        <div className="text-center mb-20">
+          <span className="text-xs font-bold text-[var(--pop-gold)] uppercase tracking-wider mb-3 block">
             How It Works
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
-            Three Simple Steps to Success
+          </span>
+          <h2 className="text-h1 font-bold text-[var(--text-primary)] mb-4">
+            Three steps to unstoppable.
           </h2>
-          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg">
-            Get started in minutes and transform your learning experience
+          <p className="text-lg text-[var(--text-secondary)] max-w-xl mx-auto">
+            From document to quiz in under 2 minutes.
           </p>
-        </motion.div>
+        </div>
 
-        <div className="relative">
-          {/* Connecting Line (Desktop) */}
-          <div className="hidden lg:block absolute top-24 left-[16.67%] right-[16.67%] h-0.5">
-            <motion.div
-              initial={{ scaleX: 0 }}
-              whileInView={{ scaleX: 1 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 1, delay: 0.5 }}
-              className="h-full bg-gradient-to-r from-[var(--brand-primary)] via-[var(--brand-secondary)] to-[var(--brand-primary)]/30 origin-left"
-            />
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
-            {steps.map((step, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-100px" }}
-                transition={{ duration: 0.5, delay: 0.3 + i * 0.2 }}
-                className="relative text-center"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="relative inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--surface-card)] border-2 border-[var(--brand-primary)]/20 shadow-lg shadow-[var(--brand-primary)]/10 mb-6 z-10"
-                >
-                  <step.icon size={32} className="text-[var(--brand-primary)]" />
-                  <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-[var(--brand-primary)] text-[var(--surface-dark)] text-sm font-bold flex items-center justify-center">
-                    {i + 1}
-                  </span>
-                </motion.div>
-                <h3 className="text-xl font-bold text-[var(--text-primary)] mb-3 font-heading">
-                  {step.title}
-                </h3>
-                <p className="text-[var(--text-secondary)] leading-relaxed">{step.description}</p>
-              </motion.div>
-            ))}
-          </div>
+        {/* Steps */}
+        <div className="space-y-28">
+          {steps.map((step, idx) => {
+            const isEven = idx % 2 === 1;
+            return (
+              <HowStep
+                key={step.number}
+                step={step}
+                isEven={isEven}
+              />
+            );
+          })}
         </div>
       </div>
     </section>
   );
 }
 
-// ============================================
-// INTERACTIVE DEMO SECTION
-// ============================================
-function DemoSection() {
-  const [isInView, setIsInView] = useState(false);
-  const [stage, setStage] = useState(0);
+function HowStep({
+  step,
+  isEven,
+}: {
+  step: {
+    number: string;
+    icon: React.ElementType;
+    title: string;
+    desc: string;
+    mascotVariant: UtoVariant;
+    mascotMessage: string;
+    mascotSide: "left" | "right";
+    glow: string;
+  };
+  isEven: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-80px" });
 
-  const stages = [
-    { name: "Upload", duration: 3000 },
-    { name: "Processing", duration: 2000 },
-    { name: "Quiz", duration: 4000 },
-    { name: "Answer", duration: 2000 },
-    { name: "Feedback", duration: 2000 },
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "grid lg:grid-cols-2 gap-12 items-center",
+        isEven && "lg:[&>*:first-child]:order-2"
+      )}
+    >
+      {/* Content side */}
+      <motion.div
+        initial={{ opacity: 0, x: isEven ? 40 : -40 }}
+        animate={isInView ? { opacity: 1, x: 0 } : {}}
+        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+      >
+        <span
+          className="block text-[80px] font-extrabold leading-none mb-4"
+          style={{ color: `${step.glow}18` }}
+        >
+          {step.number}
+        </span>
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5"
+          style={{ background: `${step.glow}18` }}
+        >
+          <step.icon size={24} style={{ color: step.glow }} />
+        </div>
+        <h3 className="text-h2 font-bold text-[var(--text-primary)] mb-4">
+          {step.title}
+        </h3>
+        <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
+          {step.desc}
+        </p>
+      </motion.div>
+
+      {/* Uto side */}
+      <UtoWithBubble
+        variant={step.mascotVariant}
+        message={step.mascotMessage}
+        position={step.mascotSide}
+        size="lg"
+      />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// STATS SECTION
+// ─────────────────────────────────────────────
+
+function StatsSection() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
+
+  const stats = [
+    { value: "10,000+", numericValue: 10000, label: "Students", sublabel: "actively learning", delay: 0 },
+    { value: "98%", numericValue: 98, label: "Satisfaction", sublabel: "5-star rating", delay: 0.1 },
+    { value: "3×", label: "Retention", sublabel: "vs passive reading", delay: 0.2 },
+    { value: "2 min", label: "To first quiz", sublabel: "upload to questions", delay: 0.3 },
   ];
-
-  useEffect(() => {
-    if (!isInView) return;
-
-    const interval = setInterval(() => {
-      setStage((prev) => (prev + 1) % stages.length);
-    }, stages[stage].duration);
-
-    return () => clearInterval(interval);
-  }, [isInView, stage]);
 
   return (
     <section
-      id="demo"
-      className="section-padding relative overflow-hidden"
+      ref={sectionRef}
+      className="relative py-24 lg:py-32 overflow-hidden section-oled"
     >
-      {/* Animated Background */}
-      <SectionBackground variant="mesh" />
+      <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+        <div
+          className="w-[800px] h-[400px] rounded-full"
+          style={{
+            background: "radial-gradient(ellipse, var(--pop-gold) 0%, transparent 70%)",
+            opacity: 0.04,
+            filter: "blur(60px)",
+          }}
+        />
+      </div>
 
       <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          onViewportEnter={() => setIsInView(true)}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          className="text-center mb-16"
         >
-          <Badge className="mb-4 bg-white/10 text-white/90 hover:bg-white/20">
-            See It In Action
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
-            Watch AutoCoach Work Its Magic
+          <span className="text-xs font-bold text-[var(--pop-coral)] uppercase tracking-wider mb-3 block">
+            By The Numbers
+          </span>
+          <h2 className="text-h1 font-bold text-[var(--text-primary)]">
+            Real students. Real results.
           </h2>
-          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg">
-            From document upload to quiz mastery in seconds
-          </p>
         </motion.div>
 
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
-          {/* Demo Window */}
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="demo-window"
-          >
-            <div className="demo-window-header">
-              <div className="demo-window-dot red" />
-              <div className="demo-window-dot yellow" />
-              <div className="demo-window-dot green" />
-              <span className="ml-4 text-xs text-gray-500 font-medium">AutoCoach</span>
-            </div>
-            <div className="p-6 bg-[var(--surface-dark)] min-h-[300px] flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                {stage === 0 && (
-                  <motion.div
-                    key="upload"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="text-center"
-                  >
-                    <motion.div
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                      className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--brand-primary)]/10 flex items-center justify-center"
-                    >
-                      <Upload size={32} className="text-[var(--brand-primary)]" />
-                    </motion.div>
-                    <p className="text-[var(--text-primary)] font-medium mb-2">
-                      Uploading document...
-                    </p>
-                    <div className="w-48 h-2 mx-auto rounded-full bg-[var(--surface-border)]/30 overflow-hidden">
-                      <motion.div
-                        className="h-full bg-[var(--brand-primary)] rounded-full"
-                        initial={{ width: "0%" }}
-                        animate={{ width: "100%" }}
-                        transition={{ duration: 2.5 }}
-                      />
-                    </div>
-                  </motion.div>
-                )}
-
-                {stage === 1 && (
-                  <motion.div
-                    key="processing"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="text-center"
-                  >
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="w-16 h-16 mx-auto mb-4"
-                    >
-                      <Loader2 size={64} className="text-[var(--brand-primary)]" />
-                    </motion.div>
-                    <p className="text-[var(--text-primary)] font-medium mb-2">
-                      AI is analyzing content...
-                    </p>
-                    <motion.div
-                      animate={{ opacity: [0.5, 1, 0.5] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                      className="flex justify-center gap-1"
-                    >
-                      <Sparkles size={16} className="text-[var(--brand-primary)]" />
-                      <Sparkles size={16} className="text-[var(--brand-secondary)]" />
-                      <Sparkles size={16} className="text-[var(--brand-primary)]" />
-                    </motion.div>
-                  </motion.div>
-                )}
-
-                {stage === 2 && (
-                  <motion.div
-                    key="quiz"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="w-full max-w-sm"
-                  >
-                    <p className="text-xs text-[var(--brand-primary)] font-medium mb-2">
-                      Question 1 of 10
-                    </p>
-                    <p className="text-sm font-medium text-[var(--text-primary)] mb-4">
-                      What is the capital of France?
-                    </p>
-                    <div className="space-y-2">
-                      {["Paris", "London", "Berlin", "Madrid"].map((opt, i) => (
-                        <motion.div
-                          key={opt}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: i * 0.15 }}
-                          className="p-3 rounded-lg border border-[var(--surface-border)] text-sm text-[var(--text-secondary)]"
-                        >
-                          {opt}
-                        </motion.div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-
-                {stage === 3 && (
-                  <motion.div
-                    key="answer"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="w-full max-w-sm"
-                  >
-                    <p className="text-xs text-[var(--brand-primary)] font-medium mb-2">
-                      Question 1 of 10
-                    </p>
-                    <p className="text-sm font-medium text-[var(--text-primary)] mb-4">
-                      What is the capital of France?
-                    </p>
-                    <div className="space-y-2">
-                      {["Paris", "London", "Berlin", "Madrid"].map((opt, i) => (
-                        <div
-                          key={opt}
-                          className={cn(
-                            "p-3 rounded-lg border text-sm transition-all",
-                            i === 0
-                              ? "border-[var(--brand-primary)] bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] font-medium"
-                              : "border-[var(--surface-border)] text-[var(--text-secondary)]"
-                          )}
-                        >
-                          {opt}
-                          {i === 0 && (
-                            <motion.span
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className="float-right"
-                            >
-                              <Check size={16} className="text-[var(--brand-primary)]" />
-                            </motion.span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-
-                {stage === 4 && (
-                  <motion.div
-                    key="feedback"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="text-center"
-                  >
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", damping: 10 }}
-                      className="w-20 h-20 mx-auto mb-4 rounded-full bg-[var(--success)]/10 flex items-center justify-center"
-                    >
-                      <Check size={40} className="text-[var(--success)]" />
-                    </motion.div>
-                    <p className="text-xl font-bold text-[var(--success)] mb-2">Correct!</p>
-                    <p className="text-[var(--text-secondary)] text-sm mb-4">
-                      Paris is the capital of France.
-                    </p>
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-sm text-[var(--text-muted)]">Score:</span>
-                      <span className="font-bold text-[var(--text-primary)]">1/1</span>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-
-          {/* Stage Descriptions */}
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="space-y-6"
-          >
-            {stages.map((s, i) => (
-              <motion.div
-                key={s.name}
-                animate={{ opacity: stage === i ? 1 : 0.4 }}
-                className="flex items-start gap-4"
-              >
-                <div
-                  className={cn(
-                    "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors",
-                    stage === i 
-                      ? "bg-[var(--brand-primary)] text-[var(--surface-dark)]" 
-                      : "bg-[var(--surface-card)] text-[var(--text-muted)]"
-                  )}
-                >
-                  {i + 1}
-                </div>
-                <div className="flex-1">
-                  <h4
-                    className={cn(
-                      "font-bold mb-1 transition-colors",
-                      stage === i ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
-                    )}
-                  >
-                    {s.name}
-                  </h4>
-                  <p className={cn(
-                    "text-sm",
-                    stage === i ? "text-[var(--text-secondary)]" : "text-[var(--text-muted)]"
-                  )}>
-                    {i === 0 && "Drag and drop your document to upload"}
-                    {i === 1 && "AI extracts content and generates questions"}
-                    {i === 2 && "Questions appear with multiple choice options"}
-                    {i === 3 && "Select your answer and submit"}
-                    {i === 4 && "Get instant feedback and explanations"}
-                  </p>
-                </div>
-
-              </motion.div>
-            ))}
-
-            {/* Stage Progress Dots */}
-            <div className="flex items-center gap-2 pt-4">
-              {stages.map((_, i) => (
-                <motion.div
-                  key={i}
-                  animate={{
-                    scale: stage === i ? 1.25 : 1,
-                    backgroundColor: stage === i ? "var(--brand-primary)" : "var(--surface-border)",
-                  }}
-                  className="w-2.5 h-2.5 rounded-full"
-                />
-              ))}
-            </div>
-          </motion.div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
+          {stats.map((stat) => (
+            <AnimatedStat key={stat.label} {...stat} inView={isInView} />
+          ))}
         </div>
+
+        <UtoWithBubble
+          variant="smiling"
+          message="These numbers are real. Real students. Real results."
+          position="right"
+          size="md"
+        />
       </div>
     </section>
   );
 }
-// ============================================
+
+// ─────────────────────────────────────────────
 // TESTIMONIALS SECTION
-// ============================================
+// ─────────────────────────────────────────────
+
 function TestimonialsSection() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
+
   const testimonials = [
     {
-      name: "Sarah Chen",
-      role: "Medical Student",
-      content:
-        "AutoCoach transformed my study routine. I went from struggling with anatomy to acing my exams. The AI-generated questions are incredibly relevant.",
-      avatar: "SC",
+      quote: "I went from failing my biochem midterms to getting an A-. AutoCoach actually understood my notes.",
+      name: "Priya S.",
+      role: "Pre-med, Year 3",
+      initials: "PS",
     },
     {
-      name: "James Wilson",
-      role: "College Student",
-      content:
-        "I upload my lecture notes and have practice quizzes ready in seconds. It's like having a personal tutor available 24/7.",
-      avatar: "JW",
+      quote: "The questions it generates are scary good. Like it actually *gets* what's important.",
+      name: "Marcus T.",
+      role: "Computer Science",
+      initials: "MT",
     },
     {
-      name: "Maria Garcia",
-      role: "High School Teacher",
-      content:
-        "I use AutoCoach to create quizzes for my students. It saves me hours of work and the questions are always on point.",
-      avatar: "MG",
+      quote: "Two weeks before my bar exam. AutoCoach on 400 pages of notes. Passed first try.",
+      name: "Jordan R.",
+      role: "Law Graduate",
+      initials: "JR",
     },
     {
-      name: "David Park",
-      role: "Working Professional",
-      content:
-        "Studying for my certification while working full-time seemed impossible. AutoCoach made it manageable and even enjoyable.",
-      avatar: "DP",
+      quote: "I study half as long and remember twice as much. That's not nothing — that's a superpower.",
+      name: "Leila K.",
+      role: "MBA Student",
+      initials: "LK",
     },
   ];
 
   return (
-    <section id="testimonials" className="section-padding relative">
-      {/* Animated Background */}
-      <SectionBackground variant="default" />
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
+    <section
+      ref={sectionRef}
+      id="testimonials"
+      className="relative py-24 lg:py-36 overflow-hidden section-deep"
+    >
+      <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
           className="text-center mb-16"
         >
-          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
+          <span className="text-xs font-bold text-[var(--brand-primary)] uppercase tracking-wider mb-3 block">
             Testimonials
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
-            Loved by Students Everywhere
+          </span>
+          <h2 className="text-h1 font-bold text-[var(--text-primary)]">
+            Loved by students everywhere.
           </h2>
-          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg">
-            Join thousands of learners who have transformed their study habits
-          </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {testimonials.map((testimonial, i) => (
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
+          {testimonials.map((t, i) => (
             <motion.div
-              key={i}
+              key={t.name}
               initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: i * 0.1, duration: 0.6 }}
             >
-              <Card className="h-full bg-[var(--surface-card)] border-[var(--surface-border)] hover:border-[var(--brand-primary)]/30 transition-all hover:-translate-y-1">
-                <CardContent className="p-6">
-                  <div className="flex mb-3">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star
-                        key={star}
-                        size={14}
-                        className="text-yellow-400 fill-yellow-400"
-                      />
+              <DirectionCard className="h-full rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)]/80 p-6 flex flex-col justify-between backdrop-blur-sm">
+                <div className="relative z-10">
+                  <div className="flex gap-px mb-4">
+                    {[...Array(5)].map((_, j) => (
+                      <Star key={j} size={13} className="fill-[var(--pop-gold)] text-[var(--pop-gold)]" />
                     ))}
                   </div>
-                  <p className="text-[var(--text-secondary)] text-sm leading-relaxed mb-4 italic">
-                    &ldquo;{testimonial.content}&rdquo;
+                  <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-6">
+                    &ldquo;{t.quote}&rdquo;
                   </p>
-                  <div className="flex items-center gap-3 pt-4 border-t border-[var(--surface-border)]">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--brand-primary)]/30 to-[var(--brand-secondary)]/30 flex items-center justify-center text-sm font-bold text-[var(--text-primary)]">
-                      {testimonial.avatar}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-[var(--text-primary)] text-sm">
-                        {testimonial.name}
-                      </p>
-                      <p className="text-[var(--text-muted)] text-xs">{testimonial.role}</p>
-                    </div>
+                </div>
+                <div className="flex items-center gap-3 relative z-10">
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                    style={{ background: "linear-gradient(135deg, var(--brand-primary), var(--pop-coral))" }}
+                  >
+                    {t.initials}
                   </div>
-                </CardContent>
-              </Card>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{t.name}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{t.role}</p>
+                  </div>
+                </div>
+              </DirectionCard>
             </motion.div>
           ))}
         </div>
+
+        <UtoWithBubble
+          variant="neutral"
+          message="Don't just take my word for it..."
+          position="left"
+          size="md"
+        />
       </div>
     </section>
   );
 }
 
-// ============================================
+// ─────────────────────────────────────────────
 // PRICING SECTION
-// ============================================
+// ─────────────────────────────────────────────
+
 function PricingSection() {
-  const [isYearly, setIsYearly] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
   const plans = [
     {
       name: "Free",
-      price: { monthly: 0, yearly: 0 },
-      description: "Perfect for getting started",
+      price: { monthly: 0, annual: 0 },
+      desc: "Perfect for exploring",
       features: [
-        "5 documents per month",
-        "10 quizzes per day",
-        "Basic question types (MCQ, T/F)",
-        "Community support",
+        "3 documents per month",
+        "Up to 10 questions per quiz",
+        "MCQ & True/False only",
+        "Basic progress tracking",
       ],
       cta: "Get Started",
       popular: false,
     },
     {
       name: "Pro",
-      price: { monthly: 9, yearly: 7 },
-      description: "For serious learners",
+      price: { monthly: 12, annual: 9 },
+      desc: "For serious students",
       features: [
         "Unlimited documents",
-        "Unlimited quizzes",
-        "All question types including Free Text",
+        "Unlimited questions",
+        "All question types (incl. free text)",
         "Advanced analytics",
-        "Priority support",
-        "Export results",
+        "Priority AI processing",
+        "Export quiz results",
       ],
-      cta: "Start Pro Trial",
+      cta: "Start Free Trial",
       popular: true,
     },
   ];
 
   return (
-    <section id="pricing" className="section-padding relative">
-      {/* Animated Background */}
-      <SectionBackground variant="mesh" />
-      <div className="mx-auto max-w-[1200px] px-6 lg:px-8 relative z-10">
+    <section
+      ref={sectionRef}
+      id="pricing"
+      className="relative py-24 lg:py-36 overflow-hidden section-oled"
+    >
+      <WarmAuroraBackground />
+
+      <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
           className="text-center mb-12"
         >
-          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
+          <span className="text-xs font-bold text-[var(--pop-teal)] uppercase tracking-wider mb-3 block">
             Pricing
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
-            Simple, Transparent Pricing
+          </span>
+          <h2 className="text-h1 font-bold text-[var(--text-primary)] mb-4">
+            Simple, honest pricing.
           </h2>
-          <p className="text-[var(--text-secondary)] max-w-2xl mx-auto text-lg mb-8">
-            Choose the plan that fits your learning journey
-          </p>
 
           {/* Toggle */}
-          <div className="flex items-center justify-center gap-4">
-            <span
+          <div className="inline-flex items-center gap-3 mt-6 p-1 rounded-full border border-[var(--surface-border)] bg-[var(--surface-card)]/50">
+            <button
+              onClick={() => setIsAnnual(false)}
               className={cn(
-                "text-sm font-medium transition-colors",
-                !isYearly ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                "px-4 py-1.5 rounded-full text-sm font-medium transition-all",
+                !isAnnual
+                  ? "bg-[var(--brand-primary)] text-white"
+                  : "text-[var(--text-secondary)]"
               )}
             >
               Monthly
-            </span>
-            <button
-              onClick={() => setIsYearly(!isYearly)}
-              className="relative w-14 h-7 rounded-full bg-[var(--surface-card)] transition-colors"
-            >
-              <motion.div
-                animate={{ x: isYearly ? 26 : 2 }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                className="absolute top-1 w-5 h-5 rounded-full bg-[var(--brand-primary)]"
-              />
             </button>
-            <span
+            <button
+              onClick={() => setIsAnnual(true)}
               className={cn(
-                "text-sm font-medium transition-colors",
-                isYearly ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+                "px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-2",
+                isAnnual
+                  ? "bg-[var(--brand-primary)] text-white"
+                  : "text-[var(--text-secondary)]"
               )}
             >
-              Yearly{" "}
-              <span className="text-[var(--success)] text-xs font-bold">Save 22%</span>
-            </span>
+              Annual
+              <span className="text-xs bg-[var(--pop-coral)]/20 text-[var(--pop-coral)] px-2 py-0.5 rounded-full font-bold">
+                -25%
+              </span>
+            </button>
           </div>
         </motion.div>
 
-        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
           {plans.map((plan, i) => (
             <motion.div
               key={plan.name}
               initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: i * 0.1, duration: 0.6 }}
             >
-              <Card className={cn(
-                "h-full relative overflow-hidden",
-                plan.popular 
-                  ? "bg-[var(--surface-card)] border-[var(--brand-primary)] shadow-xl shadow-[var(--brand-primary)]/10" 
-                  : "bg-[var(--surface-dark)] border-[var(--surface-border)]"
-              )}>
-                {plan.popular && (
-                  <div className="absolute top-0 right-0 bg-[var(--brand-primary)] text-[var(--surface-dark)] text-xs font-bold px-3 py-1 rounded-bl-lg">
-                    POPULAR
+              {plan.popular ? (
+                <div className="p-[1px] rounded-2xl bg-gradient-to-br from-[var(--brand-primary)] via-[var(--pop-coral)] to-[var(--pop-gold)] shadow-lg shadow-[var(--pop-coral)]/15 h-full">
+                  <SpotlightCard
+                    glowColor="var(--pop-coral)"
+                    className="rounded-[calc(1rem-1px)] bg-[var(--surface-card)] h-full p-7 flex flex-col"
+                  >
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <span className="text-xs font-bold text-[var(--pop-coral)] uppercase tracking-wider mb-1 block">
+                          Most Popular
+                        </span>
+                        <h3 className="text-xl font-bold text-[var(--text-primary)]">
+                          {plan.name}
+                        </h3>
+                        <p className="text-sm text-[var(--text-secondary)]">{plan.desc}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="flex items-baseline gap-1 justify-end">
+                          <span className="text-3xl font-extrabold gradient-text-warm">
+                            ${isAnnual ? plan.price.annual : plan.price.monthly}
+                          </span>
+                          <span className="text-sm text-[var(--text-secondary)]">/mo</span>
+                        </div>
+                        {isAnnual && (
+                          <span className="text-xs text-[var(--text-secondary)]">billed annually</span>
+                        )}
+                      </div>
+                    </div>
+                    <ul className="space-y-3 mb-8 flex-1">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+                          <Check size={14} className="text-[var(--pop-teal)] shrink-0" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link href="/register">
+                      <BgAnimateButton
+                        gradient="sunrise"
+                        animation="pulse"
+                        rounded="full"
+                        className="w-full"
+                        shadow="soft"
+                      >
+                        {plan.cta}
+                      </BgAnimateButton>
+                    </Link>
+                  </SpotlightCard>
+                </div>
+              ) : (
+                <SpotlightCard
+                  glowColor="var(--brand-primary)"
+                  className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)] h-full p-7 flex flex-col"
+                >
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="text-xl font-bold text-[var(--text-primary)]">{plan.name}</h3>
+                      <p className="text-sm text-[var(--text-secondary)]">{plan.desc}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-baseline gap-1 justify-end">
+                        <span className="text-3xl font-extrabold text-[var(--text-primary)]">Free</span>
+                      </div>
+                      <span className="text-xs text-[var(--text-secondary)]">forever</span>
+                    </div>
                   </div>
-                )}
-                <CardContent className="p-8">
-                  <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2 font-heading">
-                    {plan.name}
-                  </h3>
-                  <p className="text-[var(--text-muted)] text-sm mb-6">{plan.description}</p>
-
-                  <div className="mb-6">
-                    <span className="text-4xl font-extrabold text-[var(--text-primary)] font-heading">
-                      ${isYearly ? plan.price.yearly : plan.price.monthly}
-                    </span>
-                    <span className="text-[var(--text-muted)]">/month</span>
-                    {isYearly && plan.price.yearly > 0 && (
-                      <p className="text-xs text-[var(--text-muted)] mt-1">
-                        Billed annually (${plan.price.yearly * 12}/year)
-                      </p>
-                    )}
-                  </div>
-
-                  <ul className="space-y-3 mb-8">
-                    {plan.features.map((feature, fi) => (
-                      <li key={fi} className="flex items-start gap-3">
-                        <Check
-                          size={18}
-                          className={cn(
-                            "flex-shrink-0 mt-0.5",
-                            plan.popular ? "text-[var(--brand-primary)]" : "text-[var(--success)]"
-                          )}
-                        />
-                        <span className="text-[var(--text-secondary)] text-sm">{feature}</span>
+                  <ul className="space-y-3 mb-8 flex-1">
+                    {plan.features.map((f) => (
+                      <li key={f} className="flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+                        <Check size={14} className="text-[var(--brand-primary)] shrink-0" />
+                        {f}
                       </li>
                     ))}
                   </ul>
-
-                  <Button 
-                    asChild 
-                    className="w-full" 
-                    variant={plan.popular ? "default" : "outline"}
-                    size="lg"
-                  >
-                    <Link href="/signup">{plan.cta}</Link>
-                  </Button>
-                </CardContent>
-              </Card>
+                  <Link href="/register">
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-full border-[var(--surface-border)] hover:border-[var(--brand-primary)]/50"
+                    >
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                </SpotlightCard>
+              )}
             </motion.div>
           ))}
         </div>
@@ -1194,104 +1490,102 @@ function PricingSection() {
   );
 }
 
-// ============================================
+// ─────────────────────────────────────────────
 // FAQ SECTION
-// ============================================
+// ─────────────────────────────────────────────
+
 function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
 
   const faqs = [
     {
-      question: "How does AutoCoach generate quizzes?",
-      answer:
-        "AutoCoach uses advanced AI (powered by Kimi K2.5 and GPT-4) to analyze your uploaded documents, extract key concepts, and generate relevant quiz questions. The AI understands context and creates questions that test different levels of understanding.",
+      q: "What file types does AutoCoach support?",
+      a: "Currently PDF and PowerPoint (.pptx) files. We extract all text content including slide notes and document metadata.",
     },
     {
-      question: "What file formats are supported?",
-      answer:
-        "Currently, AutoCoach supports PDF and PowerPoint (PPTX) files. We extract text, process it into semantic chunks, and use embeddings to create a searchable knowledge base for quiz generation.",
+      q: "How are free-text answers evaluated?",
+      a: "Your answers are evaluated semantically by Kimi K2.5 — it understands meaning, not just keywords. A correct concept expressed in your own words will be marked correct.",
     },
     {
-      question: "How accurate is the answer evaluation?",
-      answer:
-        "For multiple choice and true/false questions, answers are evaluated with 100% accuracy. For free-text responses, our AI uses semantic evaluation to understand the meaning of your answer, not just exact word matches, achieving over 95% accuracy.",
+      q: "Is my document data kept private?",
+      a: "Yes. Documents are processed, then stored securely in your private account. We never use your content to train models or share it with third parties.",
     },
     {
-      question: "Can I use AutoCoach offline?",
-      answer:
-        "AutoCoach requires an internet connection to generate quizzes and evaluate answers as it relies on cloud-based AI services. However, we're exploring offline features for future releases.",
+      q: "How is this different from Anki or Quizlet?",
+      a: "Anki and Quizlet require you to manually create cards. AutoCoach reads your documents and generates contextual questions automatically — then adapts to your weak spots.",
     },
     {
-      question: "Is my data secure?",
-      answer:
-        "Yes, we take data security seriously. Your documents are stored securely using Supabase with row-level security. We never share your data with third parties, and you can delete your documents at any time.",
-    },
-    {
-      question: "How do I cancel my subscription?",
-      answer:
-        "You can cancel your Pro subscription at any time from your account settings. Your access will continue until the end of your billing period. Free accounts never expire.",
+      q: "Can I cancel anytime?",
+      a: "Yes. Cancel anytime from your account settings. No lock-in, no cancellation fees.",
     },
   ];
 
   return (
-    <section className="section-padding relative">
-      {/* Animated Background */}
-      <SectionBackground variant="default" />
-      <div className="mx-auto max-w-[800px] px-6 lg:px-8 relative z-10">
+    <section
+      ref={sectionRef}
+      className="relative py-24 lg:py-32 overflow-hidden section-deep"
+    >
+      <div className="absolute inset-0 opacity-50 pointer-events-none warm-aurora-bg" />
+
+      <div className="relative z-10 mx-auto max-w-[720px] px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-12"
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          className="text-center mb-14"
         >
-          <Badge className="mb-4 bg-[var(--brand-primary)]/10 text-[var(--brand-primary)] hover:bg-[var(--brand-primary)]/20">
+          <span className="text-xs font-bold text-[var(--pop-gold)] uppercase tracking-wider mb-3 block">
             FAQ
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-[var(--text-primary)] mb-4 font-heading">
-            Frequently Asked Questions
+          </span>
+          <h2 className="text-h1 font-bold text-[var(--text-primary)]">
+            Got questions? I&apos;ve got answers.
           </h2>
-          <p className="text-[var(--text-secondary)] text-lg">
-            Got questions? We&apos;ve got answers.
-          </p>
         </motion.div>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {faqs.map((faq, i) => (
             <motion.div
-              key={i}
+              key={faq.q}
               initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.5, delay: i * 0.05 }}
+              animate={isInView ? { opacity: 1, y: 0 } : {}}
+              transition={{ delay: i * 0.06 }}
+              className={cn(
+                "rounded-2xl border transition-colors duration-200 overflow-hidden",
+                openIndex === i
+                  ? "border-[var(--pop-coral)]/30 bg-[var(--surface-card)]"
+                  : "border-[var(--surface-border)] bg-[var(--surface-card)]/50"
+              )}
             >
-              <Card className="bg-[var(--surface-card)] border-[var(--surface-border)] overflow-hidden">
-                <button
-                  onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                  className="w-full flex items-center justify-between p-5 text-left"
+              <button
+                className="w-full px-6 py-5 flex items-center justify-between text-left"
+                onClick={() => setOpenIndex(openIndex === i ? null : i)}
+              >
+                <span className="font-semibold text-[var(--text-primary)] text-sm pr-4">
+                  {faq.q}
+                </span>
+                <motion.div
+                  animate={{ rotate: openIndex === i ? 45 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="shrink-0 text-[var(--pop-coral)]"
                 >
-                  <span className="font-semibold text-[var(--text-primary)] pr-4">
-                    {faq.question}
-                  </span>
+                  <X size={16} />
+                </motion.div>
+              </button>
+              <AnimatePresence initial={false}>
+                {openIndex === i && (
                   <motion.div
-                    animate={{ rotate: openIndex === i ? 180 : 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex-shrink-0"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                   >
-                    <ChevronDown size={20} className="text-[var(--text-muted)]" />
+                    <div className="px-6 pb-5 text-sm text-[var(--text-secondary)] leading-relaxed">
+                      {faq.a}
+                    </div>
                   </motion.div>
-                </button>
-                <div className={cn(
-                  "grid transition-all duration-300",
-                  openIndex === i ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                )}>
-                  <div className="overflow-hidden">
-                    <p className="px-5 pb-5 text-[var(--text-secondary)] leading-relaxed">
-                      {faq.answer}
-                    </p>
-                  </div>
-                </div>
-              </Card>
+                )}
+              </AnimatePresence>
             </motion.div>
           ))}
         </div>
@@ -1300,221 +1594,200 @@ function FAQSection() {
   );
 }
 
-// ============================================
+// ─────────────────────────────────────────────
 // FINAL CTA SECTION
-// ============================================
+// ─────────────────────────────────────────────
+
 function FinalCTASection() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const isInView = useInView(sectionRef, { once: true, margin: "-100px" });
+
   return (
     <section
-      className="section-padding relative overflow-hidden"
+      ref={sectionRef}
+      className="relative py-32 lg:py-40 overflow-hidden section-oled"
     >
-      {/* Animated Background */}
-      <SectionBackground variant="gradient" />
+      <WarmAuroraBackground />
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div
+          className="w-[700px] h-[700px] rounded-full"
+          style={{
+            background: "radial-gradient(circle, var(--pop-gold) 0%, transparent 60%)",
+            opacity: 0.05,
+            filter: "blur(80px)",
+          }}
+        />
+      </div>
 
-      <div className="relative z-10 mx-auto max-w-[800px] px-6 lg:px-8 text-center">
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.6 }}
-          className="flex flex-col items-center"
-        >
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-[var(--text-primary)] mb-6 font-heading">
-            Start Learning Smarter Today
-          </h2>
-          <p className="text-[var(--text-secondary)] text-lg mb-8 max-w-lg mx-auto">
-            Join thousands of students who are already mastering their subjects with
-            AI-powered quizzes.
-          </p>
-
+      <div className="relative z-10 mx-auto max-w-[1200px] px-6 lg:px-8">
+        <div className="grid lg:grid-cols-2 gap-16 items-center">
+          {/* Left */}
           <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, x: -40 }}
+            animate={isInView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
           >
-            <Button size="lg" asChild className="text-lg px-8 shadow-xl shadow-[var(--brand-primary)]/20">
-              <Link href="/signup">
-                Get Started Free
-                <ArrowRight className="ml-2 w-5 h-5" />
+            <h2 className="text-hero font-extrabold mb-6">
+              <span className="text-[var(--text-primary)] block">One quiz.</span>
+              <span className="gradient-text-warm block">Could change everything.</span>
+            </h2>
+            <p className="text-lg text-[var(--text-secondary)] mb-10 leading-relaxed max-w-md">
+              Drop a document. Get quizzed. Remember more. It really is that simple.
+            </p>
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <Link href="/register">
+                <BgAnimateButton
+                  gradient="sunset"
+                  animation="pulse"
+                  rounded="full"
+                  size="lg"
+                  shadow="deeper"
+                >
+                  <span className="flex items-center gap-2">
+                    Start for free
+                    <ArrowRight size={16} />
+                  </span>
+                </BgAnimateButton>
               </Link>
-            </Button>
+            </div>
+            <p className="text-xs text-[var(--text-secondary)] mt-4">
+              No credit card. No commitment.
+            </p>
           </motion.div>
 
-          <p className="mt-4 text-sm text-[var(--text-muted)]">
-            No credit card required. Start learning in seconds.
-          </p>
-        </motion.div>
+          {/* Right — Uto + bubble */}
+          <motion.div
+            initial={{ opacity: 0, x: 40 }}
+            animate={isInView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 0.7, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-col items-center gap-6"
+          >
+            <div className="relative bg-[var(--surface-card)] border border-[var(--brand-primary)]/30 rounded-2xl px-6 py-5 shadow-xl shadow-[var(--pop-coral)]/10 max-w-xs">
+              <p className="text-sm font-medium text-[var(--text-primary)] leading-relaxed">
+                Come on...{" "}
+                <span className="text-[var(--pop-coral)] font-bold">one quiz</span> won&apos;t hurt.
+                It might just change everything.
+              </p>
+              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0 border-t-[10px] border-t-[var(--surface-card)] border-x-[10px] border-x-transparent" />
+            </div>
+            <div className="relative w-64 h-64 lg:w-72 lg:h-72">
+              <div className="absolute inset-0 bg-[var(--pop-coral)] opacity-20 blur-3xl rounded-full animate-glow-pulse-primary" />
+              <div className="absolute inset-0 bg-[var(--pop-gold)] opacity-15 blur-2xl rounded-full animate-glow-pulse-secondary" />
+              <SentinelMascot variant="pleading" className="w-full h-full" />
+            </div>
+          </motion.div>
+        </div>
       </div>
     </section>
   );
 }
 
-// ============================================
+// ─────────────────────────────────────────────
 // FOOTER
-// ============================================
-function Footer() {
-  const footerLinks = {
-    product: [
-      { label: "Features", href: "#features" },
-      { label: "Pricing", href: "#pricing" },
-      { label: "FAQ", href: "#faq" },
-      { label: "Demo", href: "#demo" },
-    ],
-    resources: [
-      { label: "Blog", href: "#" },
-      { label: "Documentation", href: "#" },
-      { label: "Tutorials", href: "#" },
-    ],
-    company: [
-      { label: "About", href: "#" },
-      { label: "Contact", href: "#" },
-      { label: "Careers", href: "#" },
-    ],
-  };
+// ─────────────────────────────────────────────
 
+function Footer() {
   return (
-    <footer className="bg-[var(--surface-darker)] text-[var(--text-primary)] py-16 border-t border-[var(--surface-border)]">
+    <footer
+      className="relative py-16 border-t border-[var(--surface-border)]"
+      style={{ background: "var(--surface-oled)" }}
+    >
       <div className="mx-auto max-w-[1200px] px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-8 lg:gap-12 mb-12">
-          {/* Brand Column */}
-          <div className="col-span-2 md:col-span-3 lg:col-span-1">
-            <LogoFull size="md" className="mb-4" />
-            <p className="text-[var(--text-muted)] text-sm mb-6 max-w-xs">
-              Transform your documents into interactive learning experiences with
-              AI-powered quizzes.
+        <div className="grid md:grid-cols-4 gap-10 mb-12">
+          {/* Brand */}
+          <div className="md:col-span-2">
+            <Logo size="lg" animated />
+            <p className="text-sm text-[var(--text-secondary)] mt-4 max-w-xs leading-relaxed">
+              AI-powered study partner that transforms your documents into intelligent quizzes.
+              Built on science. Built for students.
             </p>
-            <div className="flex items-center gap-3">
-              <a
-                href="#"
-                className="w-9 h-9 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--brand-primary)]/20 flex items-center justify-center transition-colors"
-              >
-                <Twitter size={18} />
-              </a>
-              <a
-                href="#"
-                className="w-9 h-9 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--brand-primary)]/20 flex items-center justify-center transition-colors"
-              >
-                <Linkedin size={18} />
-              </a>
-              <a
-                href="#"
-                className="w-9 h-9 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--brand-primary)]/20 flex items-center justify-center transition-colors"
-              >
-                <Github size={18} />
-              </a>
+            <div className="flex gap-4 mt-6">
+              {[
+                { Icon: Twitter, href: "#" },
+                { Icon: Linkedin, href: "#" },
+                { Icon: Github, href: "#" },
+              ].map(({ Icon, href }, i) => (
+                <a
+                  key={i}
+                  href={href}
+                  className="w-9 h-9 rounded-full border border-[var(--surface-border)] flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--pop-coral)] hover:border-[var(--pop-coral)]/50 transition-colors duration-200"
+                >
+                  <Icon size={15} />
+                </a>
+              ))}
             </div>
           </div>
 
-          {/* Product Links */}
+          {/* Links */}
           <div>
-            <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Product</h4>
-            <ul className="space-y-3">
-              {footerLinks.product.map((link) => (
-                <li key={link.label}>
+            <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Product</h4>
+            <ul className="space-y-2.5">
+              {["Features", "How It Works", "Pricing", "Changelog"].map((item) => (
+                <li key={item}>
                   <a
-                    href={link.href}
-                    className="text-[var(--text-muted)] hover:text-[var(--brand-primary)] text-sm transition-colors"
+                    href="#"
+                    className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                   >
-                    {link.label}
+                    {item}
                   </a>
                 </li>
               ))}
             </ul>
           </div>
 
-          {/* Resources Links */}
           <div>
-            <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Resources</h4>
-            <ul className="space-y-3">
-              {footerLinks.resources.map((link) => (
-                <li key={link.label}>
+            <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Legal</h4>
+            <ul className="space-y-2.5">
+              {["Privacy Policy", "Terms of Service", "Cookie Policy"].map((item) => (
+                <li key={item}>
                   <a
-                    href={link.href}
-                    className="text-[var(--text-muted)] hover:text-[var(--brand-primary)] text-sm transition-colors"
+                    href="#"
+                    className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
                   >
-                    {link.label}
+                    {item}
                   </a>
                 </li>
               ))}
             </ul>
-          </div>
-
-          {/* Company Links */}
-          <div>
-            <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Company</h4>
-            <ul className="space-y-3">
-              {footerLinks.company.map((link) => (
-                <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-[var(--text-muted)] hover:text-[var(--brand-primary)] text-sm transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Newsletter */}
-          <div>
-            <h4 className="font-semibold mb-4 text-[var(--text-primary)]">Stay Updated</h4>
-            <p className="text-[var(--text-muted)] text-sm mb-4">
-              Get tips and updates delivered to your inbox.
-            </p>
-            <form className="flex gap-2">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-3 py-2 rounded-lg bg-[var(--surface-card)] border border-[var(--surface-border)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] text-sm focus:outline-none focus:border-[var(--brand-primary)]"
-              />
-              <Button type="submit" size="sm">
-                Join
-              </Button>
-            </form>
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="pt-8 border-t border-[var(--surface-border)] flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-[var(--text-muted)] text-sm">
-            © 2026 AutoCoach. All rights reserved.
+        <div className="pt-8 border-t border-[var(--surface-border)] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-[var(--text-secondary)]">
+            © {new Date().getFullYear()} AutoCoach. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
-            <a href="#" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
-              Privacy Policy
-            </a>
-            <a href="#" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
-              Terms of Service
-            </a>
-            <a href="#" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] text-sm transition-colors">
-              Cookie Policy
-            </a>
-          </div>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Made with{" "}
+            <span className="text-[var(--pop-coral)]">♥</span> for students everywhere.
+          </p>
         </div>
       </div>
     </footer>
   );
 }
 
-// ============================================
-// MAIN PAGE COMPONENT
-// ============================================
+// ─────────────────────────────────────────────
+// PAGE ROOT
+// ─────────────────────────────────────────────
+
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[var(--surface-dark)] text-[var(--text-primary)] overflow-x-hidden">
+    <div
+      className="relative min-h-screen"
+      style={{ background: "var(--surface-oled)", color: "var(--text-primary)" }}
+    >
       <Navigation />
       <HeroSection />
+      <ProblemSection />
       <FeaturesSection />
       <HowItWorksSection />
-      <DemoSection />
+      <StatsSection />
       <TestimonialsSection />
       <PricingSection />
       <FAQSection />
       <FinalCTASection />
       <Footer />
-      
-      {/* Floating Mascot Guide */}
-      <MascotGuide enabled={true} />
+      <MascotGuide />
     </div>
   );
 }

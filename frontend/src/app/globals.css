@@ -50,6 +50,15 @@
   /* Default theme (Dark Mode First) */
   --background: #34344a;
   --foreground: #f2f5de;
+
+  /* Landing page OLED surfaces (scoped to landing page components only) */
+  --surface-oled: #0f0f14;
+  --surface-deep: #16161f;
+
+  /* Popping accent colors — derived from brand palette */
+  --pop-coral: #ff6b47;  /* Electric Coral — intensified dusty rose */
+  --pop-gold: #fbbf24;   /* Warm Gold — amplified toasted almond */
+  --pop-teal: #00c9a7;   /* Electric Teal — cool complement pop */
 }
 
 @theme inline {
@@ -95,10 +104,17 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
-  /* Typography */
-  --font-sans: var(--font-inter), 'DM Sans', system-ui, sans-serif;
+  /* Typography — Rubik as primary, Inter/Jakarta as fallback */
+  --font-sans: var(--font-rubik), var(--font-inter), 'DM Sans', system-ui, sans-serif;
   --font-serif: 'Playfair Display', 'Cormorant Garamond', Georgia, serif;
-  --font-heading: var(--font-jakarta);
+  --font-heading: var(--font-rubik), var(--font-jakarta), sans-serif;
+
+  /* New color tokens */
+  --color-surface-oled: var(--surface-oled);
+  --color-surface-deep: var(--surface-deep);
+  --color-pop-coral: var(--pop-coral);
+  --color-pop-gold: var(--pop-gold);
+  --color-pop-teal: var(--pop-teal);
 }
 
 /* ============================================
@@ -115,28 +131,28 @@
   font-family: var(--font-inter), 'DM Sans', system-ui, sans-serif;
 }
 
-/* Hero/Brand: 64-96px */
+/* Hero/Brand: Rubik 800 — geometric and commanding */
 .text-hero {
   font-size: clamp(48px, 8vw, 96px);
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 
-/* H1: 48px */
+/* H1: Rubik 700 */
 .text-h1 {
-  font-size: clamp(32px, 5vw, 48px);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
-/* H2: 32px */
+/* H2: Rubik 600 */
 .text-h2 {
-  font-size: clamp(24px, 3vw, 32px);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
+  font-size: clamp(24px, 3vw, 38px);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
 }
 
 /* Body: 16px */
@@ -161,12 +177,12 @@
   line-height: 1.5;
 }
 
-/* Decorative numerals: 120px+ */
+/* Decorative numerals: Rubik 300 — ultra-light for max contrast with heavy headings */
 .text-numeral {
-  font-size: clamp(80px, 12vw, 140px);
+  font-size: clamp(72px, 11vw, 128px);
   font-weight: 300;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
 }
 
 /* ============================================
@@ -178,7 +194,7 @@ html {
 }
 
 body {
-  font-family: var(--font-inter), 'DM Sans', system-ui, sans-serif;
+  font-family: var(--font-rubik), var(--font-inter), 'DM Sans', system-ui, sans-serif;
   background: var(--surface-dark);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -425,6 +441,14 @@ body {
   to { stroke-dashoffset: 0; }
 }
 
+/* Warm aurora drift — for landing page ambient orbs */
+@keyframes warm-drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  40%  { transform: translate(35px, -25px) scale(1.08); }
+  70%  { transform: translate(-20px, 18px) scale(0.96); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
 /* ============================================
    UTILITY CLASSES
    ============================================ */
@@ -497,6 +521,9 @@ body {
 .float-medium { animation: float-medium 4s ease-in-out infinite; }
 .float-fast { animation: float-fast 3s ease-in-out infinite; }
 
+.animate-warm-drift      { animation: warm-drift 22s ease-in-out infinite; }
+.animate-warm-drift-slow { animation: warm-drift 32s ease-in-out infinite reverse; }
+
 /* Stagger delays */
 .stagger-1 { animation-delay: 0.1s; }
 .stagger-2 { animation-delay: 0.2s; }
@@ -526,6 +553,31 @@ body {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+/* Warm gradient text — coral → gold pop (landing page hero) */
+.gradient-text-warm {
+  background: linear-gradient(135deg, var(--brand-primary) 0%, var(--pop-coral) 50%, var(--pop-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Warm aurora background — OLED dark with brand-derived glows */
+.warm-aurora-bg {
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 25%, rgba(255, 107, 71, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 70% at 85% 75%, rgba(0, 201, 167, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse 40% 40% at 55% 15%, rgba(251, 191, 36, 0.08) 0%, transparent 50%),
+    var(--surface-oled);
+}
+
+/* Section padding utility */
+.section-oled {
+  background: var(--surface-oled);
+}
+.section-deep {
+  background: var(--surface-deep);
 }
 
 /* Shimmer loading effect */
