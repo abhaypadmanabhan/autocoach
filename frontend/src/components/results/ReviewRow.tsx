@@ -19,12 +19,14 @@ import type { QuestionType } from "@/lib/types";
 
 function getQuestionTypeLabel(type: QuestionType) {
   switch (type) {
-    case "mcq":
+    case "text_mcq":
       return "Multiple Choice";
-    case "true_false":
+    case "text_tf":
       return "True/False";
-    case "free_text":
+    case "text_free":
       return "Free Response";
+    case "rendered":
+      return "Interactive";
     default:
       return type;
   }
@@ -174,12 +176,14 @@ export function ReviewRow({
 
   const getQuestionTypeIcon = (type: QuestionType) => {
     switch (type) {
-      case "mcq":
+      case "text_mcq":
         return "🔘";
-      case "true_false":
+      case "text_tf":
         return "✓";
-      case "free_text":
+      case "text_free":
         return "✏️";
+      case "rendered":
+        return "🎛️";
       default:
         return "❓";
     }

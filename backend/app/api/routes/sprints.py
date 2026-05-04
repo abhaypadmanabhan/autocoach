@@ -212,7 +212,7 @@ def _create_sprint_session(user_id: UUID) -> dict:
         document_id=target_document_id,
         num_questions=5,
         difficulty="medium",
-        question_types=["mcq", "true_false"],
+        question_types=["text_mcq", "text_tf"],
     )
 
     session_id = session_data["session_id"]

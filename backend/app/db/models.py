@@ -17,7 +17,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB, ENUM as PG_ENUM
 
 
 from app.db.base import Base
@@ -239,7 +239,17 @@ class Question(Base):
         nullable=False,
     )
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
-    question_type: Mapped[str] = mapped_column(Text, nullable=False)
+    question_type: Mapped[str] = mapped_column(
+        PG_ENUM(
+            "text_free",
+            "text_mcq",
+            "text_tf",
+            "rendered",
+            name="question_type_enum",
+            create_type=False,
+        ),
+        nullable=False,
+    )
     input_method: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     options: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     correct_answer: Mapped[str] = mapped_column(Text, nullable=False)
@@ -257,6 +267,8 @@ class Question(Base):
     concept_ids: Mapped[Optional[List[UUID]]] = mapped_column(
         ARRAY(PG_UUID(as_uuid=True)), nullable=True
     )
+    render_kind: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    render_payload: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
 
 class QuizSession(Base):

@@ -1,0 +1,189 @@
+"""Tests for the adaptive concept selector and end-on-mastery logic."""
+
+import random
+from unittest.mock import patch
+
+import pytest
+
+from app.services import session_manager
+
+
+CORE_A = "11111111-1111-1111-1111-111111111111"
+CORE_B = "22222222-2222-2222-2222-222222222222"
+CORE_C = "33333333-3333-3333-3333-333333333333"
+
+DOC_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+USER_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+SESSION_ID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
+
+
+def _concept(cid: str, importance: float, mastery: float, is_core: bool = True) -> dict:
+    return {
+        "id": cid,
+        "concept_name": f"Concept-{cid[:4]}",
+        "importance_score": importance,
+        "is_core": is_core,
+        "mastery_score": mastery,
+    }
+
+
+def _hist(question_records: list[dict]) -> list[dict]:
+    """Helper to build a question history with sane defaults."""
+    out = []
+    for i, q in enumerate(question_records, start=1):
+        out.append(
+            {
+                "id": f"q-{i}",
+                "concept_ids": q["concept_ids"],
+                "is_correct": q["is_correct"],
+                "user_answer": "x",
+                "answered_at": f"2026-05-04T00:00:0{i}+00:00",
+                "question_number": i,
+            }
+        )
+    return out
+
+
+def test_selector_prefers_low_mastery_core_concept():
+    """Without history, weighted pick should heavily favour low-mastery concepts."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=10.0),  # weight ≈ 90
+        _concept(CORE_B, importance=1.0, mastery=70.0),  # weight ≈ 30
+    ]
+    with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+         patch.object(session_manager, "_get_session_question_history", return_value=[]):
+        random.seed(0)
+        picks = [
+            session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)["id"]
+            for _ in range(400)
+        ]
+
+    a_count = picks.count(CORE_A)
+    # With 30% exploration over 2 concepts, expected baseline for A is ~0.7*0.75 + 0.3*0.5 = 0.675
+    assert a_count > picks.count(CORE_B), "Low-mastery concept should win majority of picks"
+    assert a_count / len(picks) > 0.55
+
+
+def test_selector_skips_concept_after_three_consecutive_correct():
+    """A concept answered correctly 3 times in a row this session is excluded."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=20.0),
+        _concept(CORE_B, importance=1.0, mastery=20.0),
+    ]
+    history = _hist([
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": True},
+    ])
+
+    with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+         patch.object(session_manager, "_get_session_question_history", return_value=history):
+        random.seed(0)
+        picks = [
+            session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)["id"]
+            for _ in range(50)
+        ]
+
+    assert all(p == CORE_B for p in picks), "A is locked-out after 3 trailing corrects"
+
+
+def test_selector_resets_streak_on_wrong_answer():
+    """A wrong answer in between resets the trailing-correct counter."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=20.0),
+        _concept(CORE_B, importance=1.0, mastery=20.0),
+    ]
+    # 2 correct, then wrong, then 2 more correct → trailing correct = 2 (< 3) → not skipped
+    history = _hist([
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": False},
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": True},
+    ])
+
+    with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+         patch.object(session_manager, "_get_session_question_history", return_value=history):
+        random.seed(0)
+        picks = [
+            session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)["id"]
+            for _ in range(200)
+        ]
+
+    assert CORE_A in picks, "A should not be locked out — the streak was broken by a wrong answer"
+
+
+def test_miss_streak_doubles_weight_on_wrong_answer():
+    """A wrong answer in the last 2 questions doubles the concept's weight."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=50.0),
+        _concept(CORE_B, importance=1.0, mastery=50.0),
+    ]
+    # No boost
+    base_history = _hist([{"concept_ids": [CORE_A], "is_correct": True}])
+    boost_history = _hist([{"concept_ids": [CORE_A], "is_correct": False}])
+
+    def run(history):
+        with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+             patch.object(session_manager, "_get_session_question_history", return_value=history):
+            random.seed(42)
+            return [
+                session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)["id"]
+                for _ in range(800)
+            ]
+
+    base_a = run(base_history).count(CORE_A)
+    boost_a = run(boost_history).count(CORE_A)
+    assert boost_a > base_a, (
+        f"Wrong-answer boost should increase A picks; base={base_a} boost={boost_a}"
+    )
+
+
+def test_all_core_mastered_helper():
+    mastered = [
+        _concept(CORE_A, 1.0, 80.0),
+        _concept(CORE_B, 1.0, 95.0),
+        _concept(CORE_C, 1.0, 40.0, is_core=False),  # advanced — ignored
+    ]
+    not_yet = [
+        _concept(CORE_A, 1.0, 80.0),
+        _concept(CORE_B, 1.0, 79.99),
+    ]
+    no_core = [_concept(CORE_A, 1.0, 100.0, is_core=False)]
+
+    assert session_manager._all_core_mastered(mastered) is True
+    assert session_manager._all_core_mastered(not_yet) is False
+    assert session_manager._all_core_mastered(no_core) is False
+    assert session_manager._all_core_mastered([]) is False
+
+
+def test_selector_returns_none_when_no_core_concepts():
+    """Edge case: a document with only advanced concepts cannot be selected for."""
+    concepts = [_concept(CORE_A, 1.0, 50.0, is_core=False)]
+    with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+         patch.object(session_manager, "_get_session_question_history", return_value=[]):
+        result = session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)
+    assert result is None
+
+
+def test_selector_falls_back_when_all_concepts_deprioritized():
+    """If every core concept has 3 trailing correct, fall back to full core list
+    rather than returning None — better to repeat than to dead-end."""
+    concepts = [
+        _concept(CORE_A, 1.0, 50.0),
+        _concept(CORE_B, 1.0, 50.0),
+    ]
+    history = _hist([
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+    ])
+    with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+         patch.object(session_manager, "_get_session_question_history", return_value=history):
+        random.seed(7)
+        result = session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)
+    assert result is not None
+    assert result["id"] in {CORE_A, CORE_B}

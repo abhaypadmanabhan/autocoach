@@ -192,43 +192,30 @@ def evaluate_answer(
     correct_answer: str,
     question_text: str = ""
 ) -> dict:
-    """
-    Route answer evaluation to the appropriate evaluator.
-
-    Args:
-        question_type: Type of question (mcq, true_false, free_text).
-        user_answer: The user's answer.
-        correct_answer: The correct answer.
-        question_text: The question text (for free_text evaluation context).
-
-    Returns:
-        Dictionary with is_correct and feedback.
-    """
+    """Route answer evaluation by canonical question_type enum value."""
     question_type = question_type.lower()
 
-    if question_type == "mcq":
+    if question_type == "text_mcq":
         is_correct, feedback = evaluate_mcq(user_answer, correct_answer)
         return {"is_correct": is_correct, "feedback": feedback}
 
-    elif question_type in ["true_false", "truefalse", "tf"]:
+    if question_type == "text_tf":
         is_correct, feedback = evaluate_true_false(user_answer, correct_answer)
         return {"is_correct": is_correct, "feedback": feedback}
 
-    elif question_type in ["free_text", "freetext", "free", "text"]:
+    if question_type == "text_free":
         is_correct, feedback, explanation = evaluate_free_text(
             user_answer, correct_answer, question_text
         )
         return {
             "is_correct": is_correct,
             "feedback": feedback,
-            "explanation": explanation
+            "explanation": explanation,
         }
 
-    else:
-        logger.warning(f"Unknown question type: {question_type}")
-        # Default to direct string comparison
-        is_correct = normalize_answer(user_answer) == normalize_answer(correct_answer)
-        return {
-            "is_correct": is_correct,
-            "feedback": "Correct!" if is_correct else "Incorrect."
-        }
+    logger.warning(f"Unknown question type: {question_type}")
+    is_correct = normalize_answer(user_answer) == normalize_answer(correct_answer)
+    return {
+        "is_correct": is_correct,
+        "feedback": "Correct!" if is_correct else "Incorrect.",
+    }

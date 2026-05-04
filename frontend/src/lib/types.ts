@@ -35,7 +35,7 @@ export class ApiError extends Error {
 }
 
 // Quiz types
-export type QuestionType = "mcq" | "true_false" | "free_text";
+export type QuestionType = "text_mcq" | "text_tf" | "text_free" | "rendered";
 export type Difficulty = "easy" | "medium" | "hard";
 export type QuizSessionStatus = "active" | "completed";
 export type InputMethod = "typed" | "click" | "voice";

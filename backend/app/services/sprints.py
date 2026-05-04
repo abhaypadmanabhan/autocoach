@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_NUM_QUESTIONS = 5
 DEFAULT_DIFFICULTY = "medium"
-DEFAULT_QUESTION_TYPES = ["mcq", "true_false", "free_text"]
+DEFAULT_QUESTION_TYPES = ["text_mcq", "text_tf", "text_free"]
 
 
 def _utc_today_date_str() -> str:

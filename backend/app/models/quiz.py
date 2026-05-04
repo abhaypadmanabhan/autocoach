@@ -1,6 +1,25 @@
 """Pydantic models for quiz generation and sessions."""
 
+from enum import Enum
+
 from pydantic import BaseModel, Field
+
+
+class QuestionType(str, Enum):
+    """Canonical question type values. `rendered` is reserved for renderable
+    question types (render_kind + render_payload) and is unused for now."""
+
+    TEXT_FREE = "text_free"
+    TEXT_MCQ = "text_mcq"
+    TEXT_TF = "text_tf"
+    RENDERED = "rendered"
+
+
+DEFAULT_QUESTION_TYPES: list[QuestionType] = [
+    QuestionType.TEXT_MCQ,
+    QuestionType.TEXT_TF,
+    QuestionType.TEXT_FREE,
+]
 
 
 class QuizGenerateRequest(BaseModel):
@@ -9,13 +28,13 @@ class QuizGenerateRequest(BaseModel):
     document_id: str
     num_questions: int = Field(default=5, ge=1, le=20)
     difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
-    question_types: list[str] = Field(default=["mcq", "true_false", "free_text"])
+    question_types: list[QuestionType] = Field(default_factory=lambda: list(DEFAULT_QUESTION_TYPES))
 
 
 class QuestionSchema(BaseModel):
     """Schema for a single quiz question."""
 
-    question_type: str
+    question_type: QuestionType
     question_text: str
     options: list[str] | None = None
     correct_answer: str
@@ -39,7 +58,7 @@ class QuizSessionCreate(BaseModel):
     document_id: str
     num_questions: int = Field(default=5, ge=1, le=20)
     difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
-    question_types: list[str] = Field(default=["mcq", "true_false", "free_text"])
+    question_types: list[QuestionType] = Field(default_factory=lambda: list(DEFAULT_QUESTION_TYPES))
     focus_concept_ids: list[str] | None = None
 
 
@@ -49,7 +68,7 @@ class QuestionResponse(BaseModel):
     question_id: str
     question_number: int
     total_questions: int
-    question_type: str
+    question_type: QuestionType
     question_text: str
     options: list[str] | None = None
     difficulty: str
@@ -88,7 +107,7 @@ class SessionQuestionDetail(BaseModel):
 
     question_id: str
     question_number: int
-    question_type: str
+    question_type: QuestionType
     question_text: str
     user_answer: str | None = None
     is_correct: bool | None = None
