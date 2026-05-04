@@ -146,9 +146,7 @@ def process_document(document_id: str) -> None:
 
         # Extract concepts from chunks (Non-blocking: failure here should not fail the document)
         try:
-             # Need to pass chunks in a format that concept_extractor expects (list of dicts with content)
-             # We can reuse the `chunks` variable from earlier which are dicts from `chunk_text` function
-             from app.services.concept_extractor import extract_concepts
+             from app.services.concepts import extract_concepts
              extract_concepts(document_id, chunks)
         except Exception as e:
              logger.error(f"Concept extraction failed for document {document_id}: {e}")
