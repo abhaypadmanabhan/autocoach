@@ -109,7 +109,25 @@ export interface AnswerResult {
 
 export interface AnswerResponse {
   result: AnswerResult;
-  next_question: CurrentQuestion | null;
   session_complete: boolean;
+  session_ended_reason?: "cap_reached" | "mastery_threshold" | null;
+}
+
+export type NextQuestionStatus = "ready" | "preparing" | "ended" | "failed";
+
+export interface NextQuestionSummary {
+  total_answered: number;
+  correct_answers: number;
+  score_percentage: number | null;
+}
+
+export interface NextQuestionResponse {
+  status: NextQuestionStatus;
+  question?: CurrentQuestion | null;
+  retry_after_ms?: number | null;
+  reason?: "cap_reached" | "mastery_threshold" | null;
+  summary?: NextQuestionSummary | null;
+  error?: string | null;
+  message?: string | null;
 }
 

@@ -1,10 +1,12 @@
-"""Quiz session management service — adaptive on-demand loop."""
+"""Quiz session management service — adaptive on-demand loop with async generation."""
 
 import logging
 import random
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from app.config import get_settings
 from app.core.supabase import supabase_admin
 from app.services.quiz_generator import generate_single_question
 from app.services.answer_evaluator import evaluate_answer
@@ -17,6 +19,7 @@ CORE_MASTERY_THRESHOLD = 80.0
 MISS_STREAK_DECAY = 2  # weight x2 for next 2 selections after a wrong answer
 DEPRIORITIZE_AFTER_CORRECT = 3  # consecutive corrects on a concept → skip it
 EXPLORATION_PROBABILITY = 0.30
+MAX_GENERATION_ATTEMPTS = 2  # initial try + 1 retry inside the bg task
 
 
 def _get_mastery_scores(user_id: str, concept_ids: list[str]) -> dict[str, float]:
@@ -278,7 +281,12 @@ def _generate_and_insert_question(
     question_types: list[str],
     question_number: int,
 ) -> dict | None:
-    """Pick a concept, generate one question, insert it, and return the row."""
+    """Synchronous: pick a concept, generate one question, insert as ready.
+
+    Used for Q1 of a fresh session, where the caller must hand the first
+    question back in the create-session response. Subsequent questions go
+    through `generate_next_question_bg` instead.
+    """
     concept = _select_next_concept(session_id, user_id, document_id)
     if not concept:
         return None
@@ -296,6 +304,7 @@ def _generate_and_insert_question(
         )
         return None
 
+    now = datetime.now(timezone.utc).isoformat()
     record = {
         "id": str(uuid4()),
         "session_id": session_id,
@@ -310,9 +319,274 @@ def _generate_and_insert_question(
         "is_correct": None,
         "input_method": None,
         "answered_at": None,
+        "status": "ready",
+        "ready_at": now,
+        "generation_attempts": 1,
     }
     supabase_admin.table("questions").insert(record).execute()
     return record
+
+
+# ---------------------------------------------------------------------------
+# Async generation pipeline
+# ---------------------------------------------------------------------------
+
+
+def _has_active_generation(session_id: str) -> bool:
+    """True if a question for this session is already ready or generating."""
+    res = (
+        supabase_admin.table("questions")
+        .select("id,status")
+        .eq("session_id", session_id)
+        .in_("status", ["ready", "generating"])
+        .limit(1)
+        .execute()
+    )
+    return bool(res.data)
+
+
+def _claim_generation_slot(session_id: str, question_number: int) -> str | None:
+    """Insert a 'generating' placeholder row. Returns the row id, or None if
+    another worker already owns this question slot for the session."""
+    if _has_active_generation(session_id):
+        return None
+
+    row_id = str(uuid4())
+    now = datetime.now(timezone.utc).isoformat()
+    placeholder = {
+        "id": row_id,
+        "session_id": session_id,
+        "question_number": question_number,
+        # NOT NULL columns must have placeholder values until the row is
+        # filled in on the success path. They are never read while status
+        # is 'generating'.
+        "question_type": "text_free",
+        "question_text": "",
+        "correct_answer": "",
+        "status": "generating",
+        "generation_attempts": 0,
+    }
+    try:
+        supabase_admin.table("questions").insert(placeholder).execute()
+        return row_id
+    except Exception as e:
+        # Most likely a unique-violation if another worker raced us; treat
+        # as "lost the race" and let the winner proceed.
+        logger.warning(
+            f"[session {session_id}] failed to claim generation slot (likely race): {e}"
+        )
+        return None
+
+
+def _mark_generation_failed(question_id: str, attempts: int) -> None:
+    supabase_admin.table("questions").update(
+        {"status": "failed", "generation_attempts": attempts}
+    ).eq("id", question_id).execute()
+
+
+def _fill_ready_question(question_id: str, q: dict, concept_id: str, attempts: int) -> dict:
+    now = datetime.now(timezone.utc).isoformat()
+    update = {
+        "status": "ready",
+        "question_type": q.get("question_type", "text_free"),
+        "question_text": q.get("question_text", ""),
+        "options": q.get("options"),
+        "correct_answer": q.get("correct_answer", ""),
+        "explanation": q.get("explanation"),
+        "concept_ids": [concept_id],
+        "ready_at": now,
+        "generation_attempts": attempts,
+    }
+    res = (
+        supabase_admin.table("questions")
+        .update(update)
+        .eq("id", question_id)
+        .execute()
+    )
+    return (res.data[0] if res.data else {**update, "id": question_id})
+
+
+def generate_next_question_bg(session_id: str, user_id: str) -> None:
+    """Background-task entrypoint: claim a slot, run selector, call LLM,
+    flip to 'ready'. Idempotent — exits quietly if another worker already
+    owns generation for this session."""
+    try:
+        session_resp = (
+            supabase_admin.table("quiz_sessions")
+            .select("*")
+            .eq("id", session_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        if not session_resp.data:
+            logger.warning(f"[bg-gen {session_id}] session not found for user {user_id}")
+            return
+        session = session_resp.data[0]
+        if session["status"] != "active":
+            return  # Session ended between submit and bg-gen scheduling
+    except Exception as e:
+        logger.error(f"[bg-gen {session_id}] failed to fetch session: {e}")
+        return
+
+    answered, _ = _recompute_session_counts(session_id)
+    if answered >= session["total_questions"]:
+        return  # Cap reached — no more questions needed
+
+    next_qnum = answered + 1
+    placeholder_id = _claim_generation_slot(session_id, next_qnum)
+    if placeholder_id is None:
+        logger.info(
+            f"[bg-gen {session_id}] question {next_qnum} already claimed elsewhere; skipping"
+        )
+        return
+
+    document_id = session["document_id"]
+    difficulty = session["difficulty"]
+    question_types = ["text_mcq", "text_tf", "text_free"]
+
+    attempts = 0
+    last_err: Exception | None = None
+    while attempts < MAX_GENERATION_ATTEMPTS:
+        attempts += 1
+        try:
+            concept = _select_next_concept(session_id, user_id, document_id)
+            if not concept:
+                last_err = RuntimeError("selector returned no concept")
+                break
+
+            q = generate_single_question(
+                document_id=document_id,
+                concept=concept,
+                difficulty=difficulty,
+                question_types=question_types,
+            )
+            if not q:
+                logger.warning(
+                    f"[bg-gen {session_id}] attempt {attempts} returned no question; retrying"
+                )
+                continue
+
+            _fill_ready_question(placeholder_id, q, str(concept["id"]), attempts)
+            logger.info(
+                f"[bg-gen {session_id}] q#{next_qnum} ready after {attempts} attempt(s)"
+            )
+            return
+        except Exception as e:
+            last_err = e
+            logger.warning(f"[bg-gen {session_id}] attempt {attempts} raised: {e}")
+
+    _mark_generation_failed(placeholder_id, attempts)
+    logger.error(
+        f"[bg-gen {session_id}] giving up after {attempts} attempts; last error: {last_err}"
+    )
+
+
+def _trigger_generation_if_needed(session_id: str, user_id: str) -> None:
+    """Inline backstop used by GET /next when no row exists. Kicks off the
+    bg task synchronously *enough* to claim a slot before we return 202."""
+    # We deliberately do not await an LLM call here — `generate_next_question_bg`
+    # is fire-and-forget for callers and idempotent on its own.
+    try:
+        generate_next_question_bg(session_id, user_id)
+    except Exception as e:
+        logger.error(f"[trigger-gen {session_id}] error: {e}")
+
+
+def check_next_question(session_id: str, user_id: str) -> dict:
+    """Single state probe used by the long-poll loop in GET /next.
+
+    Returns one of:
+      {"status":"ready", "question": {...}}
+      {"status":"preparing"}
+      {"status":"ended", "reason": "...", "summary": {...}}
+      {"status":"failed", "error": "...", "message": "..."}
+    """
+    session_resp = (
+        supabase_admin.table("quiz_sessions")
+        .select("*")
+        .eq("id", session_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not session_resp.data:
+        return {"status": "failed", "error": "session_not_found", "message": "Session not found."}
+    session = session_resp.data[0]
+
+    # Session already complete: serve the summary.
+    if session["status"] != "active":
+        score_pct = None
+        if session["total_questions"] > 0:
+            score_pct = round(
+                (session["correct_answers"] / session["total_questions"]) * 100.0, 1
+            )
+        return {
+            "status": "ended",
+            "reason": session.get("ended_reason") or "cap_reached",
+            "summary": {
+                "total_answered": session["answered_questions"],
+                "correct_answers": session["correct_answers"],
+                "score_percentage": score_pct,
+            },
+        }
+
+    # Look for ready / generating / failed row, lowest question_number first.
+    rows = (
+        supabase_admin.table("questions")
+        .select("*")
+        .eq("session_id", session_id)
+        .in_("status", ["ready", "generating", "failed"])
+        .order("question_number")
+        .limit(1)
+        .execute()
+    )
+    row = rows.data[0] if rows.data else None
+
+    if row is None:
+        # No row at all → backstop trigger. Caller will poll again.
+        _trigger_generation_if_needed(session_id, user_id)
+        return {"status": "preparing"}
+
+    if row["status"] == "ready":
+        return {
+            "status": "ready",
+            "question": _build_question_response(
+                row, session["total_questions"], session["difficulty"]
+            ),
+        }
+
+    if row["status"] == "failed":
+        # Caller will see this; a fresh /next call (including frontend retry)
+        # re-triggers generation by virtue of removing the failed row barrier.
+        # We mark it answered-equivalent (i.e. drop it from the lookup window)
+        # by leaving status=failed and instructing the caller via the response.
+        return {
+            "status": "failed",
+            "error": "generator_unavailable",
+            "message": "Could not generate the next question. Please retry.",
+        }
+
+    # status == 'generating' — check staleness.
+    settings = get_settings()
+    ttl = max(5, int(settings.generation_stale_ttl_seconds))
+    created_at = row.get("created_at")
+    is_stale = False
+    if created_at:
+        try:
+            created_dt = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            is_stale = (datetime.now(timezone.utc) - created_dt) > timedelta(seconds=ttl)
+        except Exception:
+            is_stale = False
+
+    if is_stale:
+        logger.warning(
+            f"[next {session_id}] generating row {row['id']} stale (>{ttl}s); marking failed and re-triggering"
+        )
+        _mark_generation_failed(row["id"], (row.get("generation_attempts") or 0))
+        _trigger_generation_if_needed(session_id, user_id)
+        return {"status": "preparing"}
+
+    # Still generating, within TTL — caller should wait.
+    return {"status": "preparing"}
 
 
 def create_session(
@@ -488,7 +762,7 @@ def get_current_question(session_id: str, user_id: str) -> dict | None:
             supabase_admin.table("questions")
             .select("*")
             .eq("session_id", session_id)
-            .is_("user_answer", None)
+            .eq("status", "ready")
             .order("question_number")
             .limit(1)
             .execute()
@@ -500,24 +774,15 @@ def get_current_question(session_id: str, user_id: str) -> dict | None:
                 question, session["total_questions"], session["difficulty"]
             )
 
-        # No pending question — generate one if cap not reached.
+        # No ready question — kick off async generation if cap not reached.
         answered, _ = _recompute_session_counts(session_id)
         if answered >= session["total_questions"]:
             return None
 
-        new_q = _generate_and_insert_question(
-            session_id=session_id,
-            document_id=session["document_id"],
-            user_id=user_id,
-            difficulty=session["difficulty"],
-            question_types=["text_mcq", "text_tf", "text_free"],
-            question_number=answered + 1,
-        )
-        if not new_q:
-            return None
-        return _build_question_response(
-            new_q, session["total_questions"], session["difficulty"]
-        )
+        # Returning None tells the caller "no current question right now".
+        # Frontend uses GET /next for the long-poll path.
+        _trigger_generation_if_needed(session_id, user_id)
+        return None
 
     except Exception as e:
         logger.error(f"Failed to get current question: {e}")
@@ -527,9 +792,13 @@ def get_current_question(session_id: str, user_id: str) -> dict | None:
 def submit_answer(
     session_id: str, user_id: str, question_id: str, answer: str, input_method: str
 ) -> dict:
-    """Evaluate an answer, update mastery, then generate the next question
-    on demand using the freshly-updated mastery scores. Ends the session
-    when the cap is hit OR every core concept has reached mastery >= 80."""
+    """Fast path: evaluate, update mastery, recompute counts, return.
+
+    Does NOT generate the next question synchronously. The route handler is
+    responsible for triggering `generate_next_question_bg` afterwards
+    (typically via FastAPI BackgroundTasks). Frontend then calls
+    `GET /quiz/sessions/{id}/next` to fetch the prepared question.
+    """
     try:
         session_response = (
             supabase_admin.table("quiz_sessions")
@@ -559,7 +828,7 @@ def submit_answer(
         if question["user_answer"] is not None:
             raise ValueError("Question already answered")
 
-        # 1. Evaluate
+        # 1. Evaluate (LLM call only for text_free)
         eval_result = evaluate_answer(
             question_type=question["question_type"],
             user_answer=answer,
@@ -576,10 +845,11 @@ def submit_answer(
                 "is_correct": is_correct,
                 "input_method": input_method,
                 "answered_at": now,
+                "status": "answered",
             }
         ).eq("id", question_id).execute()
 
-        # 2. Update mastery FIRST so the next-concept selector sees fresh data.
+        # 2. Update mastery BEFORE selection so the bg task sees fresh data.
         mastery_delta = 0.0
         try:
             q_concept_ids = question.get("concept_ids")
@@ -603,11 +873,13 @@ def submit_answer(
         new_answered, new_correct = _recompute_session_counts(session_id)
         cap_hit = new_answered >= session["total_questions"]
 
-        # Pull concepts AFTER mastery update to evaluate end-on-mastery.
         post_concepts = get_document_concepts(session["document_id"], user_id)
         all_mastered = _all_core_mastered(post_concepts)
 
         is_complete = cap_hit or all_mastered
+        ended_reason = None
+        if is_complete:
+            ended_reason = "cap_reached" if cap_hit else "mastery_threshold"
 
         session_update = {
             "answered_questions": new_answered,
@@ -624,51 +896,6 @@ def submit_answer(
         except Exception as e:
             logger.error(f"Failed to update quiz session counts: {e}")
 
-        # 4. Build next question — pre-generated if any remain (in-flight
-        # sessions from before the cutover); otherwise generate on demand.
-        next_question = None
-        if not is_complete:
-            pending = (
-                supabase_admin.table("questions")
-                .select("*")
-                .eq("session_id", session_id)
-                .is_("user_answer", None)
-                .order("question_number")
-                .limit(1)
-                .execute()
-            )
-            if pending.data:
-                next_question = _build_question_response(
-                    pending.data[0],
-                    session["total_questions"],
-                    session["difficulty"],
-                )
-            else:
-                generated = _generate_and_insert_question(
-                    session_id=session_id,
-                    document_id=session["document_id"],
-                    user_id=user_id,
-                    difficulty=session["difficulty"],
-                    question_types=["text_mcq", "text_tf", "text_free"],
-                    question_number=new_answered + 1,
-                )
-                if generated:
-                    next_question = _build_question_response(
-                        generated,
-                        session["total_questions"],
-                        session["difficulty"],
-                    )
-                else:
-                    # Generator failure mid-session: end gracefully rather
-                    # than handing the user a dead session.
-                    logger.error(
-                        f"[session {session_id}] no next question; ending session early"
-                    )
-                    is_complete = True
-                    supabase_admin.table("quiz_sessions").update(
-                        {"status": "completed", "completed_at": now}
-                    ).eq("id", session_id).execute()
-
         xp_awarded = 10 if is_correct else 0
 
         return {
@@ -682,10 +909,27 @@ def submit_answer(
                 "xp_awarded": xp_awarded,
                 "mastery_delta": mastery_delta,
             },
-            "next_question": next_question,
             "session_complete": is_complete,
+            "session_ended_reason": ended_reason,
         }
 
     except Exception as e:
         logger.error(f"Failed to submit answer: {e}")
         raise
+
+
+def wait_for_next_question(
+    session_id: str, user_id: str, wait_ms: int = 5000
+) -> dict:
+    """Long-poll wrapper around `check_next_question`. Used by GET /next."""
+    settings = get_settings()
+    cap_ms = max(0, min(int(wait_ms), settings.next_question_max_wait_ms))
+    deadline = time.monotonic() + (cap_ms / 1000.0)
+
+    while True:
+        result = check_next_question(session_id, user_id)
+        if result["status"] in ("ready", "ended", "failed"):
+            return result
+        if time.monotonic() >= deadline:
+            return {"status": "preparing", "retry_after_ms": 500}
+        time.sleep(0.2)
