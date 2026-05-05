@@ -101,19 +101,3 @@ class DocumentProgressSummaryResponse(BaseModel):
     documents: list[DocumentProgressResponse]
 
 
-class DocumentSummarySchema(BaseModel):
-    """Schema for generated document summary content."""
-
-    one_liner: str
-    what_youll_learn: list[str]
-    key_concepts: list[str]
-    study_plan: list[str]
-
-
-class DocumentSummaryResponse(BaseModel):
-    """Response model for a document summary."""
-
-    document_id: UUID
-    summary: DocumentSummarySchema
-    generated_at: datetime | None = None
-    version: str | None = None

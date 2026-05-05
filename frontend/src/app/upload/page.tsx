@@ -21,9 +21,6 @@ import { ErrorBanner } from "@/components/ui/Skeleton";
 import { DiamondSpinner } from "@/components/ui/DiamondButton";
 import { ProgressDots, ProgressBar } from "@/components/ui/StatusBadge";
 import { staggerContainer, slideUpItem, dropZoneVariants, circularRevealVariants } from "@/lib/motions";
-import { ActivationBanner } from "@/components/activation/ActivationBanner";
-import { usePrecreateSprint } from "@/hooks/usePrecreateSprint";
-
 export default function Upload() {
   const router = useRouter();
   const [isDragging, setIsDragging] = useState(false);
@@ -31,8 +28,6 @@ export default function Upload() {
   const [documentId, setDocumentId] = useState<string | null>(null);
   const { upload, error: uploadError, uploading, stage, progress } = useUploadDocument();
   const { document } = usePollDocumentStatus(documentId);
-  const documentReady = document?.status === "ready" && !!documentId;
-  const { precreatedSessionId, precreateLoading } = usePrecreateSprint(documentReady, documentId);
   const conceptsExtractedRef = useRef(false);
 
   useEffect(() => {
@@ -352,15 +347,6 @@ export default function Upload() {
             ))}
           </motion.div>
 
-          {/* Activation CTA - show once per document */}
-          {document?.status === "ready" && documentId && (
-            <ActivationBanner
-              documentId={documentId}
-              sessionId={document.session_id}
-              precreatedSessionId={precreatedSessionId}
-              precreateLoading={precreateLoading}
-            />
-          )}
         </motion.div>
       </PageContainer>
     </AppShell>

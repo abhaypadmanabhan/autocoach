@@ -12,7 +12,6 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { AppShell, PageContainer } from "@/components/layout/AppShell";
 import { DocumentSidebar } from "@/components/sidebar/DocumentSidebar";
 import { DocumentDashboard } from "@/components/dashboard/DocumentDashboard";
-import { DailySprintCard } from "@/components/dashboard/DailySprintCard";
 import { WeakConceptsWidget } from "@/components/dashboard/WeakConceptsWidget";
 import { ReviewTodayWidget } from "@/components/dashboard/ReviewTodayWidget";
 import { DocumentCard } from "@/components/features/dashboard/DocumentCard";
@@ -146,13 +145,6 @@ function DashboardContent() {
                   readyDocuments={readyDocuments}
                   processingDocuments={processingDocuments}
                 />
-              </motion.div>
-            </motion.div>
-
-            {/* Daily Sprint */}
-            <motion.div variants={staggerContainer} initial="hidden" animate="show">
-              <motion.div variants={slideUpItem}>
-                <DailySprintCard />
               </motion.div>
             </motion.div>
 

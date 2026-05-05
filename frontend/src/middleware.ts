@@ -5,13 +5,9 @@ import { createMiddlewareClient } from "./lib/supabase/middleware";
 const PROTECTED_ROUTES = [
   "/dashboard",
   "/upload",
-  "/config",
   "/session",
-  "/feedback",
   "/results",
-  "/analytics",
   "/settings",
-  "/dev",
 ];
 
 // Auth routes that should redirect to dashboard if already logged in
