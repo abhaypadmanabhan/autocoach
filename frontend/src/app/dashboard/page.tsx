@@ -175,7 +175,7 @@ function DashboardContent() {
                         </Link>
                       </Button>
                       <Button size="sm" asChild className="bg-gradient-to-r from-[var(--pop-coral)] to-[var(--pop-gold)] text-white hover:shadow-lg hover:shadow-[var(--pop-coral)]/20">
-                        <Link href={`/config?document_id=${recentDocument.id}&mode=recommend`}>
+                        <Link href={`/dashboard?docId=${recentDocument.id}`}>
                           <Sparkles className="w-4 h-4 mr-1.5" />
                           Start
                         </Link>

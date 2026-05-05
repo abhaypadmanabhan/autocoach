@@ -241,7 +241,7 @@ function ResultsContent() {
                 asChild
                 className="flex-1 shadow-lg shadow-[var(--brand-primary)]/20"
               >
-                <Link href={`/config?document_id=${session.document_id}`}>
+                <Link href={`/dashboard?docId=${session.document_id}`}>
                   <RotateCcw size={18} className="mr-2" />
                   Try Again
                 </Link>

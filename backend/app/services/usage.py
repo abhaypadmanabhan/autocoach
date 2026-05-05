@@ -6,7 +6,6 @@ from fastapi import HTTPException
 from app.core.supabase import supabase_admin
 
 # Limits
-SPRINT_LIMIT = 1
 QUIZ_LIMIT = 5
 MAX_USAGE_UPDATE_RETRIES = 5
 
@@ -42,8 +41,6 @@ def get_or_create_daily_usage(user_id: str | UUID) -> dict:
     new_usage = {
         "user_id": uid,
         "date": today,
-        "sprints_used": 0,
-        "sprints_used": 0,
         "quizzes_used": 0,
         "extra_quizzes": 0,
     }
@@ -111,7 +108,6 @@ def _consume_usage_or_raise(
         return 0
 
     today = _get_today_str()
-    today = _get_today_str()
     uid = str(user_id)
 
     # Ensure row exists for compare-and-swap update path.
@@ -119,8 +115,6 @@ def _consume_usage_or_raise(
         {
             "user_id": uid,
             "date": today,
-            "sprints_used": 0,
-            "sprints_used": 0,
             "quizzes_used": 0,
             "extra_quizzes": 0,
         },
@@ -164,17 +158,6 @@ def _consume_usage_or_raise(
     )
 
 
-def check_sprint_limit(user_id: UUID) -> None:
-    """Raise 429 if sprint limit reached."""
-    usage = get_or_create_daily_usage(user_id)
-    if usage["sprints_used"] >= SPRINT_LIMIT:
-        raise _build_limit_error(
-            "sprint",
-            SPRINT_LIMIT,
-            "You've reached your daily sprint limit.",
-        )
-
-
 def check_quiz_limit(user_id: UUID) -> None:
     """Raise 429 if quiz limit reached."""
     usage = get_or_create_daily_usage(user_id)
@@ -187,17 +170,6 @@ def check_quiz_limit(user_id: UUID) -> None:
         )
 
 
-def increment_sprint_usage(user_id: UUID) -> None:
-    """Increment sprint usage count (atomic)."""
-    _consume_usage_or_raise(
-        user_id,
-        field="sprints_used",
-        limit=10**9,
-        limit_type="sprint",
-        message="You've reached your daily sprint limit.",
-    )
-
-
 def increment_quiz_usage(user_id: UUID) -> None:
     """Increment quiz usage count (atomic)."""
     _consume_usage_or_raise(
@@ -206,17 +178,6 @@ def increment_quiz_usage(user_id: UUID) -> None:
         limit=10**9,
         limit_type="quiz",
         message="You've reached your daily quiz limit.",
-    )
-
-
-def consume_sprint_usage_or_429(user_id: UUID) -> int:
-    """Atomically consume one sprint from daily quota or raise 429."""
-    return _consume_usage_or_raise(
-        user_id,
-        field="sprints_used",
-        limit=SPRINT_LIMIT,
-        limit_type="sprint",
-        message="You've reached your daily sprint limit.",
     )
 
 
