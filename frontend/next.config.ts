@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
 const nextConfig: NextConfig = {
   async headers() {
     return [
@@ -10,10 +12,10 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' https://us.i.posthog.com 'unsafe-inline'",
+              "script-src 'self' 'unsafe-inline' https://us.i.posthog.com https://us-assets.i.posthog.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
-              "connect-src 'self' https://*.supabase.co https://us.i.posthog.com",
+              `connect-src 'self' https://*.supabase.co https://us.i.posthog.com https://us-assets.i.posthog.com ${BACKEND_URL}`,
               "font-src 'self'",
               "frame-ancestors 'none'",
             ].join("; "),
