@@ -17,12 +17,17 @@ config = context.config
 
 
 # set the sqlalchemy.url from the environment variable
-db_url = os.environ.get("DATABASE_URL")
-print(f"DEBUG: DATABASE_URL found: {bool(db_url)}")
+# Prefer SUPABASE_POOLER_URL (IPv4-friendly Session Pooler) over DATABASE_URL
+# (which on Railway is the IPv6 Supabase direct host — unreachable from
+# Railway containers without IPv6 egress).
+pooler_url = os.environ.get("SUPABASE_POOLER_URL")
+db_url = pooler_url or os.environ.get("DATABASE_URL")
+source = "SUPABASE_POOLER_URL" if pooler_url else "DATABASE_URL"
+print(f"DEBUG: alembic using {source}: {bool(db_url)}")
 if db_url:
     config.set_main_option("sqlalchemy.url", db_url.replace("%", "%%"))
 else:
-    print("DEBUG: DATABASE_URL not found in env.")
+    print("DEBUG: neither SUPABASE_POOLER_URL nor DATABASE_URL found in env.")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
