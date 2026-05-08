@@ -11,8 +11,6 @@ from app.api.routes import (
     documents,
     quiz,
     sessions,
-    daily_sprint,
-    sprints,
     concepts,
     review,
     xp,
@@ -83,8 +81,6 @@ app.include_router(health.router, tags=["health"])
 app.include_router(documents.router, prefix="/documents", tags=["documents"])
 app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
 app.include_router(sessions.router, prefix="/quiz/sessions", tags=["quiz-sessions"])
-app.include_router(daily_sprint.router, prefix="/daily-sprint", tags=["daily-sprint"])
-app.include_router(sprints.router, prefix="/sprint", tags=["sprint"])
 app.include_router(concepts.router, prefix="/concepts", tags=["concepts"])
 app.include_router(review.router, prefix="/review", tags=["review"])
 app.include_router(xp.router, prefix="/xp", tags=["xp"])

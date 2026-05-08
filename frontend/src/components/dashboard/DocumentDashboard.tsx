@@ -186,7 +186,7 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                     </Button>
 
                     {hasWeakConcepts ? (
-                        <Link href={`/sprint/start?document_id=${document.id}&type=weak`}>
+                        <Link href={`/dashboard?docId=${document.id}`}>
                             <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
                                 <PlayCircle className="mr-2 h-5 w-5" />
                                 Train Weak Concepts
@@ -196,7 +196,7 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Link href={`/config?document_id=${document.id}&mode=recommend`}>
+                                    <Link href={`/dashboard?docId=${document.id}`}>
                                         <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
                                             <PlayCircle className="mr-2 h-5 w-5" />
                                             Continue Learning

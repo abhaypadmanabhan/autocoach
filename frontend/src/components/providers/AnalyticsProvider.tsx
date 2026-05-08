@@ -3,9 +3,7 @@
 import posthog from "posthog-js";
 import { useEffect } from "react";
 import { analytics } from "@/lib/analytics";
-import { apiFetch } from "@/lib/api";
 import { createBrowserClient } from "@/lib/supabase/client";
-import type { SprintStatusResponse } from "@/lib/types";
 import type { User } from "@supabase/supabase-js";
 
 function getPlanType(user: User): string {
@@ -36,25 +34,8 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            let xpTotal = 0;
-            let streakCurrent = 0;
-
-            try {
-                const sprintStatus = await apiFetch<SprintStatusResponse>("/sprint/today");
-                xpTotal = sprintStatus.total_xp ?? 0;
-                streakCurrent = sprintStatus.streak_count ?? 0;
-            } catch {
-                // Keep defaults if stats call fails.
-            }
-
-            if (!isMounted) {
-                return;
-            }
-
             analytics.identify(user.id, {
                 plan_type: getPlanType(user),
-                xp_total: xpTotal,
-                streak_current: streakCurrent,
             });
         };
 

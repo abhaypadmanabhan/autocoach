@@ -120,7 +120,7 @@ export function ConceptList({ documentId, concepts }: ConceptListProps) {
                             </div>
 
                             <div className="col-span-12 md:col-span-2 flex justify-end">
-                                <Link href={`/config?document_id=${documentId}&focus=${concept.id}`}>
+                                <Link href={`/dashboard?docId=${documentId}`}>
                                     <Button variant="ghost" size="sm" className="h-8 text-xs hover:text-brand-primary hover:bg-brand-primary/10">
                                         Quiz Concept <ChevronRight size={14} className="ml-1 opacity-50" />
                                     </Button>
