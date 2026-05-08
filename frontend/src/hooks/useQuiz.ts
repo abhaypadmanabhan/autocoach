@@ -11,6 +11,7 @@ import type {
   QuizSessionCreateRequest,
   AnswerResponse,
   InputMethod,
+  NextQuestionResponse,
 } from "@/lib/types";
 
 export function useQuizSession(sessionId: string | null) {
@@ -163,6 +164,80 @@ export function useAnswerQuestion(sessionId: string | null) {
     [sessionId, globalMutate]
   );
   return { submitAnswer, submitting, error };
+}
+
+/**
+ * Long-poll the backend for the next adaptive question.
+ *
+ * After submit_answer returns, the next question is being generated in the
+ * background. This hook fetches it via GET /next, retrying on 'preparing'
+ * status. Returns one of:
+ *   - { status: "ready", question }     → render the question
+ *   - { status: "ended", summary }      → take user to results
+ *   - { status: "failed", message }     → show retry UI
+ */
+export function useNextQuestion(sessionId: string | null) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchNext = useCallback(
+    async (waitMs = 5000): Promise<NextQuestionResponse> => {
+      if (!sessionId) throw new Error("No session ID");
+      setPending(true);
+      setError(null);
+      try {
+        // Single long-poll. Caller decides whether to retry on 'preparing'.
+        const response = await apiFetch<NextQuestionResponse>(
+          `/quiz/sessions/${sessionId}/next?wait_ms=${waitMs}`
+        );
+        return response;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : getErrorMessage(err);
+        setError(message);
+        throw err;
+      } finally {
+        setPending(false);
+      }
+    },
+    [sessionId]
+  );
+
+  /**
+   * Poll until status is terminal (ready/ended/failed) or `maxAttempts` is hit.
+   * Each call waits up to `waitMs` server-side, plus a small client-side delay
+   * between retries.
+   */
+  const pollUntilReady = useCallback(
+    async (
+      opts: { waitMs?: number; maxAttempts?: number } = {},
+    ): Promise<NextQuestionResponse> => {
+      const waitMs = opts.waitMs ?? 5000;
+      const maxAttempts = opts.maxAttempts ?? 4; // ~20s total worst case
+      let attempt = 0;
+      while (attempt < maxAttempts) {
+        attempt += 1;
+        const result = await fetchNext(waitMs);
+        if (result.status !== "preparing") {
+          return result;
+        }
+        const delay = result.retry_after_ms ?? 500;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+      // Final attempt with a short wait — surface preparing as failure.
+      const last = await fetchNext(2000);
+      if (last.status === "preparing") {
+        return {
+          status: "failed",
+          error: "timeout",
+          message: "Question generation took too long. Please retry.",
+        };
+      }
+      return last;
+    },
+    [fetchNext]
+  );
+
+  return { fetchNext, pollUntilReady, pending, error };
 }
 
 // Backward compatibility aliases

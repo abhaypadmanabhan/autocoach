@@ -95,11 +95,28 @@ class AnswerResult(BaseModel):
 
 
 class AnswerResponse(BaseModel):
-    """Response model for answer submission."""
+    """Response model for answer submission.
+
+    Note: `next_question` is no longer included. After receiving this
+    response, the frontend calls `GET /quiz/sessions/{id}/next` to fetch
+    the prepared question (which is generated in the background).
+    """
 
     result: AnswerResult
-    next_question: QuestionResponse | None = None
     session_complete: bool
+    session_ended_reason: str | None = None  # "cap_reached" | "mastery_threshold"
+
+
+class NextQuestionResponse(BaseModel):
+    """Response model for GET /quiz/sessions/{id}/next."""
+
+    status: str  # "ready" | "preparing" | "ended" | "failed"
+    question: QuestionResponse | None = None
+    retry_after_ms: int | None = None
+    reason: str | None = None
+    summary: dict | None = None
+    error: str | None = None
+    message: str | None = None
 
 
 class SessionQuestionDetail(BaseModel):

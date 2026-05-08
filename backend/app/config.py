@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     max_quiz_sessions_per_day: int = 5
     quiz_requests_per_minute: int = 60
 
+    # Adaptive loop / async generation
+    # If a question row is stuck in 'generating' status for longer than this,
+    # the next /next request marks it 'failed' and re-triggers generation.
+    # 30s = ~6x the LLM p95; tune via env without redeploying.
+    generation_stale_ttl_seconds: int = 30
+    # Long-poll cap on GET /next. Higher than typical p95 LLM, lower than
+    # browser request timeouts.
+    next_question_max_wait_ms: int = 10000
+
     def get_cors_origins(self) -> List[str]:
         """Build list of allowed CORS origins based on environment."""
         origins: List[str] = [

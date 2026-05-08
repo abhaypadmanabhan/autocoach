@@ -11,7 +11,12 @@ import {
   Timer,
   AlertCircle,
 } from "lucide-react";
-import { useSession, useSubmitAnswer, useCurrentQuestion } from "@/hooks/useQuiz";
+import {
+  useSession,
+  useSubmitAnswer,
+  useCurrentQuestion,
+  useNextQuestion,
+} from "@/hooks/useQuiz";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { analytics } from "@/lib/analytics";
@@ -42,12 +47,14 @@ function SessionContent() {
   const { session, loading: sessionLoading, error: sessionError, refetch } = useSession(sessionId);
   const { question, loading: questionLoading, error: questionError, refetch: refetchQuestion } = useCurrentQuestion(sessionId);
   const { submitAnswer, submitting, error: submitError } = useSubmitAnswer(sessionId);
+  const { pollUntilReady, pending: nextPending } = useNextQuestion(sessionId);
 
   const [answer, setAnswer] = useState<string>("");
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [isSessionComplete, setIsSessionComplete] = useState(false);
   const [inputMethod, setInputMethod] = useState<"click" | "typed" | "voice">("typed");
+  const [nextError, setNextError] = useState<string | null>(null);
   const startedTrackedRef = useRef(false);
   const resumedTrackedRef = useRef(false);
   const abandonedTrackedRef = useRef(false);
@@ -239,14 +246,36 @@ function SessionContent() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     setShowFeedback(false);
     setAnswer("");
     setLastResult(null);
-    setIsSessionComplete(false);
     setInputMethod("typed");
-    refetchQuestion();
-    refetch();
+    setNextError(null);
+
+    if (isSessionComplete) {
+      router.push(`/results?session_id=${sessionId}`);
+      return;
+    }
+
+    try {
+      const result = await pollUntilReady({ waitMs: 5000, maxAttempts: 4 });
+      if (result.status === "ended") {
+        setIsSessionComplete(true);
+        router.push(`/results?session_id=${sessionId}`);
+        return;
+      }
+      if (result.status === "failed") {
+        setNextError(result.message || "Could not load the next question. Try again.");
+        return;
+      }
+      // status === "ready" → SWR refresh picks up the new ready row.
+      await refetchQuestion();
+      await refetch();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to fetch next question";
+      setNextError(message);
+    }
   };
 
   const handleAnswer = (selectedAnswer: string, method: "click" | "typed" | "voice" = "click") => {

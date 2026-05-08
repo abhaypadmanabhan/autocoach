@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Query
 from uuid import UUID
 
 from app.config import get_settings
@@ -12,6 +12,7 @@ from app.models.quiz import (
     AnswerSubmit,
     AnswerResponse,
     AnswerResult,
+    NextQuestionResponse,
     SessionStatus,
     SessionQuestionDetail,
 )
@@ -20,6 +21,8 @@ from app.services.session_manager import (
     get_session,
     submit_answer,
     get_current_question,
+    generate_next_question_bg,
+    wait_for_next_question,
 )
 from app.services.usage import consume_quiz_usage_or_429
 from app.api.routes.documents import get_user_id_from_token
@@ -249,23 +252,11 @@ async def submit_quiz_answer(
     session_id: UUID,
     question_id: UUID,
     answer_data: AnswerSubmit,
+    background_tasks: BackgroundTasks,
     user_id=Depends(enforce_quiz_rate_limit),
 ):
-    """
-    Submit an answer for a question in a session.
-
-    Args:
-        session_id: The session ID.
-        question_id: The question ID being answered.
-        answer_data: The answer submission.
-        user_id: The authenticated user's ID.
-
-    Returns:
-        AnswerResponse with result and next question (if any).
-
-    Raises:
-        HTTPException: 404 if session/question not found, 400 if already answered.
-    """
+    """Evaluate an answer fast, then queue next-question generation in the
+    background. Frontend should call GET /next afterwards if not complete."""
     try:
         result = submit_answer(
             session_id=str(session_id),
@@ -275,18 +266,11 @@ async def submit_quiz_answer(
             input_method=answer_data.input_method,
         )
 
-        # Format next question if exists
-        next_question = None
-        if result["next_question"]:
-            q = result["next_question"]
-            next_question = QuestionResponse(
-                question_id=q["question_id"],
-                question_number=q["question_number"],
-                total_questions=q["total_questions"],
-                question_type=q["question_type"],
-                question_text=q["question_text"],
-                options=q["options"],
-                difficulty=q["difficulty"],
+        # Schedule async generation of the next question — fire-and-forget.
+        # The bg task is idempotent and short-circuits if the session ended.
+        if not result["session_complete"]:
+            background_tasks.add_task(
+                generate_next_question_bg, str(session_id), str(user_id)
             )
 
         return AnswerResponse(
@@ -300,8 +284,8 @@ async def submit_quiz_answer(
                 xp_awarded=result["result"].get("xp_awarded", 0),
                 mastery_delta=result["result"].get("mastery_delta", 0.0),
             ),
-            next_question=next_question,
             session_complete=result["session_complete"],
+            session_ended_reason=result.get("session_ended_reason"),
         )
 
     except ValueError as e:
@@ -311,3 +295,51 @@ async def submit_quiz_answer(
         raise HTTPException(
             status_code=500, detail="Failed to submit answer"
         )
+
+
+@router.get("/{session_id}/next", response_model=NextQuestionResponse)
+async def get_next_question(
+    session_id: UUID,
+    wait_ms: int = Query(default=5000, ge=0, le=10000),
+    user_id=Depends(enforce_quiz_rate_limit),
+):
+    """Long-poll for the next adaptive question.
+
+    Returns 200 with one of:
+      - {status: "ready", question: ...}
+      - {status: "ended", reason: ..., summary: ...}
+      - {status: "failed", error: ..., message: ...}
+    or 200 with {status: "preparing", retry_after_ms: 500} if generation
+    has not finished within `wait_ms`.
+    """
+    try:
+        result = wait_for_next_question(
+            session_id=str(session_id), user_id=str(user_id), wait_ms=wait_ms
+        )
+    except Exception as e:
+        logger.error("Failed to fetch next question: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch next question")
+
+    status = result.get("status")
+    question_payload = None
+    q = result.get("question")
+    if q:
+        question_payload = QuestionResponse(
+            question_id=q["question_id"],
+            question_number=q["question_number"],
+            total_questions=q["total_questions"],
+            question_type=q["question_type"],
+            question_text=q["question_text"],
+            options=q.get("options"),
+            difficulty=q["difficulty"],
+        )
+
+    return NextQuestionResponse(
+        status=status,
+        question=question_payload,
+        retry_after_ms=result.get("retry_after_ms"),
+        reason=result.get("reason"),
+        summary=result.get("summary"),
+        error=result.get("error"),
+        message=result.get("message"),
+    )

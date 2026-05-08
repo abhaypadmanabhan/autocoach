@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from sqlalchemy import (
     Integer,
+    SmallInteger,
     Boolean,
     ForeignKey,
     DateTime,
@@ -263,6 +264,24 @@ class Question(Base):
     )
     render_kind: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     render_payload: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    status: Mapped[str] = mapped_column(
+        PG_ENUM(
+            "generating",
+            "ready",
+            "answered",
+            "failed",
+            name="question_status_enum",
+            create_type=False,
+        ),
+        nullable=False,
+        server_default="ready",
+    )
+    ready_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    generation_attempts: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default="0"
+    )
 
 
 class QuizSession(Base):
