@@ -5,6 +5,7 @@ import logging
 from openai import OpenAI
 
 from app.config import get_settings
+from app.observability.langfuse import observe
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ EMBEDDING_DIMENSIONS = 1536
 MAX_BATCH_SIZE = 100
 
 
+@observe(name="embeddings.openai_3_small", as_type="generation")
 def get_embeddings(texts: list[str]) -> list[list[float]]:
     """
     Generate embeddings for a list of texts using OpenAI API.

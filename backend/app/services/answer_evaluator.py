@@ -3,6 +3,7 @@
 import json
 import logging
 
+from app.observability.langfuse import observe
 from app.services.llm import call_kimi, call_openai
 
 logger = logging.getLogger(__name__)
@@ -115,6 +116,7 @@ Rules:
 """
 
 
+@observe(name="quiz.evaluate_free_text", as_type="generation")
 def evaluate_free_text(
     user_answer: str, correct_answer: str, question_text: str
 ) -> tuple[bool, str, str]:
