@@ -2,12 +2,14 @@
 
 import logging
 
+from app.observability.langfuse import observe
 from app.services.embeddings import get_embeddings
 from app.core.qdrant import search_vectors
 
 logger = logging.getLogger(__name__)
 
 
+@observe(name="retrieval.qdrant", as_type="span")
 def retrieve_relevant_chunks(query: str, document_id: str, top_k: int = 5) -> list[dict]:
     """
     Retrieve relevant chunks from a document based on a query.

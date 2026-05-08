@@ -3,13 +3,10 @@ from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 from uuid import uuid4
 
-# Mock settings
+# Mock settings with a real Settings instance (defaults are fine).
 import app.config
 
-app.config.get_settings = lambda: MagicMock(
-    supabase_url="http://test",
-    supabase_publishable_key="test",
-    supabase_secret_key="test",
+app.config.get_settings = lambda: app.config.Settings(
     qdrant_url="http://test",
     qdrant_api_key="test",
     kimi_api_key="test",

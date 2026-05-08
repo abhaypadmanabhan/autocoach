@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from app.config import get_settings
 from app.core.supabase import supabase_admin
+from app.observability.langfuse import observe
 from app.services.quiz_generator import generate_single_question
 from app.services.answer_evaluator import evaluate_answer
 from app.services.concepts import get_document_concepts
@@ -42,6 +43,7 @@ def _get_mastery_scores(user_id: str, concept_ids: list[str]) -> dict[str, float
     }
 
 
+@observe(name="session.update_mastery", as_type="span")
 def _update_concept_mastery(user_id: str, concept_ids: list[str], is_correct: bool):
     """Update mastery for a list of concepts (Bayesian-smoothed EMA blend)."""
     if not concept_ids:

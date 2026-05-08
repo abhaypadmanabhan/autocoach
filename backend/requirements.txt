@@ -87,3 +87,6 @@ zstandard==0.25.0
 alembic==1.13.1
 SQLAlchemy==2.0.25
 psycopg2-binary==2.9.9
+
+# Observability (Phase 1.7 — see docs/specs/langfuse-selfhost.md §5)
+langfuse>=4.5,<5

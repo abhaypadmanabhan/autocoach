@@ -4,6 +4,7 @@ import json
 import logging
 
 from app.core.supabase import supabase_admin
+from app.observability.langfuse import observe
 from app.services.retrieval import retrieve_relevant_chunks
 from app.services.llm import call_kimi, call_openai
 
@@ -206,6 +207,7 @@ def _parse_llm_questions(response: str) -> list[dict]:
     return valid_questions
 
 
+@observe(name="quiz.generate_questions", as_type="generation")
 def generate_quiz_questions(
     document_id: str,
     num_questions: int = 5,

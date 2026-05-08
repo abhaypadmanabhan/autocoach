@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from pydantic import BaseModel, ValidationError
 
 from app.core.supabase import supabase_admin
+from app.observability.langfuse import observe
 from app.services.llm import call_kimi
 
 logger = logging.getLogger(__name__)
@@ -89,6 +90,7 @@ def _postprocess_concepts(concepts: List[ExtractedConcept]) -> List[dict]:
     return items
 
 
+@observe(name="ingestion.extract_concepts", as_type="generation")
 def extract_concepts(document_id: str, chunks: List[dict]) -> None:
     """Extract learning concepts from a document's chunks and store them."""
     try:
