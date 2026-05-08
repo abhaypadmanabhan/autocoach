@@ -19,7 +19,6 @@ import { ConceptList } from "@/components/dashboard/ConceptList";
 import { DashboardSkeleton } from "@/components/features/dashboard/DashboardSkeleton";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { MascotStage } from "@/components/brand/MascotStage";
-import { DocumentSummary } from "@/components/documents/DocumentSummary";
 import {
     AlertDialog,
     AlertDialogContent,
@@ -272,9 +271,6 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                     </p>
                 </div>
             </div>
-
-            {/* AI Summary - unconditionally mounted to show loading/error states */}
-            <DocumentSummary documentId={documentId} />
 
             {/* Concept List */}
             <ConceptList documentId={document.id} concepts={concepts} />
