@@ -176,7 +176,7 @@ def process_document(document_id: str) -> None:
                     document_id=document_id,
                     num_questions=5,
                     difficulty="medium",
-                    question_types=["mcq", "true_false", "free_text"],
+                    question_types=["text_mcq", "text_tf", "text_free"],
                 )
             else:
                 logger.info(f"Quiz session already exists for document {document_id} today, skipping auto-creation.")

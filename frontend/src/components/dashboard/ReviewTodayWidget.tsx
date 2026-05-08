@@ -88,7 +88,7 @@ export function ReviewTodayWidget() {
                 document_id: primaryDocId,
                 num_questions: 5,
                 difficulty: "medium",
-                question_types: ["mcq", "true_false", "free_text"],
+                question_types: ["text_mcq", "text_tf", "text_free"],
                 focus_concept_ids: conceptIds,
             });
 

@@ -34,7 +34,7 @@ export function QuestionCard({
   // Render content based on question type
   const renderQuestionContent = () => {
     switch (type) {
-      case "mcq":
+      case "text_mcq":
         return (
           <MCQOptions
             options={options}
@@ -47,7 +47,7 @@ export function QuestionCard({
           />
         );
 
-      case "true_false":
+      case "text_tf":
         return (
           <TrueFalseOptions
             selectedAnswer={selectedAnswer}
@@ -58,7 +58,7 @@ export function QuestionCard({
           />
         );
 
-      case "free_text":
+      case "text_free":
         return (
           <div className="space-y-4">
             <FreeTextInput

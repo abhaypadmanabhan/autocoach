@@ -22,16 +22,17 @@ QUIZ_SYSTEM_PROMPT = """You are an expert tutor creating quiz questions. Generat
 
 Rules:
 - Questions must be directly answerable from the content
-- For MCQ: provide exactly 4 options, only one correct
-- For true_false: create a statement that is clearly true or false based on content
-- For free_text: ask questions requiring short explanations
+- For text_mcq: provide exactly 4 options, only one correct
+- For text_tf: create a statement that is clearly true or false based on content
+- For text_free: ask questions requiring short explanations
 - Vary question difficulty based on the difficulty parameter
 - Return valid JSON only, no markdown, no explanation
+- The question_type field must be exactly one of: "text_mcq", "text_tf", "text_free"
 
 Output format (JSON array):
 [
   {
-    "question_type": "mcq",
+    "question_type": "text_mcq",
     "question_text": "What is...?",
     "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
     "correct_answer": "A",
@@ -39,14 +40,14 @@ Output format (JSON array):
     "concept_id": "optional-uuid-if-targeting-concepts"
   },
   {
-    "question_type": "true_false",
+    "question_type": "text_tf",
     "question_text": "Statement to evaluate",
     "correct_answer": "true",
     "explanation": "Why this is true/false",
     "concept_id": "optional-uuid-if-targeting-concepts"
   },
   {
-    "question_type": "free_text",
+    "question_type": "text_free",
     "question_text": "Explain how...?",
     "correct_answer": "Key points that should be mentioned",
     "explanation": "What a good answer should include",
@@ -228,7 +229,7 @@ def generate_quiz_questions(
         List of question dictionaries, or empty list on failure.
     """
     if question_types is None:
-        question_types = ["mcq", "true_false", "free_text"]
+        question_types = ["text_mcq", "text_tf", "text_free"]
 
     try:
         # Determine chunk retrieval strategy
@@ -377,3 +378,41 @@ Return ONLY a valid JSON array with no markdown formatting."""
     except Exception as e:
         logger.error(f"Failed to generate quiz questions: {e}")
         return []
+
+
+def generate_single_question(
+    document_id: str,
+    concept: dict,
+    difficulty: str = "medium",
+    question_types: list[str] | None = None,
+) -> dict | None:
+    """Generate a single quiz question for one concept.
+
+    `concept` must have at least `id` and `concept_name`; `concept_description`
+    optional. Returns the question dict (with concept_id annotated) or None.
+    """
+    if question_types is None:
+        question_types = ["text_mcq", "text_tf", "text_free"]
+
+    target = {
+        "name": concept.get("concept_name") or concept.get("name") or "Unnamed",
+        "description": concept.get("concept_description") or concept.get("description") or "",
+    }
+    cid = concept.get("id")
+
+    questions = generate_quiz_questions(
+        document_id=document_id,
+        num_questions=1,
+        difficulty=difficulty,
+        question_types=question_types,
+        target_concepts=[target],
+        focus_concept_ids=[cid] if cid else None,
+    )
+
+    if not questions:
+        return None
+
+    q = questions[0]
+    if cid and not q.get("concept_id"):
+        q["concept_id"] = cid
+    return q
