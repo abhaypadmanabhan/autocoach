@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-import { ChevronRight, Star, Lightbulb } from "lucide-react";
+import { Star, Lightbulb } from "lucide-react";
 import Link from "next/link";
 
 interface ConceptListProps {
@@ -15,7 +15,7 @@ interface ConceptListProps {
     concepts: Concept[];
 }
 
-export function ConceptList({ documentId, concepts }: ConceptListProps) {
+export function ConceptList({ documentId: _documentId, concepts }: ConceptListProps) {
     // Sort concepts: core first, then by importance
     const sortedConcepts = [...concepts].sort((a, b) => {
         if (a.is_core && !b.is_core) return -1;
@@ -33,15 +33,10 @@ export function ConceptList({ documentId, concepts }: ConceptListProps) {
                     No concepts yet
                 </h3>
                 <p className="text-text-muted text-sm max-w-md mx-auto mb-4">
-                    This document is still being processed or no concepts were detected. 
-                    Check back soon or try uploading a different document.
+                    This document is still being processed or no concepts were detected.
                 </p>
-                <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => window.location.reload()}
-                >
-                    Retry Loading
+                <Button asChild variant="outline" size="sm">
+                    <Link href="/upload">Try a new upload</Link>
                 </Button>
             </div>
         );
@@ -58,10 +53,9 @@ export function ConceptList({ documentId, concepts }: ConceptListProps) {
 
             <div className="bg-surface-card border border-surface-border/50 rounded-xl overflow-hidden">
                 <div className="grid grid-cols-12 gap-4 px-6 py-3 border-b border-surface-border/50 bg-surface-darker/30 text-xs font-semibold text-text-secondary uppercase tracking-wider">
-                    <div className="col-span-6 md:col-span-5">Concept Name</div>
-                    <div className="col-span-3 md:col-span-2 text-center">Importance</div>
-                    <div className="col-span-3 md:col-span-3">Mastery</div>
-                    <div className="col-span-12 md:col-span-2 text-right hidden md:block">Action</div>
+                    <div className="col-span-7">Concept Name</div>
+                    <div className="col-span-2 text-center">Importance</div>
+                    <div className="col-span-3">Mastery</div>
                 </div>
 
                 <div className="divide-y divide-surface-border/30">
@@ -71,11 +65,11 @@ export function ConceptList({ documentId, concepts }: ConceptListProps) {
                             initial={{ opacity: 0 }}
                             whileInView={{ opacity: 1 }}
                             viewport={{ once: true }}
-                            className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-surface-darker/20 transition-colors group"
+                            className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-surface-darker/20 transition-colors"
                         >
-                            <div className="col-span-6 md:col-span-5 space-y-1">
+                            <div className="col-span-7 space-y-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <span className="font-medium text-text-primary">{concept.concept_name}</span>
+                                    <span className="font-medium text-text-primary truncate">{concept.concept_name}</span>
                                     {concept.is_core && (
                                         <TooltipProvider>
                                             <Tooltip>
@@ -94,7 +88,7 @@ export function ConceptList({ documentId, concepts }: ConceptListProps) {
                                 )}
                             </div>
 
-                            <div className="col-span-3 md:col-span-2 flex justify-center">
+                            <div className="col-span-2 flex justify-center">
                                 <div className="flex gap-0.5">
                                     {[...Array(5)].map((_, i) => (
                                         <Star
@@ -110,21 +104,13 @@ export function ConceptList({ documentId, concepts }: ConceptListProps) {
                                 </div>
                             </div>
 
-                            <div className="col-span-3 md:col-span-3">
+                            <div className="col-span-3">
                                 <div className="flex items-center gap-3">
                                     <Progress value={concept.mastery_score || 0} className="h-1.5 bg-surface-border" />
                                     <span className="text-xs font-medium text-text-secondary w-8 text-right">
                                         {concept.mastery_score || 0}%
                                     </span>
                                 </div>
-                            </div>
-
-                            <div className="col-span-12 md:col-span-2 flex justify-end">
-                                <Link href={`/dashboard?docId=${documentId}`}>
-                                    <Button variant="ghost" size="sm" className="h-8 text-xs hover:text-brand-primary hover:bg-brand-primary/10">
-                                        Quiz Concept <ChevronRight size={14} className="ml-1 opacity-50" />
-                                    </Button>
-                                </Link>
                             </div>
                         </motion.div>
                     ))}
