@@ -1,24 +1,36 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { mutate } from "swr";
 
 import { useDocument, useDeleteDocument } from "@/hooks/useDocuments";
 import { useDocumentConcepts } from "@/hooks/useConcepts";
 import { useDocumentProgress } from "@/hooks/useDocumentProgress";
+import { useCreateSession } from "@/hooks/useQuiz";
 import { useToast } from "@/hooks/useToast";
-import { PlayCircle, Star, GraduationCap, CheckCircle2, Trash2, AlertTriangle, Loader2, Trophy, Info } from "lucide-react";
+import {
+    PlayCircle,
+    Trash2,
+    AlertTriangle,
+    Loader2,
+    Trophy,
+    RefreshCw,
+    FileQuestion,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { analytics } from "@/lib/analytics";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ApiError } from "@/lib/types";
 import { ConceptList } from "@/components/dashboard/ConceptList";
 import { DashboardSkeleton } from "@/components/features/dashboard/DashboardSkeleton";
 import { ErrorCard } from "@/components/ui/ErrorCard";
 import { MascotStage } from "@/components/brand/MascotStage";
+import { PageContainer } from "@/components/layout/AppShell";
+import { staggerContainer, slideUpItem } from "@/lib/motions";
 import {
     AlertDialog,
     AlertDialogContent,
@@ -29,16 +41,12 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
 } from "@/components/primitives/Modal";
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 interface DocumentDashboardProps {
     documentId: string;
 }
+
+const MASTERY_THRESHOLD = 80;
 
 export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const router = useRouter();
@@ -46,6 +54,7 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     const { concepts, isLoading: conceptsLoading, error: conceptsError, refetch } = useDocumentConcepts(documentId);
     const { progress, isLoading: progressLoading } = useDocumentProgress(documentId);
     const { deleteDocument, deleting } = useDeleteDocument();
+    const { createSession, creating } = useCreateSession();
     const { showToast } = useToast();
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const conceptsTrackedRef = useRef(false);
@@ -53,6 +62,26 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
     useEffect(() => {
         conceptsTrackedRef.current = false;
     }, [documentId]);
+
+    useEffect(() => {
+        if (document?.status === "ready") {
+            mutate("/documents/");
+
+            if (concepts.length === 0) {
+                refetch();
+            } else if (!conceptsTrackedRef.current) {
+                const key = `concepts_extracted_${documentId}`;
+                if (!sessionStorage.getItem(key)) {
+                    sessionStorage.setItem(key, "1");
+                    analytics.capture("concepts_extracted", {
+                        document_id: documentId,
+                        concept_count: concepts.length,
+                    });
+                }
+                conceptsTrackedRef.current = true;
+            }
+        }
+    }, [document?.status, concepts.length, refetch, documentId]);
 
     const handleDeleteConfirm = async () => {
         try {
@@ -65,28 +94,25 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
         }
     };
 
-    // Auto-refresh concepts AND sidebar list when document becomes ready
-    useEffect(() => {
-        if (document?.status === "ready") {
-            // Refresh sidebar list to show specific AI title
-            mutate("/documents/");
-
-            if (concepts.length === 0) {
-                console.log("Document ready but no concepts, triggering refetch...");
-                refetch();
-            } else if (!conceptsTrackedRef.current) {
-                const CONCEPTS_TRACKED_KEY = `concepts_extracted_${documentId}`;
-                if (!sessionStorage.getItem(CONCEPTS_TRACKED_KEY)) {
-                    sessionStorage.setItem(CONCEPTS_TRACKED_KEY, "1");
-                    analytics.capture("concepts_extracted", {
-                        document_id: documentId,
-                        concept_count: concepts.length,
-                    });
-                }
-                conceptsTrackedRef.current = true;
-            }
+    const handleStartQuiz = async () => {
+        if (!document) return;
+        try {
+            const session = await createSession({
+                document_id: document.id,
+                num_questions: 10,
+                difficulty: "medium",
+                question_types: ["text_mcq", "text_tf", "text_free"],
+            });
+            router.push(`/session?session_id=${session.session_id}`);
+        } catch (err: unknown) {
+            const status = err instanceof ApiError ? err.status : undefined;
+            const msg =
+                status === 429
+                    ? "Daily quiz limit reached."
+                    : "Couldn't start quiz. Try again.";
+            showToast(msg, "error");
         }
-    }, [document?.status, concepts.length, refetch, documentId]);
+    };
 
     if (documentLoading || conceptsLoading || progressLoading) {
         return <DashboardSkeleton />;
@@ -94,204 +120,161 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
 
     if (documentError || conceptsError || !document) {
         return (
-            <div className="p-6 md:p-8 max-w-5xl mx-auto">
-                <ErrorCard
-                    error={documentError || conceptsError || "Failed to load document dashboard"}
-                    onRetry={() => window.location.reload()}
-                />
-                <div className="mt-6 text-center">
-                    <Link href="/dashboard" className="text-brand-primary hover:underline">
-                        Back to Dashboard
-                    </Link>
+            <PageContainer size="xl">
+                <div className="py-16">
+                    <ErrorCard
+                        error={documentError || conceptsError || "Failed to load document"}
+                        onRetry={() => window.location.reload()}
+                    />
+                    <div className="mt-6 text-center">
+                        <Link href="/dashboard" className="text-brand-primary hover:underline">
+                            Back to Dashboard
+                        </Link>
+                    </div>
                 </div>
-            </div>
+            </PageContainer>
         );
     }
 
-    const coreConcepts = concepts.filter(c => c.is_core);
-    const masteredConcepts = concepts.filter(c => (c.mastery_score || 0) >= 80);
-
-    // Use progress data if available, fallback to manual calculation
+    const masteredCount = concepts.filter(
+        (c) => (c.mastery_score ?? 0) >= MASTERY_THRESHOLD,
+    ).length;
     const totalMastery = progress?.mastery_percent ?? document.progress ?? 0;
     const milestone = progress?.milestone;
+    const allMastered = concepts.length > 0 && masteredCount === concepts.length;
 
-    // Milestone config
-    const getMilestoneConfig = (m: string) => {
-        switch (m) {
+    const milestoneConfig = (() => {
+        switch (milestone) {
             case "25": return { label: "Apprentice", color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/20" };
             case "50": return { label: "Scholar", color: "text-purple-500", bg: "bg-purple-500/10", border: "border-purple-500/20" };
             case "75": return { label: "Expert", color: "text-amber-500", bg: "bg-amber-500/10", border: "border-amber-500/20" };
             case "100": return { label: "Master", color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" };
             default: return null;
         }
-    };
-
-    const milestoneConfig = milestone && milestone !== "none" ? getMilestoneConfig(milestone) : null;
-
-    // CTA for weak concepts
-    const hasWeakConcepts = (progress?.weak_concepts_count ?? 0) > 0;
+    })();
 
     return (
-        <div className="p-6 md:p-8 space-y-8 max-w-5xl mx-auto pb-20">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-text-secondary border-surface-border">
-                            Document Dashboard
-                        </Badge>
-                        {document.status === "processing" && (
-                            <Badge variant="secondary" className="bg-brand-primary/10 text-brand-primary">
-                                Processing
-                            </Badge>
-                        )}
+        <PageContainer size="xl">
+            <motion.div
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+                className="space-y-14 md:space-y-20 py-8 md:py-12"
+            >
+                {/* Header */}
+                <motion.header
+                    variants={slideUpItem}
+                    className="flex items-start justify-between gap-6"
+                >
+                    <div className="space-y-4 flex-1 min-w-0">
+                        <span className="text-xs uppercase tracking-[0.2em] text-text-muted font-medium">
+                            Document
+                        </span>
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <h1 className="text-3xl md:text-5xl lg:text-6xl font-serif text-text-primary leading-[1.05] tracking-tight">
+                                {document.ai_title || document.filename}
+                            </h1>
+                            <MascotStage mode="dashboard" />
+                        </div>
                         {milestoneConfig && (
-                            <Badge variant="secondary" className={cn(milestoneConfig.bg, milestoneConfig.color, "border", milestoneConfig.border)}>
+                            <Badge
+                                variant="secondary"
+                                className={cn(
+                                    milestoneConfig.bg,
+                                    milestoneConfig.color,
+                                    "border",
+                                    milestoneConfig.border,
+                                )}
+                            >
                                 <Trophy className="w-3 h-3 mr-1" />
                                 {milestoneConfig.label}
                             </Badge>
                         )}
+                        {document.status === "ready" && concepts.length > 0 && (
+                            <p className="text-text-secondary text-sm">
+                                <span className="text-text-primary font-medium">
+                                    {masteredCount}
+                                </span>{" "}
+                                of{" "}
+                                <span className="text-text-primary font-medium">
+                                    {concepts.length}
+                                </span>{" "}
+                                concepts mastered
+                                <span className="text-text-muted mx-2">·</span>
+                                <span className="text-text-primary font-medium">
+                                    {Math.round(totalMastery)}%
+                                </span>{" "}
+                                overall
+                            </p>
+                        )}
                     </div>
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-3xl md:text-4xl font-serif text-text-primary font-medium">
-                            {document.ai_title || document.filename}
-                        </h1>
-                        <MascotStage mode="dashboard" />
-                    </div>
-                    <div className="flex items-center gap-4 text-text-secondary text-sm">
-                        <span>{concepts.length} Concepts Found</span>
-                        <span>•</span>
-                        <span>Created {new Date(document.created_at).toLocaleDateString()}</span>
-                    </div>
-                </div>
 
-                <div className="flex items-center gap-3">
                     <Button
-                        variant="outline"
-                        size="lg"
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setDeleteModalOpen(true)}
-                        className="rounded-full border-semantic-error/30 text-semantic-error hover:bg-semantic-error/10 hover:text-semantic-error"
+                        className="rounded-full text-text-muted hover:text-semantic-error hover:bg-semantic-error/10 shrink-0"
+                        aria-label="Delete document"
                     >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
+                        <Trash2 className="h-5 w-5" />
                     </Button>
+                </motion.header>
 
-                    <Button
-                        variant="outline"
-                        size="lg"
-                        onClick={() => window.location.reload()}
-                        className="rounded-full"
-                    >
-                        Refresh Data
-                    </Button>
-
-                    {hasWeakConcepts ? (
-                        <Link href={`/dashboard?docId=${document.id}`}>
-                            <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
-                                <PlayCircle className="mr-2 h-5 w-5" />
-                                Train Weak Concepts
-                            </Button>
-                        </Link>
+                {/* Primary CTA section — state-driven */}
+                <motion.section variants={slideUpItem} className="py-4 md:py-8">
+                    {document.status === "processing" ? (
+                        <ProcessingCTA />
+                    ) : document.status === "failed" ? (
+                        <FailedCTA errorMessage={document.error_message} />
+                    ) : concepts.length === 0 ? (
+                        <NoConceptsCTA />
                     ) : (
-                        <TooltipProvider>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Link href={`/dashboard?docId=${document.id}`}>
-                                        <Button size="lg" className="rounded-full bg-brand-primary hover:bg-brand-primary/90 text-surface-dark font-medium shadow-lg shadow-brand-primary/20 px-8">
-                                            <PlayCircle className="mr-2 h-5 w-5" />
-                                            Continue Learning
-                                        </Button>
-                                    </Link>
-                                </TooltipTrigger>
-                                <TooltipContent side="bottom" className="max-w-xs">
-                                    <p>No weak concepts yet. Start learning to identify focus areas.</p>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
+                        <StartQuizCTA
+                            onClick={handleStartQuiz}
+                            creating={creating}
+                            allMastered={allMastered}
+                            conceptCount={concepts.length}
+                        />
                     )}
-                </div>
-            </div>
+                </motion.section>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-surface-card border border-surface-border/50 rounded-xl p-6 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-text-secondary text-sm font-medium uppercase tracking-wider">Overall Mastery</span>
-                        <CheckCircle2 className="text-brand-primary opacity-50" size={20} />
-                    </div>
-                    <div className="flex items-end gap-2">
-                        <span className="text-4xl font-serif text-text-primary">{Math.round(totalMastery)}%</span>
-                        <span className="text-sm text-text-muted mb-1">core mastery</span>
-                    </div>
-                    <Progress value={totalMastery} className="h-2 mt-2" />
-                    {totalMastery === 0 && (
-                        <p className="text-xs text-text-secondary mt-2">
-                            Start your first sprint to begin tracking mastery
-                        </p>
-                    )}
-                </div>
+                {/* Concept list — only when populated */}
+                {concepts.length > 0 && (
+                    <motion.section variants={slideUpItem}>
+                        <ConceptList documentId={document.id} concepts={concepts} />
+                    </motion.section>
+                )}
+            </motion.div>
 
-                <div className="bg-surface-card border border-surface-border/50 rounded-xl p-6 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-text-secondary text-sm font-medium uppercase tracking-wider">Concepts Mastered</span>
-                        <GraduationCap className="text-semantic-success opacity-50" size={20} />
-                    </div>
-                    <div className="flex items-end gap-2">
-                        <span className="text-4xl font-serif text-text-primary">{progress?.mastered_concepts_count ?? masteredConcepts.length}</span>
-                        <span className="text-sm text-text-muted mb-1">/ {progress?.concepts_total ?? concepts.length} concepts</span>
-                    </div>
-                    <div className="flex gap-1 mt-3">
-                        {/* Mini concept dots visualization */}
-                        {concepts.slice(0, 10).map((c, i) => (
-                            <div
-                                key={i}
-                                className={cn(
-                                    "h-1.5 flex-1 rounded-full",
-                                    (c.mastery_score || 0) >= 80 ? "bg-semantic-success" : "bg-surface-border"
-                                )}
-                            />
-                        ))}
-                        {concepts.length > 10 && <div className="h-1.5 w-1.5 rounded-full bg-surface-border" />}
-                    </div>
-                </div>
-
-                <div className="bg-surface-card border border-surface-border/50 rounded-xl p-6 flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                        <span className="text-text-secondary text-sm font-medium uppercase tracking-wider">Focus Areas</span>
-                        <Star className="text-semantic-warning opacity-50" size={20} />
-                    </div>
-                    <div className="flex items-end gap-2">
-                        <span className="text-4xl font-serif text-text-primary">{progress?.weak_concepts_count ?? 0}</span>
-                        <span className="text-sm text-text-muted mb-1">weak concepts</span>
-                    </div>
-                    <p className="text-xs text-text-secondary mt-2 line-clamp-2">
-                        {hasWeakConcepts
-                            ? "Prioritize practicing these concepts to improve mastery."
-                            : `Focus on core concepts like ${coreConcepts.slice(0, 2).map(c => c.concept_name).join(", ")}...`}
-                    </p>
-                </div>
-            </div>
-
-            {/* Concept List */}
-            <ConceptList documentId={document.id} concepts={concepts} />
-
-            {/* Delete Confirmation Modal */}
-            <AlertDialog open={deleteModalOpen} onOpenChange={(open) => { if (!open) setDeleteModalOpen(false); }}>
+            {/* Delete confirmation modal */}
+            <AlertDialog
+                open={deleteModalOpen}
+                onOpenChange={(open) => {
+                    if (!open) setDeleteModalOpen(false);
+                }}
+            >
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <div className="w-12 h-12 rounded-full bg-semantic-error/10 flex items-center justify-center mx-auto mb-2">
                             <AlertTriangle size={24} className="text-semantic-error" />
                         </div>
-                        <AlertDialogTitle className="text-center">Delete Document</AlertDialogTitle>
+                        <AlertDialogTitle className="text-center">
+                            Delete Document
+                        </AlertDialogTitle>
                         <AlertDialogDescription className="text-center">
-                            Are you sure you want to delete &quot;{document.ai_title || document.filename}&quot;? This will also delete all associated quiz sessions and cannot be undone.
+                            Are you sure you want to delete &quot;
+                            {document.ai_title || document.filename}&quot;? This will also
+                            delete all associated quiz sessions and cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             disabled={deleting}
-                            onClick={(e) => { e.preventDefault(); handleDeleteConfirm(); }}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleDeleteConfirm();
+                            }}
                             className="bg-semantic-error text-white hover:bg-semantic-error/90"
                         >
                             {deleting ? (
@@ -306,6 +289,118 @@ export function DocumentDashboard({ documentId }: DocumentDashboardProps) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+        </PageContainer>
+    );
+}
+
+function StartQuizCTA({
+    onClick,
+    creating,
+    allMastered,
+    conceptCount,
+}: {
+    onClick: () => void;
+    creating: boolean;
+    allMastered: boolean;
+    conceptCount: number;
+}) {
+    const label = allMastered ? "Review Mastered Concepts" : "Start Quiz";
+    const Icon = allMastered ? RefreshCw : PlayCircle;
+
+    return (
+        <div className="flex flex-col items-start gap-4">
+            <motion.button
+                onClick={onClick}
+                disabled={creating}
+                whileHover={creating ? {} : { scale: 1.01 }}
+                whileTap={creating ? {} : { scale: 0.99 }}
+                className={cn(
+                    "inline-flex items-center justify-center gap-3",
+                    "rounded-full px-12 md:px-16 py-6 md:py-7",
+                    "text-lg md:text-xl font-semibold",
+                    "text-white",
+                    "transition-shadow",
+                    "disabled:opacity-50 disabled:cursor-not-allowed",
+                    allMastered
+                        ? "bg-gradient-to-r from-[var(--semantic-success)] to-[var(--brand-primary)] hover:shadow-2xl hover:shadow-[var(--semantic-success)]/30"
+                        : "bg-gradient-to-r from-[var(--pop-coral)] to-[var(--pop-gold)] hover:shadow-2xl hover:shadow-[var(--pop-coral)]/30",
+                )}
+            >
+                {creating ? (
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                ) : (
+                    <Icon className="h-6 w-6" />
+                )}
+                {creating ? "Starting quiz…" : label}
+            </motion.button>
+            <p className="text-sm text-text-muted pl-2">
+                {allMastered
+                    ? `Mastered all ${conceptCount} concepts. Refresh your memory.`
+                    : "10 questions · adaptive difficulty"}
+            </p>
+        </div>
+    );
+}
+
+function ProcessingCTA() {
+    return (
+        <div className="flex flex-col items-start gap-4">
+            <button
+                disabled
+                className="inline-flex items-center justify-center gap-3 rounded-full px-12 md:px-16 py-6 md:py-7 text-lg md:text-xl font-semibold bg-surface-card border border-surface-border text-text-muted cursor-not-allowed"
+            >
+                <Loader2 className="h-6 w-6 animate-spin" />
+                Preparing your quiz…
+            </button>
+            <p className="text-sm text-text-muted pl-2">
+                Extracting concepts from your document. This usually takes a minute.
+            </p>
+        </div>
+    );
+}
+
+function FailedCTA({ errorMessage }: { errorMessage?: string }) {
+    return (
+        <div className="rounded-2xl border border-semantic-error/30 bg-semantic-error/5 p-6 md:p-8 max-w-2xl">
+            <div className="flex items-start gap-4">
+                <AlertTriangle className="text-semantic-error mt-1 shrink-0" size={24} />
+                <div className="space-y-3 flex-1">
+                    <p className="text-text-primary font-medium text-lg">
+                        We couldn&apos;t process this document.
+                    </p>
+                    {errorMessage && (
+                        <p className="text-sm text-text-secondary">{errorMessage}</p>
+                    )}
+                    <Button asChild variant="outline" size="sm" className="mt-1">
+                        <Link href="/upload">Try a new upload</Link>
+                    </Button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function NoConceptsCTA() {
+    return (
+        <div className="rounded-2xl border border-surface-border bg-surface-card/30 p-6 md:p-8 max-w-2xl">
+            <div className="flex items-start gap-4">
+                <FileQuestion
+                    className="text-text-muted mt-1 shrink-0"
+                    size={24}
+                />
+                <div className="space-y-3 flex-1">
+                    <p className="text-text-primary font-medium text-lg">
+                        No concepts could be extracted from this document.
+                    </p>
+                    <p className="text-sm text-text-secondary">
+                        The document may be empty, scanned without OCR, or in an
+                        unsupported format.
+                    </p>
+                    <Button asChild variant="outline" size="sm" className="mt-1">
+                        <Link href="/upload">Try a new upload</Link>
+                    </Button>
+                </div>
+            </div>
         </div>
     );
 }
