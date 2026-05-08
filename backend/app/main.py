@@ -17,6 +17,7 @@ from app.api.routes import (
     onboarding,
 )
 from app.config import get_settings
+from app.observability.langfuse import flush as langfuse_flush, is_enabled as langfuse_enabled
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,9 +37,13 @@ async def lifespan(app: FastAPI):
     logger.info("AutoCoach API starting up")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"CORS allowed origins: {cors_origins}")
+    logger.info(
+        f"Langfuse: {'enabled' if langfuse_enabled() else 'disabled (NOOP)'}"
+    )
     logger.info("=" * 50)
     yield
     # Shutdown
+    langfuse_flush()
     logger.info("AutoCoach API shutting down")
 
 
