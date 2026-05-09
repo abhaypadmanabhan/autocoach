@@ -1,271 +1,281 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
-import { Camera, Trash2, Mail, Key, CreditCard } from "lucide-react";
-import { AppShell, PageContainer } from "@/components/layout/AppShell";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import { Camera, Loader2, Trash2 } from "lucide-react";
+import type { User } from "@supabase/supabase-js";
+
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useAvatar } from "@/hooks/useAvatar";
 import { useToast } from "@/hooks/useToast";
-import { staggerContainer, slideUpItem } from "@/lib/motions";
-import type { User } from "@supabase/supabase-js";
-import Image from "next/image";
+import { cn } from "@/lib/utils";
+
+import { AppShell, PageContainer } from "@/components/layout/AppShell";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function SettingsPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [sendingReset, setSendingReset] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
   const { showToast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [user, setUser] = useState<User | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [sendingReset, setSendingReset] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const { avatarUrl, uploading, uploadAvatar, deleteAvatar } = useAvatar(
-    user?.id ?? null
+    user?.id ?? null,
   );
 
   useEffect(() => {
     const supabase = createBrowserClient();
-
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUser(user);
-      setLoading(false);
+      setLoadingUser(false);
     });
   }, []);
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
+  const initials = (user?.email ?? "??").slice(0, 2).toUpperCase();
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     try {
       await uploadAvatar(file);
-      showToast("Avatar updated successfully", "success");
+      showToast("Avatar updated", "success");
     } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to upload avatar",
-        "error"
-      );
+      showToast(err instanceof Error ? err.message : "Upload failed", "error");
     }
-
-    // Reset input so the same file can be selected again
     e.target.value = "";
   };
 
-  const handleDeleteAvatar = async () => {
+  const onRemoveAvatar = async () => {
     try {
       await deleteAvatar();
       showToast("Avatar removed", "success");
     } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to delete avatar",
-        "error"
-      );
+      showToast(err instanceof Error ? err.message : "Delete failed", "error");
     }
   };
 
-  const handlePasswordReset = async () => {
+  const onResetPassword = async () => {
     if (!user?.email) return;
-
     setSendingReset(true);
     try {
       const supabase = createBrowserClient();
       const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
         redirectTo: `${window.location.origin}/settings`,
       });
-
       if (error) throw error;
-
-      showToast("Password reset email sent. Check your inbox.", "success");
+      showToast("Reset email sent", "success");
     } catch (err) {
-      showToast(
-        err instanceof Error ? err.message : "Failed to send reset email",
-        "error"
-      );
+      showToast(err instanceof Error ? err.message : "Failed to send", "error");
     } finally {
       setSendingReset(false);
     }
   };
 
-  function getInitials(email: string | undefined): string {
-    if (!email) return "?";
-    return email.slice(0, 2).toUpperCase();
-  }
-
-  if (loading) {
-    return (
-      <AppShell showBack backHref="/dashboard" title="Settings">
-        <PageContainer size="md">
-          <div className="flex items-center justify-center py-20">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="w-8 h-8 border-2 border-brand-primary rotate-45"
-              style={{ borderRadius: "4px" }}
-            />
-          </div>
-        </PageContainer>
-      </AppShell>
-    );
-  }
+  const onSignOut = async () => {
+    setSigningOut(true);
+    try {
+      const supabase = createBrowserClient();
+      await supabase.auth.signOut();
+      router.replace("/login");
+    } catch {
+      window.location.href = "/login";
+    }
+  };
 
   return (
-    <AppShell showBack backHref="/dashboard" title="Settings">
+    <AppShell title="Settings" eyebrow="Account" showBack backHref="/dashboard">
       <PageContainer size="md">
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="show"
-          className="space-y-8"
-        >
-          {/* Profile Section */}
-          <motion.section
-            variants={slideUpItem}
-            className="bg-surface-darker rounded-2xl border border-surface-border p-6"
-          >
-            <h2 className="text-lg font-semibold text-text-primary mb-6 flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center">
-                <Camera size={18} className="text-brand-primary" />
-              </div>
-              Profile
-            </h2>
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              {/* Avatar */}
-              <div className="relative group">
-                <button
-                  onClick={handleAvatarClick}
-                  disabled={uploading}
-                  className="relative w-24 h-24 rounded-full bg-gradient-to-br from-brand-primary to-brand-secondary flex items-center justify-center text-surface-dark font-bold text-2xl overflow-hidden group-hover:opacity-90 transition-opacity disabled:cursor-wait"
-                >
-                  {avatarUrl ? (
-                    <Image
-                      src={avatarUrl}
-                      alt="User avatar"
-                      width={96}
-                      height={96}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span>{getInitials(user?.email)}</span>
-                  )}
-
-                  {/* Upload overlay */}
-                  <div className="absolute inset-0 bg-surface-dark/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    {uploading ? (
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: "linear",
-                        }}
-                        className="w-6 h-6 border-2 border-text-primary border-t-transparent rounded-full"
+        {loadingUser ? (
+          <div className="grid place-items-center py-16">
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--fg-tertiary)]" />
+          </div>
+        ) : (
+          <div className="space-y-10 mt-2">
+            <SettingsRow label="Profile">
+              <div className="flex items-start gap-5">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className={cn(
+                      "relative h-24 w-24 rounded-full overflow-hidden",
+                      "border border-[var(--line-default)] bg-[linear-gradient(135deg,oklch(0.55_0.10_263),oklch(0.45_0.06_263))]",
+                      "grid place-items-center font-mono text-[20px] text-white",
+                      "transition-[border-color] duration-[180ms] hover:border-[var(--line-strong)]",
+                      "disabled:cursor-wait",
+                    )}
+                    aria-label="Upload avatar"
+                  >
+                    {avatarUrl ? (
+                      <Image
+                        src={avatarUrl}
+                        alt="Avatar"
+                        width={96}
+                        height={96}
+                        className="object-cover"
                       />
                     ) : (
-                      <Camera size={24} className="text-text-primary" />
+                      <span>{initials}</span>
                     )}
-                  </div>
-                </button>
-
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </div>
-
-              {/* User Info */}
-              <div className="flex-1">
-                <div className="flex items-center gap-2 text-text-muted mb-1">
-                  <Mail size={14} />
-                  <span className="text-xs uppercase tracking-wider">
-                    Email
-                  </span>
-                </div>
-                <p className="text-text-primary font-medium">{user?.email}</p>
-
-                {avatarUrl && (
-                  <button
-                    onClick={handleDeleteAvatar}
-                    className="mt-4 flex items-center gap-2 text-sm text-semantic-error hover:text-semantic-error/80 transition-colors"
-                  >
-                    <Trash2 size={16} />
-                    Remove avatar
+                    <span className="absolute inset-0 grid place-items-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity">
+                      {uploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      ) : (
+                        <Camera className="h-4 w-4 text-white" />
+                      )}
+                    </span>
                   </button>
-                )}
-              </div>
-            </div>
-          </motion.section>
-
-          {/* Security Section */}
-          <motion.section
-            variants={slideUpItem}
-            className="bg-surface-darker rounded-2xl border border-surface-border p-6"
-          >
-            <h2 className="text-lg font-semibold text-text-primary mb-6 flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-brand-secondary/10 flex items-center justify-center">
-                <Key size={18} className="text-brand-secondary" />
-              </div>
-              Security
-            </h2>
-
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <p className="text-text-primary font-medium">Password</p>
-                <p className="text-text-muted text-sm">
-                  Receive an email to reset your password
-                </p>
-              </div>
-
-              <button
-                onClick={handlePasswordReset}
-                disabled={sendingReset}
-                className="px-4 py-2.5 rounded-xl bg-surface-border hover:bg-surface-border/70 text-text-primary font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {sendingReset ? "Sending..." : "Change password"}
-              </button>
-            </div>
-          </motion.section>
-
-          {/* Subscription Section */}
-          <motion.section
-            variants={slideUpItem}
-            className="bg-surface-darker rounded-2xl border border-surface-border p-6"
-          >
-            <h2 className="text-lg font-semibold text-text-primary mb-6 flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-semantic-success/10 flex items-center justify-center">
-                <CreditCard size={18} className="text-semantic-success" />
-              </div>
-              Subscription
-            </h2>
-
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-text-primary font-medium">Free Plan</p>
-                  <span className="px-2 py-0.5 text-xs rounded-full bg-surface-border text-text-muted">
-                    Current
-                  </span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onPickFile}
+                  />
                 </div>
-                <p className="text-text-muted text-sm mt-1">
-                  Upgrade coming soon
-                </p>
+                <div className="flex-1 space-y-3">
+                  <div className="space-y-1.5">
+                    <Label variant="mono">Email</Label>
+                    <Input value={user?.email ?? ""} disabled readOnly />
+                  </div>
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={onRemoveAvatar}
+                      className="inline-flex items-center gap-1.5 text-[12px] text-[var(--fg-tertiary)] hover:text-[var(--danger)] transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Remove avatar
+                    </button>
+                  )}
+                </div>
               </div>
+            </SettingsRow>
 
-              <button
-                disabled
-                className="px-4 py-2.5 rounded-xl bg-brand-primary/10 text-brand-primary font-medium cursor-not-allowed opacity-50"
-              >
-                Upgrade
-              </button>
-            </div>
-          </motion.section>
-        </motion.div>
+            <SettingsRow label="Security">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[14px] font-medium text-[var(--fg-primary)]">
+                    Password
+                  </p>
+                  <p className="text-[13px] text-[var(--fg-secondary)] mt-0.5">
+                    Get an email to reset your password.
+                  </p>
+                </div>
+                <Button
+                  variant="secondary"
+                  onClick={onResetPassword}
+                  disabled={sendingReset}
+                >
+                  {sendingReset ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Sending
+                    </>
+                  ) : (
+                    "Send reset email"
+                  )}
+                </Button>
+              </div>
+            </SettingsRow>
+
+            <SettingsRow label="Subscription">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[14px] font-medium text-[var(--fg-primary)]">
+                      Free plan
+                    </p>
+                    <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] px-1.5 py-px rounded-sm border border-[var(--line-default)] text-[var(--fg-tertiary)]">
+                      Current
+                    </span>
+                  </div>
+                  <p className="text-[13px] text-[var(--fg-secondary)] mt-0.5">
+                    Unlimited uploads, adaptive sessions, smart review.
+                  </p>
+                </div>
+                <Button variant="secondary" disabled>
+                  Upgrade
+                  <span className="ml-1 font-mono text-[10px] text-[var(--fg-disabled)]">
+                    Soon
+                  </span>
+                </Button>
+              </div>
+            </SettingsRow>
+
+            <SettingsRow label="Account">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[14px] font-medium text-[var(--fg-primary)]">
+                    Sign out
+                  </p>
+                  <p className="text-[13px] text-[var(--fg-secondary)] mt-0.5">
+                    End your session on this device.
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={signingOut}>
+                      Sign out
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sign out?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        You&apos;ll need to sign in again to continue. Active session
+                        progress is saved.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={onSignOut}>
+                        Sign out
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </SettingsRow>
+          </div>
+        )}
       </PageContainer>
     </AppShell>
+  );
+}
+
+function SettingsRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 md:gap-8 pt-8 border-t border-[var(--line-subtle)] first:border-t-0 first:pt-0">
+      <h2 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)] pt-1">
+        {label}
+      </h2>
+      <div>{children}</div>
+    </section>
   );
 }

@@ -1,259 +1,189 @@
 "use client";
 
-import { Suspense, useState, useEffect, useRef } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import {
-  Loader2,
-  CheckCircle,
-  XCircle,
-  ArrowRight,
-  Timer,
   AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
+  XCircle,
 } from "lucide-react";
+
 import {
   useSession,
   useSubmitAnswer,
   useCurrentQuestion,
   useNextQuestion,
 } from "@/hooks/useQuiz";
+import { useDocument } from "@/hooks/useDocuments";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { analytics } from "@/lib/analytics";
-import { AppShell, PageContainer } from "@/components/layout/AppShell";
-import { QuestionCardSkeleton, ErrorBanner } from "@/components/ui/Skeleton";
-import { QuestionCard } from "@/components/quiz/QuestionCard";
-import { TimerBar } from "@/components/quiz/TimerBar";
-import { FeedbackPanel } from "@/components/quiz/FeedbackPanel";
-import { ProgressBar } from "@/components/ui/StatusBadge";
-import { MascotStage } from "@/components/brand/MascotStage";
-import { staggerContainer, slideUpItem, pageVariants } from "@/lib/motions";
-import type { AnswerResult } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { ToastProvider } from "@/components/ui/Toast";
+import type { AnswerResult, CurrentQuestion, QuestionType } from "@/lib/types";
 
-// Format seconds to mm:ss
+import { TopNav } from "@/components/layout/TopNav";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ProgressHairline } from "@/components/primitives-acx/ProgressHairline";
+import { Kbd } from "@/components/primitives-acx/Kbd";
+import { WhyInset } from "@/components/primitives-acx/WhyInset";
+import { KeyboardHints } from "@/components/primitives-acx/KeyboardHints";
+
+const LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
+
 function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
 function SessionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get("session_id");
+  const sessionId = searchParams.get("session_id") ?? searchParams.get("id");
   const timerParam = searchParams.get("t");
-  const initialTimerSeconds = timerParam ? parseInt(timerParam, 10) : null;
+  const initialTimer = timerParam ? parseInt(timerParam, 10) : null;
 
-  const { session, loading: sessionLoading, error: sessionError, refetch } = useSession(sessionId);
-  const { question, loading: questionLoading, error: questionError, refetch: refetchQuestion } = useCurrentQuestion(sessionId);
-  const { submitAnswer, submitting, error: submitError } = useSubmitAnswer(sessionId);
-  const { pollUntilReady, pending: nextPending } = useNextQuestion(sessionId);
+  const {
+    session,
+    loading: sessionLoading,
+    error: sessionError,
+    refetch: refetchSession,
+  } = useSession(sessionId);
+  const {
+    question,
+    loading: questionLoading,
+    error: questionError,
+    refetch: refetchQuestion,
+  } = useCurrentQuestion(sessionId);
+  const { submitAnswer, submitting, error: submitError } =
+    useSubmitAnswer(sessionId);
+  const { pollUntilReady } = useNextQuestion(sessionId);
+  const { document } = useDocument(session?.document_id ?? null);
 
-  const [answer, setAnswer] = useState<string>("");
+  const [answer, setAnswer] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
-  const [isSessionComplete, setIsSessionComplete] = useState(false);
-  const [inputMethod, setInputMethod] = useState<"click" | "typed" | "voice">("typed");
+  const [isComplete, setIsComplete] = useState(false);
+  const [inputMethod, setInputMethod] = useState<"click" | "typed" | "voice">(
+    "typed",
+  );
   const [nextError, setNextError] = useState<string | null>(null);
   const startedTrackedRef = useRef(false);
-  const resumedTrackedRef = useRef(false);
-  const abandonedTrackedRef = useRef(false);
-  const seenQuestionIdsRef = useRef<Set<string>>(new Set());
 
-  // Timer state
-  const [timeRemaining, setTimeRemaining] = useState<number | null>(() => {
-    if (typeof window === "undefined" || !sessionId || !initialTimerSeconds) return initialTimerSeconds;
-    const storageKey = `quiz_timer_start_${sessionId}`;
-    let startTime = sessionStorage.getItem(storageKey);
-    if (!startTime) {
-      startTime = Date.now().toString();
-      sessionStorage.setItem(storageKey, startTime);
+  // Timer — init from sessionStorage to handle page refresh mid-session
+  const [remaining, setRemaining] = useState<number | null>(() => {
+    if (typeof window === "undefined" || !sessionId || !initialTimer) {
+      return initialTimer;
     }
-    const elapsed = Math.floor((Date.now() - parseInt(startTime, 10)) / 1000);
-    return Math.max(0, initialTimerSeconds - elapsed);
-  });
-
-  const [timerActive, setTimerActive] = useState(() => {
-    if (typeof window === "undefined" || !sessionId || !initialTimerSeconds) return false;
-    const storageKey = `quiz_timer_start_${sessionId}`;
-    const startTime = sessionStorage.getItem(storageKey) || Date.now().toString();
-    if (!sessionStorage.getItem(storageKey)) {
-      sessionStorage.setItem(storageKey, startTime);
+    const key = `quiz_timer_start_${sessionId}`;
+    let start = sessionStorage.getItem(key);
+    if (!start) {
+      start = String(Date.now());
+      sessionStorage.setItem(key, start);
     }
-    const elapsed = Math.floor((Date.now() - parseInt(startTime, 10)) / 1000);
-    return initialTimerSeconds - elapsed > 0;
+    const elapsed = Math.floor((Date.now() - parseInt(start, 10)) / 1000);
+    return Math.max(0, initialTimer - elapsed);
   });
-
-  const [timeUp, setTimeUp] = useState(() => {
-    if (typeof window === "undefined" || !sessionId || !initialTimerSeconds) return false;
-    const storageKey = `quiz_timer_start_${sessionId}`;
-    const startTime = sessionStorage.getItem(storageKey) || Date.now().toString();
-    if (!sessionStorage.getItem(storageKey)) {
-      sessionStorage.setItem(storageKey, startTime);
-    }
-    const elapsed = Math.floor((Date.now() - parseInt(startTime, 10)) / 1000);
-    return initialTimerSeconds - elapsed <= 0;
+  const [timerActive, setTimerActive] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !sessionId || !initialTimer) return false;
+    const key = `quiz_timer_start_${sessionId}`;
+    const start = sessionStorage.getItem(key);
+    if (!start) return Boolean(initialTimer);
+    const elapsed = Math.floor((Date.now() - parseInt(start, 10)) / 1000);
+    return initialTimer - elapsed > 0;
   });
-
-  // Auth guard
-  useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createBrowserClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) router.push("/login");
-    };
-    checkAuth();
-  }, [router]);
+  const [timeUp, setTimeUp] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !sessionId || !initialTimer) return false;
+    const key = `quiz_timer_start_${sessionId}`;
+    const start = sessionStorage.getItem(key);
+    if (!start) return false;
+    const elapsed = Math.floor((Date.now() - parseInt(start, 10)) / 1000);
+    return initialTimer - elapsed <= 0;
+  });
 
   useEffect(() => {
     if (!sessionId) {
       router.push("/dashboard");
+      return;
     }
+    const supabase = createBrowserClient();
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (!s) router.push("/login");
+    });
   }, [sessionId, router]);
 
+  // Tick timer
   useEffect(() => {
-    startedTrackedRef.current = false;
-    resumedTrackedRef.current = false;
-    abandonedTrackedRef.current = false;
-    seenQuestionIdsRef.current.clear();
-  }, [sessionId]);
+    if (!timerActive || remaining === null || remaining <= 0) return;
+    const id = setInterval(() => {
+      setRemaining((p) => {
+        if (p === null || p <= 1) {
+          clearInterval(id);
+          setTimerActive(false);
+          setTimeUp(true);
+          return 0;
+        }
+        return p - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [timerActive, remaining]);
 
-  // Redirect to results if session is already completed (handles refresh)
+  // Time-up redirect
+  useEffect(() => {
+    if (timeUp && sessionId) {
+      const t = setTimeout(() => {
+        router.push(`/results?session_id=${sessionId}`);
+      }, 1800);
+      return () => clearTimeout(t);
+    }
+  }, [timeUp, sessionId, router]);
+
+  // Already complete → redirect
   useEffect(() => {
     if (session?.status === "completed" && sessionId) {
       router.replace(`/results?session_id=${sessionId}`);
     }
   }, [session?.status, sessionId, router]);
 
+  // Track quiz_session_started once
   useEffect(() => {
-    if (!sessionId || !session || !question) return;
-    if (startedTrackedRef.current) return;
+    if (!sessionId || !session || !question || startedTrackedRef.current) return;
     if (question.question_number !== 1) return;
-
     analytics.capture("quiz_session_started", {
       document_id: session.document_id,
       session_id: sessionId,
       question_id: question.question_id,
-      question_number: question.question_number,
     });
     startedTrackedRef.current = true;
   }, [sessionId, session, question]);
 
-  useEffect(() => {
-    if (!sessionId || !session || !question) return;
-    if (seenQuestionIdsRef.current.has(question.question_id)) return;
-
-    analytics.capture("quiz_question_seen", {
-      document_id: session.document_id,
-      session_id: sessionId,
-      question_id: question.question_id,
-      question_number: question.question_number,
-    });
-    seenQuestionIdsRef.current.add(question.question_id);
-  }, [sessionId, session, question]);
-
-  useEffect(() => {
-    if (!sessionId || !session || !question) return;
-    if (resumedTrackedRef.current) return;
-    if (session.status !== "active" || session.answered_questions <= 0) return;
-
-    analytics.capture("quiz_resumed", {
-      document_id: session.document_id,
-      session_id: sessionId,
-      question_id: question.question_id,
-      question_number: question.question_number,
-    });
-    resumedTrackedRef.current = true;
-  }, [sessionId, session, question]);
-
-  useEffect(() => {
-    if (!sessionId) return;
-
-    const captureAbandoned = () => {
-      if (!session || session.status === "completed" || isSessionComplete) return;
-      if (abandonedTrackedRef.current) return;
-
-      analytics.capture("quiz_abandoned", {
-        document_id: session.document_id,
-        session_id: sessionId,
-        question_id: question?.question_id,
-        question_number: question?.question_number,
-      });
-      abandonedTrackedRef.current = true;
-    };
-
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        captureAbandoned();
-      }
-    };
-
-    const onPageHide = () => {
-      captureAbandoned();
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pagehide", onPageHide);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pagehide", onPageHide);
-    };
-  }, [sessionId, session, question, isSessionComplete]);
-
-  // Timer countdown
-  useEffect(() => {
-    if (!timerActive || timeRemaining === null || timeRemaining <= 0) return;
-
-    const interval = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev === null || prev <= 1) {
-          clearInterval(interval);
-          setTimerActive(false);
-          setTimeUp(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [timerActive, timeRemaining]);
-
-  // Auto-navigate when time's up
-  useEffect(() => {
-    if (timeUp && sessionId) {
-      const timeout = setTimeout(() => {
-        router.push(`/results?session_id=${sessionId}`);
-      }, 2000);
-      return () => clearTimeout(timeout);
-    }
-  }, [timeUp, sessionId, router]);
-
-  const handleSubmit = async () => {
-    if (!question || !answer.trim() || timeUp) return;
-
+  const handleSubmit = useCallback(async () => {
+    if (!question || !answer.trim() || timeUp || submitting) return;
     try {
-      // Always trim the answer before submitting
-      const trimmedAnswer = answer.trim();
-      setAnswer(trimmedAnswer);
-      const result = await submitAnswer(question.question_id, trimmedAnswer, inputMethod);
+      const trimmed = answer.trim();
+      const result = await submitAnswer(question.question_id, trimmed, inputMethod);
       setLastResult(result.result);
-      setIsSessionComplete(result.session_complete);
+      setIsComplete(result.session_complete);
       setShowFeedback(true);
     } catch {
-      // Error handled by hook
+      // surfaced via submitError
     }
-  };
+  }, [answer, inputMethod, question, submitAnswer, submitting, timeUp]);
 
-  const handleNext = async () => {
+  const handleNext = useCallback(async () => {
     setShowFeedback(false);
     setAnswer("");
     setLastResult(null);
     setInputMethod("typed");
     setNextError(null);
 
-    if (isSessionComplete) {
+    if (!sessionId) return;
+    if (isComplete) {
       router.push(`/results?session_id=${sessionId}`);
       return;
     }
@@ -261,296 +191,512 @@ function SessionContent() {
     try {
       const result = await pollUntilReady({ waitMs: 5000, maxAttempts: 4 });
       if (result.status === "ended") {
-        setIsSessionComplete(true);
+        setIsComplete(true);
         router.push(`/results?session_id=${sessionId}`);
         return;
       }
       if (result.status === "failed") {
-        setNextError(result.message || "Could not load the next question. Try again.");
+        setNextError(result.message ?? "Couldn't load next question.");
         return;
       }
-      // status === "ready" → SWR refresh picks up the new ready row.
       await refetchQuestion();
-      await refetch();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to fetch next question";
-      setNextError(message);
+      await refetchSession();
+    } catch (err) {
+      setNextError(err instanceof Error ? err.message : "Failed to fetch next question");
     }
-  };
+  }, [isComplete, pollUntilReady, refetchQuestion, refetchSession, router, sessionId]);
 
-  const handleAnswer = (selectedAnswer: string, method: "click" | "typed" | "voice" = "click") => {
-    setAnswer(selectedAnswer);
-    setInputMethod(method);
-  };
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore typing in textareas (free text)
+      const t = e.target as HTMLElement | null;
+      const isTextarea =
+        t?.tagName === "TEXTAREA" || (t as HTMLElement)?.isContentEditable;
 
-  const progress = session ? ((session.answered_questions / session.total_questions) * 100) : 0;
+      if (e.key === "Enter" && !e.shiftKey) {
+        if (showFeedback) {
+          e.preventDefault();
+          handleNext();
+          return;
+        }
+        if (!isTextarea && answer.trim()) {
+          e.preventDefault();
+          handleSubmit();
+          return;
+        }
+        if (isTextarea && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          handleSubmit();
+          return;
+        }
+      }
 
-  if (sessionLoading || questionLoading) {
-    return (
-      <div className="pb-32">
-        <PageContainer size="lg">
-          <div className="py-8">
-            {/* Skeleton Progress Header */}
-            <div className="mb-6">
-              <div className="w-full bg-surface-border/30 rounded-full h-1" />
-            </div>
-            {/* Skeleton Question Card */}
-            <QuestionCardSkeleton />
-          </div>
-        </PageContainer>
-      </div>
-    );
-  }
+      // MCQ A-D / 1-4
+      if (
+        question?.options &&
+        question.options.length > 0 &&
+        !isTextarea &&
+        !showFeedback
+      ) {
+        const upper = e.key.toUpperCase();
+        const letterIdx = LETTERS.indexOf(upper as (typeof LETTERS)[number]);
+        if (letterIdx >= 0 && letterIdx < question.options.length) {
+          e.preventDefault();
+          setAnswer(question.options[letterIdx]);
+          setInputMethod("click");
+          return;
+        }
+        const num = parseInt(e.key, 10);
+        if (!isNaN(num) && num >= 1 && num <= question.options.length) {
+          e.preventDefault();
+          setAnswer(question.options[num - 1]);
+          setInputMethod("click");
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [answer, handleNext, handleSubmit, question, showFeedback]);
 
-  // Show error state
-  if (sessionError || questionError) {
-    return (
-      <div className="h-[80vh] flex flex-col items-center justify-center px-4">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="w-20 h-20 rounded-full bg-semantic-error/20 flex items-center justify-center mb-6"
-        >
-          <AlertCircle size={40} className="text-semantic-error" />
-        </motion.div>
-        <h2 className="text-h2 font-serif text-text-primary mb-2">Something went wrong</h2>
-        <p className="text-text-muted mb-6 text-center max-w-md">
-          {sessionError || questionError || "Unable to load the quiz session"}
-        </p>
-        <div className="flex gap-4">
-          <motion.button
-            onClick={() => {
-              refetch();
-              refetchQuestion();
-            }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="px-6 py-3 rounded-xl border-2 border-surface-border text-text-primary font-semibold hover:bg-surface-card transition-colors"
-          >
-            Try Again
-          </motion.button>
-          <motion.button
-            onClick={() => router.push("/dashboard")}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="px-6 py-3 rounded-xl bg-brand-primary text-surface-dark font-semibold hover:bg-brand-primary/90 transition-colors"
-          >
-            Back to Dashboard
-          </motion.button>
-        </div>
-      </div>
-    );
-  }
+  const progress = session
+    ? (session.answered_questions / session.total_questions) * 100
+    : 0;
 
-  // Show session complete
-  if (!question && !showFeedback) {
-    return (
-      <div className="h-[80vh] flex flex-col items-center justify-center">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 200 }}
-          className="w-20 h-20 rounded-full bg-semantic-success/20 flex items-center justify-center mb-6"
-        >
-          <CheckCircle size={40} className="text-semantic-success" />
-        </motion.div>
-        <h2 className="text-h2 font-serif text-text-primary mb-4">Session Complete!</h2>
-        <motion.button
-          onClick={() => router.push(`/results?session_id=${sessionId}`)}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          className="
-            px-8 py-3 rounded-xl
-            bg-brand-primary text-surface-dark
-            font-semibold
-            hover:bg-brand-primary/90 transition-colors
-          "
-        >
-          View Results
-        </motion.button>
-      </div>
-    );
-  }
+  const timerStatus =
+    remaining === null
+      ? null
+      : remaining <= 10
+        ? "critical"
+        : remaining <= 30
+          ? "warning"
+          : "normal";
+
+  const sessionComplete = !sessionLoading && !question && session?.status === "completed";
 
   return (
-    <div className="pb-32">
-      <PageContainer size="lg">
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="show"
-          className="py-8"
+    <div className="min-h-screen flex flex-col bg-[var(--bg-base)] text-[var(--fg-primary)]">
+      <TopNav
+        showBack
+        backHref="/dashboard"
+        eyebrow={document?.ai_title ?? document?.filename}
+        title={
+          session && question
+            ? `Question ${question.question_number} of ${session.total_questions}`
+            : "Loading"
+        }
+        showHud
+        showSidebarTrigger={false}
+        rightContent={
+          remaining !== null ? (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 h-[30px] px-3 rounded-full border font-mono text-[12px] tabular-nums",
+                timerStatus === "critical" &&
+                  "border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[var(--danger)] critical-pulse",
+                timerStatus === "warning" &&
+                  "border-[color-mix(in_oklab,var(--warning)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--warning)_8%,var(--bg-elev))] text-[var(--warning)]",
+                timerStatus === "normal" &&
+                  "border-[var(--line-default)] bg-[var(--bg-elev)] text-[var(--fg-secondary)]",
+              )}
+            >
+              {formatTime(remaining)}
+            </span>
+          ) : undefined
+        }
+      />
+
+      <ProgressHairline value={progress} />
+
+      <main className="flex-1 px-4 sm:px-6 py-8 sm:py-10">
+        <div
+          className={cn(
+            "mx-auto transition-[max-width] duration-[240ms]",
+            showFeedback ? "max-w-[1040px]" : "max-w-[720px]",
+          )}
         >
-          {/* Mascot Coach Strip */}
-          <motion.div variants={slideUpItem} className="mb-4">
-            <MascotStage
-              mode="quiz"
-              isLoading={submitting}
-              answerState={showFeedback ? (lastResult?.is_correct ? "correct" : "wrong") : "idle"}
-              timedOut={timeUp}
-            />
-          </motion.div>
-
-          {/* Progress Header */}
-          <motion.div variants={slideUpItem} className="mb-6">
-            {/* Single progress bar — no text labels */}
-            <div className="w-full bg-surface-border/30 rounded-full h-1 overflow-hidden">
-              <motion.div
-                className="h-full bg-brand-primary rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.5 }}
-              />
+          {sessionLoading || questionLoading ? (
+            <div className="rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)] p-8 flex items-center justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-[var(--fg-tertiary)]" />
             </div>
-
-            {/* Timer only — shown in timed mode */}
-            {initialTimerSeconds && timeRemaining !== null && (
-              <div className="flex justify-end mt-3">
-                <div className="flex items-center gap-2 bg-surface-card px-3 py-1.5 rounded-xl border border-surface-border">
-                  <Timer size={16} className={timeRemaining <= 10 ? "text-semantic-error" : "text-brand-secondary"} />
-                  <span className={`font-mono text-base font-bold ${timeRemaining <= 10 ? "text-semantic-error" : "text-text-primary"}`}>
-                    {formatTime(timeRemaining)}
-                  </span>
-                </div>
-              </div>
-            )}
-          </motion.div>
-
-          {/* Question Card */}
-          <motion.div variants={slideUpItem}>
-            {question && (
-              <div className="bg-surface-card rounded-3xl p-8 md:p-12 border border-surface-border">
-                <QuestionCard
-                  number={question.question_number}
-                  question={question.question_text}
-                  type={question.question_type}
-                  options={question.options || undefined}
-                  onAnswer={handleAnswer}
-                  selectedAnswer={answer}
+          ) : sessionError || questionError ? (
+            <ErrorState
+              message={sessionError ?? questionError ?? "Failed to load session"}
+              onRetry={() => {
+                refetchSession();
+                refetchQuestion();
+              }}
+              onExit={() => router.push("/dashboard")}
+            />
+          ) : sessionComplete ? (
+            <CompletionState sessionId={sessionId!} onView={() => router.push(`/results?session_id=${sessionId}`)} />
+          ) : question ? (
+            <div
+              className={cn(
+                "grid gap-6",
+                showFeedback ? "lg:grid-cols-[1fr_320px]" : "grid-cols-1",
+              )}
+            >
+              <div className="rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)] p-6 sm:p-8">
+                <QuestionView
+                  question={question}
+                  answer={answer}
+                  setAnswer={(v, m = "click") => {
+                    setAnswer(v);
+                    setInputMethod(m);
+                  }}
                   showFeedback={showFeedback}
                   correctAnswer={lastResult?.correct_answer}
                   isCorrect={lastResult?.is_correct}
+                  disabled={showFeedback || submitting || timeUp}
                 />
 
-                {/* Submit button */}
                 {!showFeedback && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="mt-8 flex justify-end"
-                  >
-                    <motion.button
+                  <div className="mt-6 flex items-center justify-between">
+                    {submitError && (
+                      <p className="text-[12px] text-[var(--danger)] flex items-center gap-1.5">
+                        <AlertCircle className="h-3 w-3" />
+                        {getErrorMessage(submitError)}
+                      </p>
+                    )}
+                    <Button
                       onClick={handleSubmit}
                       disabled={!answer.trim() || submitting || timeUp}
-                      whileHover={!answer.trim() || submitting || timeUp ? {} : { scale: 1.02 }}
-                      whileTap={!answer.trim() || submitting || timeUp ? {} : { scale: 0.98 }}
-                      className="
-                        flex items-center gap-2 px-8 py-4 rounded-xl
-                        font-semibold text-lg
-                        transition-all
-                        disabled:opacity-50 disabled:cursor-not-allowed
-                        bg-brand-primary text-surface-dark
-                        hover:bg-brand-primary/90
-                      "
+                      size="lg"
+                      className="ml-auto"
                     >
                       {submitting ? (
                         <>
-                          <Loader2 size={20} className="animate-spin" />
-                          Submitting...
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Submitting
                         </>
                       ) : timeUp ? (
-                        "Time's Up"
+                        "Time's up"
                       ) : (
                         <>
-                          Submit Answer
-                          <ArrowRight size={20} />
+                          Submit
+                          <Kbd className="ml-1">↵</Kbd>
                         </>
                       )}
-                    </motion.button>
-                  </motion.div>
+                    </Button>
+                  </div>
                 )}
+              </div>
 
-                {/* Error message */}
-                {submitError && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 p-4 rounded-xl bg-semantic-error/10 border border-semantic-error/30 text-semantic-error flex items-center gap-2"
+              {showFeedback && lastResult && (
+                <aside className="anim-marg-in space-y-4 lg:pl-2">
+                  <div
+                    className={cn(
+                      "p-4 rounded-md border",
+                      lastResult.is_correct
+                        ? "border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--success)_8%,var(--bg-elev))]"
+                        : "border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))]",
+                    )}
                   >
-                    <AlertCircle size={18} />
-                    {getErrorMessage(submitError)}
-                  </motion.div>
-                )}
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
-      </PageContainer>
+                    <div className="flex items-center gap-2">
+                      {lastResult.is_correct ? (
+                        <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-[var(--danger)]" />
+                      )}
+                      <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)]">
+                        {lastResult.is_correct ? "Correct" : "Incorrect"}
+                      </span>
+                      {lastResult.xp_awarded != null && lastResult.xp_awarded !== 0 && (
+                        <span className="ml-auto font-mono text-[11px] tabular-nums text-[var(--fg-secondary)]">
+                          +{lastResult.xp_awarded} XP
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-      {/* Feedback Panel */}
-      <AnimatePresence>
-        {showFeedback && lastResult && (
-          <FeedbackPanel
-            isCorrect={lastResult.is_correct}
-            explanation={lastResult.explanation || undefined}
-            correctAnswer={lastResult.correct_answer}
-            userAnswer={answer}
-            onNext={isSessionComplete ? () => router.push(`/results?session_id=${sessionId}`) : handleNext}
-            isLastQuestion={isSessionComplete}
-          />
-        )}
-      </AnimatePresence>
+                  {!lastResult.is_correct && (
+                    <div className="space-y-1.5">
+                      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
+                        You said
+                      </span>
+                      <p className="text-[14px] text-[var(--fg-secondary)] line-through decoration-[var(--line-default)]">
+                        {answer || "—"}
+                      </p>
+                    </div>
+                  )}
 
-      {/* Time's Up Overlay */}
-      <AnimatePresence>
-        {timeUp && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-surface-dark/95 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="text-center"
-            >
-              {/* Timeout mascot with message */}
-              <div className="flex justify-center mb-6">
-                <MascotStage mode="quiz" timedOut />
-              </div>
-              <h2 className="text-4xl font-bold text-text-primary mb-2">Time&apos;s Up!</h2>
-              <p className="text-text-muted mb-6">Redirecting to results...</p>
-              <motion.div className="w-48 h-1 bg-surface-border rounded-full mx-auto overflow-hidden">
-                <motion.div
-                  className="h-full bg-brand-primary"
-                  initial={{ width: "0%" }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 2, ease: "linear" }}
-                />
-              </motion.div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                  <div className="space-y-1.5">
+                    <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
+                      Correct answer
+                    </span>
+                    <p className="text-[14px] font-medium text-[var(--fg-primary)]">
+                      {lastResult.correct_answer}
+                    </p>
+                  </div>
+
+                  {lastResult.explanation && (
+                    <WhyInset>{lastResult.explanation}</WhyInset>
+                  )}
+
+                  {nextError && (
+                    <p className="text-[12px] text-[var(--danger)]">{nextError}</p>
+                  )}
+
+                  <Button onClick={handleNext} block size="lg">
+                    {isComplete ? "View results" : "Next question"}
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </aside>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </main>
+
+      {!showFeedback && question && (
+        <KeyboardHints
+          hints={[
+            ...(question.options && question.options.length > 0
+              ? [{ keys: ["A", "/", "1"], label: "Select" }]
+              : []),
+            { keys: ["↵"], label: "Submit" },
+            { keys: ["esc"], label: "Exit" },
+          ]}
+        />
+      )}
+
+      {timeUp && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 backdrop-blur-sm">
+          <div className="text-center px-6">
+            <div className="mx-auto h-14 w-14 rounded-full grid place-items-center bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] mb-4">
+              <AlertCircle className="h-6 w-6 text-[var(--danger)]" />
+            </div>
+            <h2 className="text-[24px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] mb-2">
+              Time&apos;s up
+            </h2>
+            <p className="text-[13px] text-[var(--fg-secondary)] mb-4">
+              Redirecting to results…
+            </p>
+            <ProgressHairline value={100} className="w-48 mx-auto" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-export default function Session() {
+function QuestionView({
+  question,
+  answer,
+  setAnswer,
+  showFeedback,
+  correctAnswer,
+  isCorrect,
+  disabled,
+}: {
+  question: CurrentQuestion;
+  answer: string;
+  setAnswer: (v: string, method?: "click" | "typed" | "voice") => void;
+  showFeedback: boolean;
+  correctAnswer?: string;
+  isCorrect?: boolean;
+  disabled: boolean;
+}) {
+  const isMcq = (question.options?.length ?? 0) > 0;
+  const isFreeText = question.question_type === "text_free";
+
   return (
-    <AppShell>
+    <div className="space-y-6">
+      <div className="flex items-baseline justify-between">
+        <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
+          {questionTypeLabel(question.question_type)}
+        </span>
+        <span className="font-mono text-[11px] tabular-nums text-[var(--fg-tertiary)]">
+          {String(question.question_number).padStart(2, "0")}
+        </span>
+      </div>
+
+      <h1 className="text-[20px] sm:text-[24px] font-medium leading-[1.4] tracking-[-0.01em] text-[var(--fg-primary)]">
+        {question.question_text}
+      </h1>
+
+      {isMcq && question.options && (
+        <div className="space-y-2">
+          {question.options.map((opt, i) => {
+            const letter = LETTERS[i] ?? String(i + 1);
+            const selected = answer === opt;
+            const correct = showFeedback && correctAnswer === opt;
+            const wrong = showFeedback && selected && !isCorrect;
+            return (
+              <button
+                key={i}
+                type="button"
+                disabled={disabled && !showFeedback}
+                onClick={() => setAnswer(opt, "click")}
+                className={cn(
+                  "group w-full flex items-start gap-3 text-left p-3.5 rounded-md border bg-[var(--bg-base)]",
+                  "transition-[border-color,background-color] duration-[180ms]",
+                  !showFeedback &&
+                    !selected &&
+                    "border-[var(--line-default)] hover:border-[var(--line-strong)] hover:bg-[var(--bg-elev)]",
+                  !showFeedback && selected && "border-[var(--accent)] bg-[var(--accent-fade)]",
+                  correct &&
+                    "border-[color-mix(in_oklab,var(--success)_50%,var(--line-default))] bg-[color-mix(in_oklab,var(--success)_10%,var(--bg-elev))]",
+                  wrong &&
+                    "border-[color-mix(in_oklab,var(--danger)_50%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_10%,var(--bg-elev))]",
+                  disabled && !showFeedback && "opacity-60 cursor-not-allowed",
+                )}
+              >
+                <span
+                  className={cn(
+                    "shrink-0 h-6 w-6 grid place-items-center rounded-sm border font-mono text-[11px]",
+                    !showFeedback &&
+                      !selected &&
+                      "border-[var(--line-default)] text-[var(--fg-tertiary)] group-hover:text-[var(--fg-secondary)]",
+                    !showFeedback &&
+                      selected &&
+                      "border-[var(--accent)] bg-[var(--accent)] text-white",
+                    correct && "border-[var(--success)] bg-[var(--success)] text-white",
+                    wrong && "border-[var(--danger)] bg-[var(--danger)] text-white",
+                  )}
+                >
+                  {letter}
+                </span>
+                <span className="text-[14px] flex-1 text-[var(--fg-primary)]">
+                  {opt}
+                </span>
+                {correct && <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />}
+                {wrong && <XCircle className="h-4 w-4 text-[var(--danger)]" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {!isMcq && isFreeText && (
+        <div className="space-y-1.5">
+          <Textarea
+            placeholder="Type your answer…"
+            value={answer}
+            disabled={disabled}
+            onChange={(e) => setAnswer(e.target.value, "typed")}
+            className="min-h-32"
+          />
+          <div className="flex items-center justify-between text-[11px] font-mono text-[var(--fg-tertiary)]">
+            <span>Cmd/Ctrl + ↵ to submit</span>
+            <span className="tabular-nums">{answer.length}</span>
+          </div>
+        </div>
+      )}
+
+      {!isMcq && !isFreeText && (
+        <div className="grid grid-cols-2 gap-2">
+          {["True", "False"].map((opt, i) => {
+            const selected = answer.toLowerCase() === opt.toLowerCase();
+            const correct = showFeedback && correctAnswer?.toLowerCase() === opt.toLowerCase();
+            const wrong = showFeedback && selected && !isCorrect;
+            return (
+              <button
+                key={opt}
+                type="button"
+                disabled={disabled && !showFeedback}
+                onClick={() => setAnswer(opt, "click")}
+                className={cn(
+                  "p-4 rounded-md border bg-[var(--bg-base)] transition-[border-color,background-color] duration-[180ms]",
+                  !showFeedback && !selected && "border-[var(--line-default)] hover:border-[var(--line-strong)]",
+                  !showFeedback && selected && "border-[var(--accent)] bg-[var(--accent-fade)] text-[var(--accent)]",
+                  correct && "border-[color-mix(in_oklab,var(--success)_50%,var(--line-default))] text-[var(--success)]",
+                  wrong && "border-[color-mix(in_oklab,var(--danger)_50%,var(--line-default))] text-[var(--danger)]",
+                )}
+              >
+                <span className="font-mono text-[13px] uppercase tracking-[0.06em]">
+                  {opt}
+                </span>
+                <span className="block mt-1 font-mono text-[10.5px] text-[var(--fg-tertiary)]">
+                  {i + 1}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function questionTypeLabel(t: QuestionType) {
+  switch (t) {
+    case "text_mcq":
+      return "Multiple choice";
+    case "text_tf":
+      return "True / False";
+    case "text_free":
+      return "Free response";
+    default:
+      return "Question";
+  }
+}
+
+function ErrorState({
+  message,
+  onRetry,
+  onExit,
+}: {
+  message: string;
+  onRetry: () => void;
+  onExit: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] p-8 text-center">
+      <div className="mx-auto h-12 w-12 rounded-full grid place-items-center bg-[color-mix(in_oklab,var(--danger)_15%,var(--bg-elev))] mb-4">
+        <AlertCircle className="h-5 w-5 text-[var(--danger)]" />
+      </div>
+      <h2 className="text-[20px] font-medium text-[var(--fg-primary)] mb-2">
+        Something went wrong
+      </h2>
+      <p className="text-[13px] text-[var(--fg-secondary)] mb-6 max-w-md mx-auto">
+        {message}
+      </p>
+      <div className="flex gap-2 justify-center">
+        <Button variant="secondary" onClick={onRetry}>
+          Try again
+        </Button>
+        <Button onClick={onExit}>Back to dashboard</Button>
+      </div>
+    </div>
+  );
+}
+
+function CompletionState({
+  onView,
+}: {
+  sessionId: string;
+  onView: () => void;
+}) {
+  return (
+    <div className="rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)] p-12 text-center">
+      <div className="mx-auto h-14 w-14 rounded-full grid place-items-center bg-[color-mix(in_oklab,var(--success)_10%,var(--bg-elev))] border border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] mb-5">
+        <CheckCircle2 className="h-6 w-6 text-[var(--success)]" />
+      </div>
+      <h2 className="text-[24px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] mb-2">
+        Session complete
+      </h2>
+      <Button onClick={onView} size="lg">
+        View results
+        <ArrowRight className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+export default function SessionPage() {
+  return (
+    <ToastProvider>
       <Suspense
         fallback={
-          <div className="h-[80vh] flex items-center justify-center">
-            <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+          <div className="min-h-screen grid place-items-center bg-[var(--bg-base)]">
+            <Loader2 className="h-5 w-5 animate-spin text-[var(--fg-tertiary)]" />
           </div>
         }
       >
         <SessionContent />
       </Suspense>
-    </AppShell>
+    </ToastProvider>
   );
 }

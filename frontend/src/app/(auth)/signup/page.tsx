@@ -2,39 +2,33 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
 import {
-  Mail,
-  Lock,
-  ArrowRight,
   Loader2,
-  CheckCircle,
-  Sparkles,
   Eye,
   EyeOff,
-  User,
-  Check,
   AlertCircle,
-  PartyPopper,
+  Mail,
+  ArrowRight,
+  CheckCircle2,
 } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+
 import { createBrowserClient } from "@/lib/supabase/client";
 import { signupSchema, type SignupFormData } from "@/lib/validation/auth";
-import { Button } from "@/components/primitives/Button";
-import { Input, Label } from "@/components/primitives/Input";
-import { Checkbox } from "@/components/primitives/Checkbox";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { SocialButtons } from "@/components/auth/SocialButtons";
 
-const inputClassName =
-  "h-auto pl-12 pr-4 py-3 border-slate-border rounded-xl bg-white shadow-none transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus-visible:ring-0 text-indigo-space placeholder:text-slate-text/60";
+type StrengthLabel = "Weak" | "Fair" | "Good" | "Strong";
 
-// Password strength checker
 function getPasswordStrength(password: string): {
   score: number;
-  label: string;
-  color: string;
-  textColor: string;
+  label: StrengthLabel;
+  classes: string;
 } {
   let score = 0;
   if (password.length >= 6) score++;
@@ -43,10 +37,10 @@ function getPasswordStrength(password: string): {
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
 
-  if (score <= 1) return { score, label: "Weak", color: "bg-error", textColor: "text-error" };
-  if (score <= 2) return { score, label: "Fair", color: "bg-orange-400", textColor: "text-orange-500" };
-  if (score <= 3) return { score, label: "Good", color: "bg-yellow-400", textColor: "text-yellow-600" };
-  return { score, label: "Strong", color: "bg-success", textColor: "text-success" };
+  if (score <= 1) return { score, label: "Weak", classes: "bg-[var(--danger)] text-[var(--danger)]" };
+  if (score <= 2) return { score, label: "Fair", classes: "bg-[var(--warning)] text-[var(--warning)]" };
+  if (score <= 3) return { score, label: "Good", classes: "bg-[var(--accent)] text-[var(--accent)]" };
+  return { score, label: "Strong", classes: "bg-[var(--success)] text-[var(--success)]" };
 }
 
 export default function SignupPage() {
@@ -69,30 +63,22 @@ export default function SignupPage() {
   });
 
   const watchedPassword = watch("password", "");
-  const passwordStrength = getPasswordStrength(watchedPassword);
+  const strength = getPasswordStrength(watchedPassword);
 
   const onSubmit = async (data: SignupFormData) => {
     setLoading(true);
     setServerError(null);
-    setSuccess(false);
-
     const supabase = createBrowserClient();
     const { error } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
-      options: {
-        data: {
-          full_name: data.name,
-        },
-      },
+      options: { data: { full_name: data.name } },
     });
-
     if (error) {
       setServerError(error.message);
       setLoading(false);
       return;
     }
-
     setSuccess(true);
     setLoading(false);
   };
@@ -100,319 +86,159 @@ export default function SignupPage() {
   const handleSocialSignup = async (provider: "google" | "apple") => {
     setSocialLoading(provider);
     setServerError(null);
-
-    // Placeholder - In production, implement actual OAuth
     setTimeout(() => {
       setSocialLoading(null);
-      setServerError(`${provider.charAt(0).toUpperCase() + provider.slice(1)} signup coming soon!`);
-    }, 1000);
+      setServerError(`${provider === "google" ? "Google" : "Apple"} sign-up coming soon`);
+    }, 800);
   };
 
   if (success) {
     return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="text-center py-8"
-      >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-          className="relative mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-success/10 mb-6"
+      <div className="text-center py-4">
+        <div className="mx-auto h-14 w-14 rounded-full grid place-items-center bg-[color-mix(in_oklab,var(--success)_8%,var(--bg-elev))] border border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] mb-5">
+          <CheckCircle2 className="h-6 w-6 text-[var(--success)]" />
+        </div>
+        <h2 className="text-[24px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] mb-2">
+          Check your inbox
+        </h2>
+        <p className="text-[14px] text-[var(--fg-secondary)] mb-3">
+          We sent a confirmation link to
+        </p>
+        <p className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-[var(--line-default)] bg-[var(--bg-elev)] font-mono text-[12px] text-[var(--fg-primary)] mb-6">
+          <Mail className="h-3.5 w-3.5 text-[var(--fg-tertiary)]" />
+          {getValues("email")}
+        </p>
+        <p className="text-[12px] text-[var(--fg-tertiary)] mb-7">
+          Click the link to activate your account.
+        </p>
+        <Link
+          href="/login"
+          className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
         >
-          <CheckCircle className="h-10 w-10 text-success" />
-          {/* Celebration sparkles */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.4, type: "spring" }}
-            className="absolute -top-2 -right-2"
-          >
-            <PartyPopper className="h-6 w-6 text-primary" />
-          </motion.div>
-        </motion.div>
-        <motion.h2
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="text-2xl font-extrabold text-indigo-space mb-3 font-heading"
-        >
-          You&apos;re all set!
-        </motion.h2>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="text-slate-text mb-2 leading-relaxed"
-        >
-          We&apos;ve sent a confirmation link to
-        </motion.p>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.35 }}
-          className="mb-6"
-        >
-          <span className="inline-flex items-center gap-2 bg-indigo-space/5 text-indigo-space font-semibold px-4 py-2 rounded-lg text-sm">
-            <Mail className="h-4 w-4" />
-            {getValues("email")}
-          </span>
-        </motion.p>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="text-sm text-slate-text mb-8"
-        >
-          Click the link in your email to activate your account and start learning.
-        </motion.p>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 font-semibold text-primary hover:text-primary-dark transition-colors"
-          >
-            <ArrowRight className="h-4 w-4 rotate-180" />
-            Back to login
-          </Link>
-        </motion.div>
-      </motion.div>
+          ← Back to login
+        </Link>
+      </div>
     );
   }
 
   return (
     <div>
-      {/* Header */}
-      <div className="text-center mb-8">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
-          className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary mb-4"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          Start for free
-        </motion.div>
-        <motion.h1
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="text-3xl font-extrabold text-indigo-space font-heading"
-        >
-          Create your account
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="mt-2 text-slate-text"
-        >
-          Join thousands of learners on AutoCoach
-        </motion.p>
+      <div className="mb-7">
+        <h1 className="text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+          Create account
+        </h1>
+        <p className="mt-1.5 text-[14px] text-[var(--fg-secondary)]">
+          Start mastering any topic, free
+        </p>
       </div>
 
-      {/* Social Signup Buttons */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="mb-6"
-      >
-        <SocialButtons
-          onSocialLogin={handleSocialSignup}
-          loading={socialLoading}
-          disabled={loading}
-        />
-      </motion.div>
+      <SocialButtons
+        onSocialLogin={handleSocialSignup}
+        loading={socialLoading}
+        disabled={loading}
+      />
 
-      {/* Divider */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="relative mb-6"
-      >
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-slate-border/70"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-background-light text-slate-text/80 text-xs uppercase tracking-wider font-medium">
-            or sign up with email
-          </span>
-        </div>
-      </motion.div>
+      <div className="relative my-6">
+        <Separator />
+        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-3 bg-[var(--bg-base)] font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
+          or with email
+        </span>
+      </div>
 
-      {/* Error Message */}
       {serverError && (
-        <motion.div
-          initial={{ opacity: 0, y: -10, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="mb-5 bg-error-light border border-error/20 text-error px-4 py-3 rounded-xl text-sm flex items-start gap-2.5"
+        <div
+          className="mb-5 flex items-start gap-2 px-3 py-2.5 rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[13px] text-[var(--danger)]"
+          role="alert"
         >
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
           <span>{serverError}</span>
-        </motion.div>
+        </div>
       )}
 
-      {/* Signup Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-        {/* Name Field */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.35 }}
-        >
-          <Label htmlFor="name" className="block text-indigo-space mb-2 text-sm font-medium">
+        <div className="space-y-1.5">
+          <Label htmlFor="name" variant="mono">
             Full name
           </Label>
-          <div className="relative group/input">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <User className="h-5 w-5 text-slate-text/70 transition-colors duration-200 group-focus-within/input:text-primary" />
-            </div>
-            <Input
-              id="name"
-              type="text"
-              autoFocus
-              placeholder="John Doe"
-              {...register("name")}
-              className={inputClassName}
-            />
-          </div>
+          <Input id="name" autoFocus autoComplete="name" {...register("name")} />
           {errors.name && (
-            <p className="mt-1.5 text-xs text-error flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              {errors.name.message}
-            </p>
+            <p className="text-[12px] text-[var(--danger)]">{errors.name.message}</p>
           )}
-        </motion.div>
+        </div>
 
-        {/* Email Field */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Label htmlFor="email" className="block text-indigo-space mb-2 text-sm font-medium">
-            Email address
+        <div className="space-y-1.5">
+          <Label htmlFor="email" variant="mono">
+            Email
           </Label>
-          <div className="relative group/input">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-slate-text/70 transition-colors duration-200 group-focus-within/input:text-primary" />
-            </div>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              {...register("email")}
-              className={inputClassName}
-            />
-          </div>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            {...register("email")}
+          />
           {errors.email && (
-            <p className="mt-1.5 text-xs text-error flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              {errors.email.message}
-            </p>
+            <p className="text-[12px] text-[var(--danger)]">{errors.email.message}</p>
           )}
-        </motion.div>
+        </div>
 
-        {/* Password Field */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.45 }}
-        >
-          <Label htmlFor="password" className="block text-indigo-space mb-2 text-sm font-medium">
+        <div className="space-y-1.5">
+          <Label htmlFor="password" variant="mono">
             Password
           </Label>
-          <div className="relative group/input">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-slate-text/70 transition-colors duration-200 group-focus-within/input:text-primary" />
-            </div>
+          <div className="relative">
             <Input
               id="password"
               type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
               {...register("password")}
-              className={`${inputClassName} !pr-12`}
+              className="pr-10"
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-text/70 hover:text-indigo-space transition-colors duration-200"
+              onClick={() => setShowPassword((s) => !s)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center h-7 w-7 rounded-sm text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)]"
             >
-              {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+              {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             </button>
           </div>
-          {errors.password && (
-            <p className="mt-1.5 text-xs text-error flex items-center gap-1">
-              <AlertCircle className="h-3 w-3" />
-              {errors.password.message}
-            </p>
-          )}
 
-          {/* Password Strength Indicator */}
           {watchedPassword.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              className="mt-3"
-            >
-              <div className="flex items-center gap-3 mb-2.5">
-                {/* Segmented strength bar */}
+            <div className="pt-2">
+              <div className="flex items-center gap-3 mb-1.5">
                 <div className="flex-1 flex gap-1">
-                  {[1, 2, 3, 4, 5].map((segment) => (
-                    <div
-                      key={segment}
-                      className="flex-1 h-1.5 rounded-full overflow-hidden bg-slate-border/40 transition-all duration-300"
-                    >
+                  {[0, 1, 2, 3].map((seg) => {
+                    const filled = strength.score - 1 >= seg;
+                    return (
                       <div
-                        className={`h-full rounded-full transition-all duration-300 ${
-                          segment <= passwordStrength.score ? passwordStrength.color : "bg-transparent"
-                        }`}
-                      />
-                    </div>
-                  ))}
+                        key={seg}
+                        className="flex-1 h-[3px] rounded-full bg-[var(--bg-elev)] overflow-hidden"
+                      >
+                        <div
+                          className={`h-full transition-all duration-300 ${filled ? strength.classes.split(" ")[0] : ""}`}
+                          style={{ width: filled ? "100%" : "0%" }}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
-                <span className={`text-xs font-semibold ${passwordStrength.textColor} min-w-[44px] text-right`}>
-                  {passwordStrength.label}
+                <span
+                  className={`font-mono text-[10.5px] uppercase tracking-[0.08em] ${strength.classes.split(" ")[1]}`}
+                >
+                  {strength.label}
                 </span>
               </div>
-              <ul className="space-y-1.5">
-                {[
-                  { check: watchedPassword.length >= 6, text: "At least 6 characters" },
-                  { check: /[A-Z]/.test(watchedPassword), text: "One uppercase letter" },
-                  { check: /[0-9]/.test(watchedPassword), text: "One number" },
-                ].map((req, i) => (
-                  <li
-                    key={i}
-                    className={`text-xs flex items-center gap-2 transition-colors duration-200 ${
-                      req.check ? "text-success" : "text-slate-text/50"
-                    }`}
-                  >
-                    <div className={`flex items-center justify-center w-4 h-4 rounded-full transition-all duration-200 ${
-                      req.check ? "bg-success/10" : "bg-slate-border/30"
-                    }`}>
-                      <Check className={`h-2.5 w-2.5 transition-all duration-200 ${req.check ? "opacity-100" : "opacity-30"}`} />
-                    </div>
-                    {req.text}
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
+            </div>
           )}
-        </motion.div>
 
-        {/* Terms Checkbox */}
-        <motion.div
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: 0.5 }}
-          className="flex items-start gap-3"
-        >
+          {errors.password && (
+            <p className="text-[12px] text-[var(--danger)]">{errors.password.message}</p>
+          )}
+        </div>
+
+        <div className="flex items-start gap-2.5 pt-1">
           <Controller
             name="agreedToTerms"
             control={control}
@@ -420,75 +246,60 @@ export default function SignupPage() {
               <Checkbox
                 id="terms"
                 checked={field.value}
-                onCheckedChange={(checked) => field.onChange(checked === true)}
-                className="mt-0.5 h-5 w-5 rounded border-2 border-slate-border data-[state=checked]:border-primary transition-colors duration-200"
+                onCheckedChange={(c) => field.onChange(c === true)}
+                className="mt-0.5"
               />
             )}
           />
-          <div>
-            <label htmlFor="terms" className="text-sm text-slate-text leading-relaxed cursor-pointer">
-              I agree to the{" "}
-              <Link href="#" className="text-primary hover:text-primary-dark font-medium transition-colors">
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link href="#" className="text-primary hover:text-primary-dark font-medium transition-colors">
-                Privacy Policy
-              </Link>
-            </label>
-            {errors.agreedToTerms && (
-              <p className="mt-1 text-xs text-error flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                {errors.agreedToTerms.message}
-              </p>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Submit Button */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.55 }}
-          className="pt-1"
-        >
-          <Button
-            type="submit"
-            disabled={loading || socialLoading !== null}
-            className="w-full gap-2 h-auto py-3.5 rounded-xl shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 hover:bg-primary-dark transition-all duration-200"
+          <label
+            htmlFor="terms"
+            className="text-[12px] text-[var(--fg-secondary)] leading-relaxed cursor-pointer"
           >
-            {loading ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" />
-                Creating account...
-              </>
-            ) : (
-              <>
-                Create account
-                <ArrowRight className="h-5 w-5" />
-              </>
-            )}
-          </Button>
-        </motion.div>
+            I agree to the{" "}
+            <Link href="#" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
+              Terms
+            </Link>{" "}
+            and{" "}
+            <Link href="#" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
+              Privacy Policy
+            </Link>
+          </label>
+        </div>
+        {errors.agreedToTerms && (
+          <p className="text-[12px] text-[var(--danger)] -mt-3">
+            {errors.agreedToTerms.message}
+          </p>
+        )}
+
+        <Button
+          type="submit"
+          size="lg"
+          block
+          disabled={loading || socialLoading !== null}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Creating account
+            </>
+          ) : (
+            <>
+              Create account
+              <ArrowRight className="h-3.5 w-3.5" />
+            </>
+          )}
+        </Button>
       </form>
 
-      {/* Login Link */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        className="mt-8 text-center"
-      >
-        <p className="text-sm text-slate-text">
-          Already have an account?{" "}
-          <Link
-            href="/login"
-            className="font-semibold text-primary hover:text-primary-dark transition-colors"
-          >
-            Sign in
-          </Link>
-        </p>
-      </motion.div>
+      <p className="mt-7 text-center text-[13px] text-[var(--fg-secondary)]">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+        >
+          Sign in
+        </Link>
+      </p>
     </div>
   );
 }

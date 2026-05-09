@@ -1,300 +1,278 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { Suspense, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Plus, Loader2, AlertTriangle, Sparkles, FileText } from "lucide-react";
-import { useDocuments, useDeleteDocument } from "@/hooks/useDocuments";
+import { useRouter } from "next/navigation";
+import { Plus, FileText, Loader2, ArrowRight, Upload } from "lucide-react";
+
+import { useDocuments } from "@/hooks/useDocuments";
 import { useDocumentProgressSummary } from "@/hooks/useDocumentProgress";
-import { useToast } from "@/hooks/useToast";
+import { useOnboarding } from "@/hooks/useOnboarding";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { AppShell, PageContainer } from "@/components/layout/AppShell";
-import { DocumentSidebar } from "@/components/sidebar/DocumentSidebar";
-import { DocumentDashboard } from "@/components/dashboard/DocumentDashboard";
-import { WeakConceptsWidget } from "@/components/dashboard/WeakConceptsWidget";
-import { ReviewTodayWidget } from "@/components/dashboard/ReviewTodayWidget";
-import { DocumentCard } from "@/components/features/dashboard/DocumentCard";
-import { StatsGrid } from "@/components/features/dashboard/StatsGrid";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from "@/components/primitives/Modal";
-import { staggerContainer, slideUpItem } from "@/lib/motions";
-import { DashboardSkeleton } from "@/components/features/dashboard/DashboardSkeleton";
-import { ErrorBanner } from "@/components/features/dashboard/ErrorBanner";
+import { cn } from "@/lib/utils";
+import { milestoneFromMastery } from "@/lib/milestones";
+
+import { AppShell, PageContainer, Section } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import type { Document } from "@/lib/types";
-import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { Kbd } from "@/components/primitives-acx/Kbd";
+import { LivePill } from "@/components/primitives-acx/LivePill";
+import { StatCell } from "@/components/primitives-acx/StatCell";
+import { StatusPill } from "@/components/primitives-acx/StatusPill";
+import { MilestoneBadge } from "@/components/primitives-acx/MilestoneBadge";
+import { SmartReviewCard } from "@/components/dashboard/SmartReviewCard";
 
 function DashboardContent() {
   const router = useRouter();
-  const { documents, loading, error, refetch } = useDocuments();
-  const { summary: progressSummary } = useDocumentProgressSummary();
-  const { deleteDocument, deleting } = useDeleteDocument();
-  const { showToast } = useToast();
-  const [userLoading, setUserLoading] = useState(true);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+  const { documents, isLoading, error } = useDocuments();
+  const { summary } = useDocumentProgressSummary();
+  const { onboarding, isLoading: onboardingLoading } = useOnboarding();
 
-  const handleDeleteClick = (doc: Document) => {
-    setDocumentToDelete(doc);
-    setDeleteModalOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!documentToDelete) return;
-    try {
-      await deleteDocument(documentToDelete.id);
-      showToast("Document deleted successfully", "success");
-      setDeleteModalOpen(false);
-      setDocumentToDelete(null);
-    } catch {
-      showToast("Failed to delete document", "error");
-    }
-  };
-
-  const handleDeleteCancel = () => {
-    setDeleteModalOpen(false);
-    setDocumentToDelete(null);
-  };
-
-  const getProgress = (docId: string) => {
-    return progressSummary?.documents.find(p => p.document_id === docId);
-  };
-
+  // Redirect to onboarding if not complete
   useEffect(() => {
-    const checkAuth = async () => {
-      const supabase = createBrowserClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/login");
-        return;
+    if (!onboardingLoading && onboarding && !onboarding.has_completed) {
+      router.replace("/onboarding");
+    }
+  }, [onboarding, onboardingLoading, router]);
+
+  // Auth guard
+  useEffect(() => {
+    const supabase = createBrowserClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) router.replace("/login");
+    });
+  }, [router]);
+
+  // ⌘N → /upload
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        router.push("/upload");
       }
-      setUserLoading(false);
     };
-    checkAuth();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [router]);
 
   const totalDocuments = documents.length;
   const readyDocuments = documents.filter((d) => d.status === "ready").length;
-  const processingDocuments = documents.filter((d) => d.status === "processing").length;
   const recentDocument = documents.find((d) => d.status === "ready");
 
-  const searchParams = useSearchParams();
-  const docId = searchParams.get("docId");
-
-  if (loading || userLoading) return <DashboardSkeleton />;
+  const progressDocs = summary?.documents ?? [];
+  const avgMastery =
+    progressDocs.length > 0
+      ? progressDocs.reduce((acc, d) => acc + d.mastery_percent, 0) / progressDocs.length
+      : 0;
+  const sessionsTotal = progressDocs.reduce(
+    (acc, d) => acc + d.concepts_practiced,
+    0,
+  );
 
   return (
-    <AppShell sidebar={<DocumentSidebar />}>
-      {docId ? (
-        <DocumentDashboard documentId={docId} />
-      ) : (
-        <PageContainer size="xl">
-          <div className="space-y-10">
+    <AppShell title="Dashboard" eyebrow="Workspace">
+      <PageContainer size="lg">
+        {/* Hero */}
+        <Section className="mt-2">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+            <div>
+              <LivePill>Welcome back</LivePill>
+              <h1 className="mt-3 text-[36px] sm:text-[44px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+                Ready to learn?
+              </h1>
+              <p className="mt-2 text-[15px] text-[var(--fg-secondary)] max-w-[520px]">
+                Pick up where you left off, review what&apos;s due, or upload a new
+                document and start a fresh session.
+              </p>
+            </div>
+            <Button asChild size="lg">
+              <Link href="/upload">
+                <Plus className="h-3.5 w-3.5" />
+                Study new
+                <Kbd className="ml-1">⌘N</Kbd>
+              </Link>
+            </Button>
+          </div>
+        </Section>
 
-            {/* Hero Section - Minimal & Bold */}
-            <motion.div
-              variants={staggerContainer}
-              initial="hidden"
-              animate="show"
-              className="flex flex-col md:flex-row md:items-end justify-between gap-6"
-            >
-              <motion.div variants={slideUpItem} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--pop-coral)] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--pop-coral)]" />
-                  </span>
-                  <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs font-medium bg-[var(--pop-coral)]/10 text-[var(--pop-coral)] border-none">
-                    Welcome back
-                  </Badge>
+        {/* Stats */}
+        <Section>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCell label="Documents" value={totalDocuments} />
+            <StatCell label="Ready" value={readyDocuments} />
+            <StatCell label="Concepts practiced" value={sessionsTotal} />
+            <StatCell
+              label="Avg mastery"
+              value={Math.round(avgMastery)}
+              unit="%"
+            />
+          </div>
+        </Section>
+
+        {/* Continue learning */}
+        {recentDocument && (
+          <Section>
+            <h2 className="mb-3 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
+              Continue learning
+            </h2>
+            <div className="flex items-center justify-between gap-4 p-4 rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)]">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="grid place-items-center h-10 w-10 rounded-md bg-[var(--bg-elev)] border border-[var(--line-default)] shrink-0">
+                  <FileText className="h-4 w-4 text-[var(--fg-secondary)]" />
                 </div>
-                <h1 className="text-4xl md:text-5xl font-extrabold text-[var(--text-primary)] font-heading tracking-tight">
-                  Ready to{" "}
-                  <span className="gradient-text-warm">learn?</span>
-                </h1>
-                <p className="text-[var(--text-secondary)] text-base">
-                  Keep your streak alive. Your documents are waiting.
-                </p>
-              </motion.div>
-
-              <motion.div variants={slideUpItem}>
-                <Button asChild size="lg" className="bg-gradient-to-r from-[var(--pop-coral)] to-[var(--pop-gold)] text-white hover:shadow-lg hover:shadow-[var(--pop-coral)]/20 font-semibold px-6">
-                  <Link href="/upload">
-                    <Plus size={18} className="mr-2" />
-                    Study New
+                <div className="min-w-0">
+                  <p className="text-[14px] font-medium text-[var(--fg-primary)] truncate">
+                    {recentDocument.ai_title ?? recentDocument.filename}
+                  </p>
+                  <p className="text-[12px] text-[var(--fg-tertiary)]">Ready to study</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button variant="secondary" size="sm" asChild>
+                  <Link href={`/dashboard/${recentDocument.id}`}>View</Link>
+                </Button>
+                <Button size="sm" asChild>
+                  <Link href={`/dashboard/${recentDocument.id}`}>
+                    Start
+                    <ArrowRight className="h-3 w-3" />
                   </Link>
                 </Button>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
+          </Section>
+        )}
 
-            {/* Stats Grid */}
-            <motion.div variants={staggerContainer} initial="hidden" animate="show">
-              <motion.div variants={slideUpItem}>
-                <StatsGrid
-                  totalDocuments={totalDocuments}
-                  readyDocuments={readyDocuments}
-                  processingDocuments={processingDocuments}
-                />
-              </motion.div>
-            </motion.div>
+        {/* Smart review */}
+        <Section>
+          <h2 className="mb-3 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
+            Smart review
+          </h2>
+          <SmartReviewCard />
+        </Section>
 
-            {/* Continue Learning - Inline minimal */}
-            {recentDocument && (
-              <motion.div
-                variants={staggerContainer}
-                initial="hidden"
-                animate="show"
-              >
-                <motion.div variants={slideUpItem}>
-                  <div className="flex items-center justify-between p-4 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-card)]/30 backdrop-blur-sm">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-[var(--pop-coral)]/10 flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-[var(--pop-coral)]" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-[var(--text-primary)] font-heading line-clamp-1">
-                          {recentDocument.ai_title || recentDocument.filename}
-                        </p>
-                        <p className="text-sm text-[var(--text-muted)]">Ready to study</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard?docId=${recentDocument.id}`}>
-                          View
-                        </Link>
-                      </Button>
-                      <Button size="sm" asChild className="bg-gradient-to-r from-[var(--pop-coral)] to-[var(--pop-gold)] text-white hover:shadow-lg hover:shadow-[var(--pop-coral)]/20">
-                        <Link href={`/dashboard?docId=${recentDocument.id}`}>
-                          <Sparkles className="w-4 h-4 mr-1.5" />
-                          Start
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-            )}
-
-            {/* Smart Review */}
-            <motion.div variants={staggerContainer} initial="hidden" animate="show">
-              <ReviewTodayWidget />
-            </motion.div>
-
-            {/* Weak Concepts Loop */}
-            <motion.div variants={staggerContainer} initial="hidden" animate="show">
-              <WeakConceptsWidget />
-            </motion.div>
-
-            {/* Documents Section */}
-            <motion.div variants={staggerContainer} initial="hidden" animate="show">
-              <motion.div variants={slideUpItem}>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-[var(--text-primary)] font-heading">
-                    Your Documents
-                  </h2>
-                  <Button variant="ghost" size="sm" asChild className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                    <Link href="/upload">View all</Link>
-                  </Button>
-                </div>
-
-                {documents.length === 0 ? (
-                  <div className="relative overflow-hidden rounded-2xl border border-dashed border-[var(--surface-border)] bg-[var(--surface-card)]/20 backdrop-blur-sm p-12 text-center">
-                    <div className="absolute inset-0 warm-aurora-bg-subtle" />
-                    <div className="relative z-10">
-                      <div className="w-16 h-16 rounded-2xl bg-[var(--surface-card)]/50 flex items-center justify-center mx-auto mb-4">
-                        <FileText className="w-8 h-8 text-[var(--text-muted)]" />
-                      </div>
-                      <p className="text-[var(--text-muted)] mb-4">No documents yet</p>
-                      <Button asChild size="lg" className="bg-gradient-to-r from-[var(--pop-coral)] to-[var(--pop-gold)] text-white hover:shadow-lg hover:shadow-[var(--pop-coral)]/20 font-semibold">
-                        <Link href="/upload">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Upload First Document
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {documents.slice(0, 6).map((doc, index) => (
-                      <motion.div
-                        key={doc.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05, duration: 0.4 }}
-                      >
-                        <DocumentCard
-                          document={doc}
-                          progress={getProgress(doc.id)}
-                          onContinue={() => router.push(`/dashboard?docId=${doc.id}`)}
-                          onDelete={() => handleDeleteClick(doc)}
-                        />
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </motion.div>
-            </motion.div>
-
-            {/* Error */}
-            {error && (
-              <ErrorBanner
-                message={`Failed to load documents: ${error}`}
-                onRetry={() => refetch()}
-              />
-            )}
+        {/* Documents grid */}
+        <Section>
+          <div className="flex items-baseline justify-between mb-3">
+            <h2 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
+              Your documents
+            </h2>
+            <span className="font-mono text-[11px] tabular-nums text-[var(--fg-tertiary)]">
+              {documents.length}
+            </span>
           </div>
 
-          {/* Delete Confirmation Modal */}
-          <AlertDialog open={deleteModalOpen} onOpenChange={(open) => { if (!open) handleDeleteCancel(); }}>
-            <AlertDialogContent className="bg-[var(--surface-card)] border-[var(--surface-border)]">
-              <AlertDialogHeader>
-                <div className="w-12 h-12 rounded-full bg-[var(--semantic-error)]/10 flex items-center justify-center mx-auto mb-2">
-                  <AlertTriangle size={24} className="text-[var(--semantic-error)]" />
-                </div>
-                <AlertDialogTitle className="text-center text-[var(--text-primary)]">Delete Document</AlertDialogTitle>
-                <AlertDialogDescription className="text-center text-[var(--text-secondary)]">
-                  Are you sure you want to delete &quot;{documentToDelete?.filename}&quot;? This will also delete all associated quiz sessions and cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={deleting} className="bg-[var(--surface-card)] border-[var(--surface-border)] text-[var(--text-primary)]">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  disabled={deleting}
-                  onClick={(e) => { e.preventDefault(); handleDeleteConfirm(); }}
-                  className="bg-[var(--semantic-error)] text-white hover:bg-[var(--semantic-error)]/90"
-                >
-                  {deleting ? (
-                    <>
-                      <Loader2 size={18} className="animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    "Delete"
-                  )}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </PageContainer>
-      )}
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-32 rounded-md" />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="p-5 rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[13px] text-[var(--danger)]">
+              {`Failed to load documents: ${error}`}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {documents.map((doc) => {
+                const progress = progressDocs.find(
+                  (p) => p.document_id === doc.id,
+                );
+                return (
+                  <DocCard
+                    key={doc.id}
+                    id={doc.id}
+                    title={doc.ai_title ?? doc.filename}
+                    status={doc.status}
+                    mastery={progress?.mastery_percent}
+                  />
+                );
+              })}
+              <Link
+                href="/upload"
+                className={cn(
+                  "group flex flex-col items-center justify-center gap-2 p-5",
+                  "min-h-[8rem] rounded-md border border-dashed border-[var(--line-default)]",
+                  "text-[var(--fg-tertiary)] hover:text-[var(--fg-secondary)] hover:border-[var(--line-strong)] hover:bg-[var(--bg-surface)]",
+                  "transition-colors duration-[180ms]",
+                )}
+              >
+                <Upload className="h-4 w-4" />
+                <span className="text-[13px]">Upload document</span>
+              </Link>
+            </div>
+          )}
+        </Section>
+      </PageContainer>
     </AppShell>
   );
 }
 
-export default function Dashboard() {
+function DocCard({
+  id,
+  title,
+  status,
+  mastery,
+}: {
+  id: string;
+  title: string;
+  status: "pending" | "processing" | "ready" | "failed";
+  mastery?: number;
+}) {
+  const statusVariant = status === "ready" ? "ready" : status === "failed" ? "failed" : "processing";
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
+    <Link
+      href={status === "ready" ? `/dashboard/${id}` : "#"}
+      onClick={(e) => {
+        if (status !== "ready") e.preventDefault();
+      }}
+      className={cn(
+        "group relative flex flex-col p-4 rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)]",
+        "transition-[border-color,background-color] duration-[180ms]",
+        "hover:border-[var(--line-default)] hover:bg-[var(--bg-surface)]",
+        status !== "ready" && "cursor-default",
+      )}
+    >
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="grid place-items-center h-8 w-8 rounded-md bg-[var(--bg-elev)] border border-[var(--line-default)]">
+          <FileText className="h-3.5 w-3.5 text-[var(--fg-secondary)]" />
+        </div>
+        <StatusPill variant={statusVariant} />
+      </div>
+      <p className="text-[14px] font-medium text-[var(--fg-primary)] line-clamp-2 mb-3">
+        {title}
+      </p>
+      <div className="mt-auto">
+        {mastery !== undefined ? (
+          <div>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <MilestoneBadge level={milestoneFromMastery(mastery)} mastery={mastery} />
+            </div>
+            <div className="h-1 rounded-full bg-[var(--bg-elev)] overflow-hidden">
+              <div
+                className="h-full bg-[var(--accent)] rounded-full transition-[width] duration-[240ms]"
+                style={{ width: `${mastery}%` }}
+              />
+            </div>
+          </div>
+        ) : (
+          <span className="font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--fg-tertiary)]">
+            No sessions yet
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen grid place-items-center bg-[var(--bg-base)]">
+          <Loader2 className="h-5 w-5 animate-spin text-[var(--fg-tertiary)]" />
+        </div>
+      }
+    >
       <DashboardContent />
     </Suspense>
   );
