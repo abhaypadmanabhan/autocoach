@@ -1,4 +1,5 @@
 .env
+.env.*
 __pycache__/
 venv/
 node_modules/
@@ -6,3 +7,13 @@ node_modules/
 *.pyc
 .DS_Store
 .worktrees/
+
+# Vercel deploy artifacts
+.vercel/
+
+# Local design refs (HTML mocks)
+Autocoach_Design/
+
+# Local task notes
+tasks/bugs.md
+tasks/design-handoff-prompt.md
