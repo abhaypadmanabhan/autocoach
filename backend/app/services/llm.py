@@ -12,7 +12,7 @@ settings = get_settings()
 
 # Kimi API configuration
 KIMI_BASE_URL = "https://api.moonshot.ai/v1"
-KIMI_MODEL = "kimi-k2.5"
+KIMI_MODEL = "kimi-k2.6"
 
 
 def call_kimi(system_prompt: str, user_prompt: str) -> str:
@@ -46,6 +46,8 @@ def call_kimi(system_prompt: str, user_prompt: str) -> str:
         )
 
         content = response.choices[0].message.content
+        if response.model and not response.model.startswith(KIMI_MODEL):
+            logger.warning(f"Kimi response model={response.model}, expected {KIMI_MODEL}")
         logger.info(f"Kimi API call successful, response length: {len(content) if content else 0}")
         return content if content else ""
     except Exception as e:
