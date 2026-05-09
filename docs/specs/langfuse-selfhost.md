@@ -162,11 +162,13 @@ Verified locations from backend recon:
 |---|---|---|---|
 | Quiz question generation (Kimi) | `backend/app/services/quiz_generator.py:326` (`generate_quiz_questions`) | `quiz.generate_questions` | `generation` |
 | Quiz fallback (OpenAI) | `backend/app/services/quiz_generator.py:357` | covered by parent span | — |
-| Concept extraction during ingestion | `backend/app/services/quiz_generator.py:144` (`extract_concepts_from_content`) | `ingestion.extract_concepts` | `generation` |
+| Concept extraction during ingestion | `backend/app/services/concepts.py:93` (`extract_concepts`) | `ingestion.extract_concepts` | `generation` |
 | Free-text answer eval (Kimi → OpenAI fallback) | `backend/app/services/answer_evaluator.py:141` (`evaluate_free_text`) | `quiz.evaluate_free_text` | `generation` |
 | Embedding generation | `backend/app/services/embeddings.py:51` (`get_embeddings`) | `embeddings.openai_3_small` | `generation` |
 | Qdrant retrieval | `backend/app/services/retrieval.py:26` (`retrieve_relevant_chunks`) | `retrieval.qdrant` | `span` |
 | Mastery update | `backend/app/services/session_manager.py:97` (`_update_concept_mastery`) | `session.update_mastery` | `span` |
+
+Note: spec originally referenced `extract_concepts_from_content` at `quiz_generator.py:144`; that function did not exist. Decorator landed on `concepts.extract_concepts` (verified entry point — calls `call_kimi`).
 
 The lower-level wrappers in `backend/app/services/llm.py` (`call_kimi`, `call_openai`) are intentionally **not** instrumented at the wrapper level — instrumenting at the service-method level produces meaningfully named spans (`quiz.generate_questions` vs anonymous `call_kimi`).
 
