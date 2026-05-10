@@ -19,8 +19,11 @@ from app.api.routes import (
 from app.config import get_settings
 from app.observability.langfuse import flush as langfuse_flush, is_enabled as langfuse_enabled
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Configure logging. force=True clears handlers uvicorn attached to the root
+# logger on import, so our INFO-level config takes effect and lifespan
+# logger.info() calls surface in `railway logs`. Named loggers
+# (uvicorn.access, uvicorn.error) keep their own handlers.
+logging.basicConfig(level=logging.INFO, force=True)
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
