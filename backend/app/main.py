@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -17,6 +18,7 @@ from app.api.routes import (
     onboarding,
 )
 from app.config import get_settings
+from app.core.qdrant import keepalive_loop as qdrant_keepalive_loop
 from app.observability.langfuse import flush as langfuse_flush, is_enabled as langfuse_enabled
 
 # Configure logging. force=True clears handlers uvicorn attached to the root
@@ -44,8 +46,19 @@ async def lifespan(app: FastAPI):
         f"Langfuse: {'enabled' if langfuse_enabled() else 'disabled (NOOP)'}"
     )
     logger.info("=" * 50)
+
+    keepalive_task = asyncio.create_task(
+        qdrant_keepalive_loop(settings.qdrant_keepalive_interval_s)
+    )
+
     yield
+
     # Shutdown
+    keepalive_task.cancel()
+    try:
+        await keepalive_task
+    except asyncio.CancelledError:
+        pass
     langfuse_flush()
     logger.info("AutoCoach API shutting down")
 

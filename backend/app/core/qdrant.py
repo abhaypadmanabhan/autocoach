@@ -1,5 +1,6 @@
 """Qdrant vector database client and utilities."""
 
+import asyncio
 import logging
 from uuid import uuid4
 
@@ -228,3 +229,29 @@ try:
     ensure_collection_exists()
 except Exception as e:
     logger.error(f"Failed to initialize Qdrant collection: {e}")
+
+
+async def keepalive_loop(interval_s: int) -> None:
+    """Background task: ping Qdrant every interval_s seconds.
+
+    Prevents the Qdrant Cloud cluster from suspending due to inactivity
+    (which today blocked uploads + RAG mid-session). The ping is a cheap
+    `get_collections()` call, run in a thread so it doesn't block the
+    event loop.
+    """
+    if interval_s <= 0:
+        logger.info("Qdrant keep-alive disabled (interval_s=%s)", interval_s)
+        return
+
+    logger.info("Qdrant keep-alive started (interval=%ss)", interval_s)
+    try:
+        while True:
+            await asyncio.sleep(interval_s)
+            try:
+                await asyncio.to_thread(qdrant_client.get_collections)
+                logger.debug("Qdrant keep-alive ping ok")
+            except Exception as e:
+                logger.warning("Qdrant keep-alive ping failed: %s", e)
+    except asyncio.CancelledError:
+        logger.info("Qdrant keep-alive stopped")
+        raise

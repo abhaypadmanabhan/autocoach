@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Qdrant
     qdrant_url: str
     qdrant_api_key: str
+    # Background ping interval to keep the Qdrant Cloud cluster from idling
+    # into suspension. 0 disables the keep-alive loop. Default 300s (5 min).
+    qdrant_keepalive_interval_s: int = 300
 
     # AI APIs
     kimi_api_key: str
