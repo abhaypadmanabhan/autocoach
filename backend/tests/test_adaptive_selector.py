@@ -88,18 +88,28 @@ def test_selector_skips_concept_after_three_consecutive_correct():
 
 
 def test_selector_resets_streak_on_wrong_answer():
-    """A wrong answer in between resets the trailing-correct counter."""
+    """A wrong answer in between resets the trailing-correct counter.
+
+    History places the streak-relevant CORE_A activity in the older part of
+    history and CORE_B in the recent window, so the recent-asked dedup filter
+    (RECENT_ASK_WINDOW) does not interfere with what this test is checking.
+    """
     concepts = [
         _concept(CORE_A, importance=1.0, mastery=20.0),
         _concept(CORE_B, importance=1.0, mastery=20.0),
     ]
-    # 2 correct, then wrong, then 2 more correct → trailing correct = 2 (< 3) → not skipped
+    # A correct, A correct, A wrong, A correct, A correct, B, B, B
+    # → A trailing-correct = 2 (frozen by the wrong) → not skipped
+    # → A NOT in last RECENT_ASK_WINDOW (=3) entries → not dedup-filtered
     history = _hist([
         {"concept_ids": [CORE_A], "is_correct": True},
         {"concept_ids": [CORE_A], "is_correct": True},
         {"concept_ids": [CORE_A], "is_correct": False},
         {"concept_ids": [CORE_A], "is_correct": True},
         {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
     ])
 
     with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
@@ -113,30 +123,62 @@ def test_selector_resets_streak_on_wrong_answer():
     assert CORE_A in picks, "A should not be locked out — the streak was broken by a wrong answer"
 
 
-def test_miss_streak_doubles_weight_on_wrong_answer():
-    """A wrong answer in the last 2 questions doubles the concept's weight."""
+def test_selector_skips_concept_asked_in_recent_window():
+    """A concept asked within the last RECENT_ASK_WINDOW questions is excluded
+    even if its trailing-correct count is below the lockout threshold.
+
+    Bug fix: prior to this, the selector only deprioritized after 3 consecutive
+    correct answers, so the same concept could be picked back-to-back-to-back
+    (Langfuse trace 2026-05-09 showed RAG-components asked 3× in one session).
+    """
     concepts = [
-        _concept(CORE_A, importance=1.0, mastery=50.0),
-        _concept(CORE_B, importance=1.0, mastery=50.0),
+        _concept(CORE_A, importance=1.0, mastery=10.0),  # very tempting weight
+        _concept(CORE_B, importance=1.0, mastery=70.0),
     ]
-    # No boost
-    base_history = _hist([{"concept_ids": [CORE_A], "is_correct": True}])
-    boost_history = _hist([{"concept_ids": [CORE_A], "is_correct": False}])
+    # B in old history (out of recent window), A fills the last 3 answered Qs.
+    # A must be excluded by recent_asked despite tempting weight.
+    history = _hist([
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": False},
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": True},
+    ])
 
-    def run(history):
-        with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
-             patch.object(session_manager, "_get_session_question_history", return_value=history):
-            random.seed(42)
-            return [
-                session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)["id"]
-                for _ in range(800)
-            ]
+    with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+         patch.object(session_manager, "_get_session_question_history", return_value=history):
+        random.seed(0)
+        picks = [
+            session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)["id"]
+            for _ in range(200)
+        ]
 
-    base_a = run(base_history).count(CORE_A)
-    boost_a = run(boost_history).count(CORE_A)
-    assert boost_a > base_a, (
-        f"Wrong-answer boost should increase A picks; base={base_a} boost={boost_a}"
+    assert all(p == CORE_B for p in picks), (
+        f"A was asked in the recent window and must be excluded; picks={picks[:10]}…"
     )
+
+
+def test_selector_falls_back_when_all_concepts_in_recent_window():
+    """Tiny core pool: if the recent-window filter would empty the candidate
+    list, drop that filter (still respect 3-correct lockout) and pick anyway."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=20.0),
+        _concept(CORE_B, importance=1.0, mastery=20.0),
+    ]
+    # Only 2 core concepts; recent 3 history entries cover both.
+    history = _hist([
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": True},
+    ])
+
+    with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+         patch.object(session_manager, "_get_session_question_history", return_value=history):
+        random.seed(0)
+        result = session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)
+
+    assert result is not None
+    assert result["id"] in {CORE_A, CORE_B}
 
 
 def test_all_core_mastered_helper():

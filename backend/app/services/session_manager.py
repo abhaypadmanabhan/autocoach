@@ -17,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 CORE_MASTERY_THRESHOLD = 80.0
-MISS_STREAK_DECAY = 2  # weight x2 for next 2 selections after a wrong answer
 DEPRIORITIZE_AFTER_CORRECT = 3  # consecutive corrects on a concept → skip it
+RECENT_ASK_WINDOW = 3  # never re-pick a concept that appeared in the last N answered Qs
 EXPLORATION_PROBABILITY = 0.30
 MAX_GENERATION_ATTEMPTS = 2  # initial try + 1 retry inside the bg task
 
@@ -179,11 +179,12 @@ def _select_next_concept(
 
     Algorithm:
       1. Load CORE concepts with current user mastery.
-      2. Skip concepts with the last 3 answers correct in this session.
-      3. base weight = (100 - mastery) * importance_score
-      4. If concept appeared in last 2 answered questions AND was wrong → weight × 2
-      5. With probability EXPLORATION_PROBABILITY: uniform-random over core concepts.
-         Otherwise: weighted sample by step 3-4 weights.
+      2. Skip concepts answered correctly 3 times in a row this session.
+      3. Skip concepts asked in the last RECENT_ASK_WINDOW answered questions
+         (prevents back-to-back-to-back picks).
+      4. weight = max(1, (100 - mastery) * importance_score)
+      5. With probability EXPLORATION_PROBABILITY: uniform-random over candidates.
+         Otherwise: weighted sample by step 4 weights.
     """
     all_concepts = get_document_concepts(document_id, user_id)
     if not all_concepts:
@@ -222,16 +223,24 @@ def _select_next_concept(
         cid for cid, n in trailing_correct.items() if n >= DEPRIORITIZE_AFTER_CORRECT
     }
 
-    # Miss-streak boost: concepts wrong in last MISS_STREAK_DECAY answered Qs.
-    last_n = history[-MISS_STREAK_DECAY:] if history else []
-    boosted: set[str] = set()
-    for q in last_n:
-        if q.get("is_correct") is False:
-            for cid in q.get("concept_ids") or []:
-                boosted.add(str(cid))
+    # Recent-asked dedup: concepts that appeared in the last RECENT_ASK_WINDOW
+    # answered questions are excluded so the selector cannot pick the same
+    # concept back-to-back-to-back. (Without this, a high-importance / low-mastery
+    # concept can dominate a 10-Q session — observed via Langfuse 2026-05-09.)
+    recent_asked: set[str] = set()
+    for q in history[-RECENT_ASK_WINDOW:]:
+        for cid in q.get("concept_ids") or []:
+            recent_asked.add(str(cid))
 
-    candidates = [c for c in core_concepts if str(c["id"]) not in skip_concepts]
-    # Edge case: if all core concepts are deprioritized, fall back to full core list.
+    candidates = [
+        c for c in core_concepts
+        if str(c["id"]) not in skip_concepts and str(c["id"]) not in recent_asked
+    ]
+    # Tiny pool fallback: drop the recent-asked filter first (still respect the
+    # 3-correct lockout); if that is also empty, fall back to the full core list
+    # rather than dead-ending.
+    if not candidates:
+        candidates = [c for c in core_concepts if str(c["id"]) not in skip_concepts]
     if not candidates:
         candidates = core_concepts
 
@@ -251,8 +260,6 @@ def _select_next_concept(
         # is still selectable; floor weight at 1.0 so a fully-mastered concept
         # can still be selected via exploration in degenerate cases.
         weight = max(1.0, (100.0 - mastery) * max(importance, 0.1))
-        if str(c["id"]) in boosted:
-            weight *= 2.0
         weights.append(weight)
 
     chosen = random.choices(candidates, weights=weights, k=1)[0]
