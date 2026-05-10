@@ -1,24 +1,34 @@
-# AutoCoach — Engineering Handoff (2026-05-08)
+# AutoCoach — Engineering Handoff (2026-05-10)
 
 ## Current State
-- Stack: Vercel (frontend), Railway (backend FastAPI), Supabase (Postgres + auth), Qdrant Cloud (vectors)
+- Stack: Vercel (frontend), Railway (backend FastAPI **+ Langfuse stack co-located**), Supabase (Postgres + auth), Qdrant Cloud (vectors)
 - Backend URL: https://autocoach-production.up.railway.app
 - Frontend URL: https://autocoach-rho.vercel.app
+- Langfuse UI: https://langfuse-web-production-31ed.up.railway.app (autocoach project)
 - Repo: github.com/abhaypadmanabhan/autocoach
 - Migration head: `02968ade0f8e` (no migrations added today)
-- Main HEAD: `5ad5964` — Kimi K2.6 spec doc commit (latest before this HANDOFF update)
-- Branch state: `main` is clean. `feat/phase-1.7-langfuse` and `feat/kimi-k2.6-bump` merged + branches deleted (or about to be).
+- Main HEAD: `f9af8b9` (latest before this HANDOFF commit)
+- Branch state: `main` is clean. Today's PRs merged: #9 lifespan-log-fix, #10 quiz-dedup, #11 health-deep, #12 qdrant-keepalive.
 
 ## Phase 1.7 — Where We Are Right Now
-- **Backend instrumentation:** merged + deployed, running in **NOOP mode** in prod (langfuse SDK installed, 6 `@observe()` decorators applied to LLM + retrieval call sites, lifespan flush hook wired). `LANGFUSE_*` env vars are intentionally unset on autocoach Railway service — `_init_client()` short-circuits, decorators are pass-through.
-- **Langfuse Railway stack:** **not yet deployed.** No traces being captured.
-- **Spec ready:** `docs/specs/langfuse-selfhost.md` covers deployment topology, secrets, networking, retention, integration plan, verification, rollback.
-- **Kimi model:** **K2.6 live in prod** (was on K2.5 yesterday). `KIMI_MODEL` constant in `backend/app/services/llm.py:15` flipped + 2-line `response.model` echo check warns on silent provider downgrade. Spec at `docs/specs/kimi-k2.6-migration.md`.
-- **Next session picks up by:**
-  1. Deploy Langfuse stack to Railway per `docs/specs/langfuse-selfhost.md` (Postgres + ClickHouse + Redis + Minio + langfuse-web + langfuse-worker via official template).
-  2. Set `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST` / `LANGFUSE_ENVIRONMENT=production` env vars on autocoach Railway service.
-  3. Redeploy backend (env-var change triggers redeploy; no code change needed).
-  4. Run spec §6 step 5 smoke test — first trace should automatically show `model=kimi-k2.6` because the constant is already live.
+- **Backend instrumentation:** merged + deployed, **LIVE** in prod. `LANGFUSE_*` env vars set on autocoach Railway service. Lifespan banner flips to `Langfuse: enabled` (visible thanks to the `force=True` basicConfig fix from PR #9). 6 `@observe()` decorators emitting traces.
+- **Langfuse Railway stack:** **deployed** (2026-05-10). Co-located in `autocoach-production` project per spec §1. Services: langfuse-web, langfuse-worker, Postgres, ClickHouse, Redis, MinIO. Health endpoint `/api/public/health` returns `{"status":"OK","version":"3.173.0"}` for both shallow + `failIfDatabaseUnavailable=true` variants.
+- **Smoke test:** **passed** (2026-05-10). User observed traces in UI: parent `quiz.generate_questions`, generation child tagged `model=kimi-k2.6`, `environment=production`, `release=<git sha>`. No instrumentation exceptions.
+- **Spec status:** `docs/specs/langfuse-selfhost.md` **executed end-to-end**. Open question §9.4 resolved — health body shape is `{"status":"OK","version":"3.<minor>.<patch>"}`.
+- **Kimi model:** K2.6 still live (no changes today).
+- **Next session picks up Phase 1.7 step 3+:** golden eval set construction (3 PDFs × 50 (question, source_chunk, ideal_answer) tuples), Ragas integration, hand-grade for human-vs-LLM-judge agreement.
+
+## Active Bug — Diagnosed, Fix Shipped
+- **Quiz repetition (HANDOFF #11, original):** within a single 10-Q session, the selector handed the generator the same `focus_concept_id` 3+ times (RAG-components 3×, Drop-D-Tuning verbatim duplicate). Diagnosed via Langfuse trace 2026-05-09: same `concept_id` arg across consecutive `quiz.generate_questions` spans → selection-side, not extraction or generation.
+- **Root cause:** selector only deprioritized after 3 trailing **correct** answers. A high-importance / low-mastery concept could be picked back-to-back, and the miss-streak boost (×2 weight after a wrong answer) actively re-amplified it.
+- **Fix shipped (PR #10):** new `RECENT_ASK_WINDOW=3` excludes any concept asked in the last 3 answered Qs. Two-level fallback for tiny core pools. `MISS_STREAK_DECAY` boost dropped (its slice was always inside the recent-asked window post-fix → dead code; AND it was contributing to the original bug).
+- **Verification pending:** trigger a new 10-Q session against the original repeating doc; pull trace; confirm `focus_concept_id` differs across consecutive `quiz.generate_questions` spans.
+
+## What Shipped 2026-05-10 (4 PRs, all merged to main)
+- **PR #9** (`fix/lifespan-log-visibility`): `logging.basicConfig(force=True)` in `app/main.py` so the lifespan banner surfaces under uvicorn on Railway. Fixes HANDOFF #8. Without this, Step 3 banner-flip verification (`Langfuse: enabled` vs `disabled (NOOP)`) wouldn't have been visible.
+- **PR #10** (`fix/quiz-dedup-recent-window`): selector-side dedup. New `RECENT_ASK_WINDOW=3` in `session_manager.py`. Dropped `MISS_STREAK_DECAY` boost. 2 new tests + 1 updated + 1 removed. Fixes the original HANDOFF #11 quiz repetition bug.
+- **PR #11** (`feat/health-deep-checks`): `/health?deep=true` probes Qdrant + Postgres, returns 503 with per-dep `checks` map on degraded. Default `/health` unchanged (static 200). 4 new tests.
+- **PR #12** (`feat/qdrant-keepalive`): background asyncio loop pings Qdrant every `QDRANT_KEEPALIVE_INTERVAL_S` (default 300s) to prevent Cloud cluster suspension. Wrapped in `asyncio.to_thread` so it doesn't block the event loop. Set env var to 0 to disable. 3 new tests.
 
 ## What Shipped 2026-05-08 (combined push — 8 commits)
 - **Phase 1.7 instrumentation merge** (`cb9a3bd`):
@@ -69,16 +79,17 @@
 4. Harden `useUploadDocument.ts:90,93` — `.includes()` defensive pattern same as the bug we fixed in `useDocumentSummary`
 5. Add latency telemetry in prod (validate p50/p95 estimates from PR4 spec — submit ~250ms, `GET /next` median wait, etc.)
 6. Dashboard root cleanup — audit `WeakConceptsWidget` for orphan endpoints, kill if dead (was out of scope for PR5)
-7. Langfuse: `embeddings.get_embeddings` `@observe` captures full 100×1536 float vectors per call (~600KB raw per trace). After Langfuse is live and trace size is measurable, set `capture_input=False, capture_output=False` on that decorator. Don't fix preemptively — verify it's actually a problem first.
-8. App lifespan logs in `app/main.py` are swallowed in production — uvicorn's log capture on Railway only surfaces uvicorn's own logs and module-level errors. `logger.info()` calls inside the lifespan context manager don't appear. Pre-existing, not caused by Phase 1.7. Fix: configure `logging.basicConfig` with `force=True` or hook into uvicorn's logger. Low priority — only matters when we want to verify lifespan-time state from logs (e.g. Langfuse NOOP confirmation).
-9. Pre-existing test failures surfaced during Phase 1.7 baseline run (filed in `tasks/bugs.md`):
+7. Langfuse: `embeddings.get_embeddings` `@observe` captures full 100×1536 float vectors per call (~600KB raw per trace). Now that Langfuse is live, measure actual trace size; if problematic, set `capture_input=False, capture_output=False` on that decorator. Don't fix preemptively.
+8. ~~App lifespan logs swallowed in production~~ — **fixed PR #9 (2026-05-10)**.
+9. Pre-existing test failures (filed in `tasks/bugs.md`):
    - `test_usage_limits::test_consume_quiz_usage_bypasses_limit_for_pro_user` — pro-bypass test hits real Supabase; FK violation. Pre-existing since 2026-02-16 (`66ead90`).
    - `test_usage_service::test_consume_quiz_usage_pro_bypass` — same root cause. Pre-existing since 2026-02-13 (`c890156`).
    - `test_xp_redemption::test_redeem_xp_refund_on_failure` — asserts 2 `users.update` calls, prod makes 3. Pre-existing since 2026-02-16 (`9b4cb5b`).
    - `test_onboarding::test_onboarding_flow` — missing `async_client` fixture. Pre-existing since 2026-02-23 (`4b18382`).
-10. CI audit — confirm pytest runs on PR and blocks on failure. As of 2026-05-08 unknown whether `.github/workflows/*.yml` actually gates merges on the backend test suite. If not, the 4 pre-existing failures could mask real regressions. Inspect + harden as needed.
-11. Quiz repetition issue (observed 2026-05-08) — multiple near-duplicate questions appearing within a single 10-Q session (e.g. RAG-components asked 3 times, Drop-D-Tuning verbatim-duplicated). Diagnosis blocked on Phase 1.7 traces being live so we can compare retrieved chunks across question generations. Re-investigate after Langfuse stack is deployed.
-12. Langfuse SDK auth-warning per call — `WARNING:langfuse:Authentication error: Langfuse client initialized without public_key. Client will be disabled.` fires on every `@observe`-decorated call (not just at boot) because the SDK re-checks auth at each invocation when its internal singleton is unset. Cosmetic log noise only — NOOP behavior is correct. Silence later via `logging.getLogger("langfuse").setLevel(logging.ERROR)` once Langfuse stack is live (or before, if log volume is annoying).
+10. CI audit — confirm pytest runs on PR and blocks on failure. As of 2026-05-10 still unverified whether `.github/workflows/*.yml` gates merges on the backend test suite. If not, the 4 pre-existing failures could mask real regressions.
+11. ~~Quiz repetition~~ — **diagnosed + fixed PR #10 (2026-05-10)**. Verify after a fresh 10-Q session against the original repeating doc — confirm `focus_concept_id` differs across consecutive `quiz.generate_questions` spans in Langfuse.
+12. ~~Langfuse SDK auth-warning per call~~ — **self-resolved**. NOOP-mode warnings stopped firing once we left NOOP. Future-proof only if creds get rotated wrong; not worth pre-silencing.
+13. **New:** Qdrant Cloud cluster suspension — keep-alive (PR #12, default 5min ping) prevents it but is per-replica + per-process. If autocoach scales to multiple workers, multiple pings (idempotent). If we move off Cloud free tier, drop the keep-alive.
 
 ## Phase 1.7 Plan (Next Sprint — Eval & Observability)
 Deliverables in order:
