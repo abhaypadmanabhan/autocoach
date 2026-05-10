@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { BrandMark } from "@/components/primitives-acx/BrandMark";
 import { Kbd } from "@/components/primitives-acx/Kbd";
 import { LivePill } from "@/components/primitives-acx/LivePill";
+import { ThemeToggle } from "@/components/primitives-acx/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -70,6 +71,7 @@ function Nav() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Button variant="ghost" size="sm" asChild>
             <Link href="/login">Sign in</Link>
           </Button>

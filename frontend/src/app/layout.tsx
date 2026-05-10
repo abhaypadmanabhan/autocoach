@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { AnalyticsProvider } from "@/components/providers/AnalyticsProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { PosthogDebug } from "@/components/debug/PosthogDebug";
 
 export const metadata: Metadata = {
@@ -19,12 +20,14 @@ export default function RootLayout({
     process.env.NODE_ENV !== "production" || process.env.NEXT_PUBLIC_POSTHOG_DEBUG === "true";
 
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}>
-        <AnalyticsProvider>
-          {shouldRenderDebug && <PosthogDebug />}
-          {children}
-        </AnalyticsProvider>
+        <ThemeProvider>
+          <AnalyticsProvider>
+            {shouldRenderDebug && <PosthogDebug />}
+            {children}
+          </AnalyticsProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

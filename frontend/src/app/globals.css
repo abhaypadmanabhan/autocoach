@@ -60,6 +60,45 @@
   --d-sheet:  320ms;
 }
 
+/* ============================================================
+   Light theme override
+   Source: Autocoach_Design/dashboard-document.html
+   ============================================================ */
+
+[data-theme="light"], .light {
+  --bg-base:        #FFFFFF;
+  --bg-surface:     #FAFAFA;
+  --bg-elev:        #F4F4F5;
+  --bg-overlay:     #FFFFFF;
+  --bg-inset:       #F7F7F8;
+
+  --line-subtle:    #ECECEE;
+  --line-default:   #DCDCE0;
+  --line-strong:    #B4B4B8;
+
+  --fg-primary:     #18181B;
+  --fg-secondary:   #52525B;
+  --fg-tertiary:    #71717A;
+  --fg-disabled:    #A1A1AA;
+
+  --accent:         oklch(0.50 0.18 263);
+  --accent-hover:   oklch(0.45 0.18 263);
+  --accent-active:  oklch(0.40 0.18 263);
+  --accent-fade:    color-mix(in oklab, var(--accent) 10%, transparent);
+  --accent-line:    color-mix(in oklab, var(--accent) 32%, transparent);
+
+  --success:        oklch(0.50 0.13 156);
+  --warning:        oklch(0.60 0.12 75);
+  --danger:         oklch(0.55 0.18 22);
+  --streak:         oklch(0.62 0.18 50);
+
+  color-scheme: light;
+}
+
+[data-theme="dark"], .dark {
+  color-scheme: dark;
+}
+
 @theme inline {
   /* Color tokens — both raw + shadcn semantic aliases */
   --color-bg: var(--bg-base);
@@ -218,6 +257,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background-color: var(--line-default); border-radius: 999px; }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--line-strong); }
+
+/* Prevent transition flash on theme change */
+.disable-transitions, .disable-transitions * {
+  transition: none !important;
+}
 
 /* ============================================================
    Keyframes used by mocks

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { BrandMark } from "@/components/primitives-acx/BrandMark";
+import { ThemeToggle } from "@/components/primitives-acx/ThemeToggle";
 import { ToastProvider } from "@/components/ui/Toast";
 import { analytics } from "@/lib/analytics";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -92,9 +93,12 @@ export default function OnboardingPage() {
               AutoCoach
             </span>
           </div>
-          <span className="ml-auto font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
-            Step {step} / 3
-          </span>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
+              Step {step} / 3
+            </span>
+            <ThemeToggle />
+          </div>
         </header>
 
         <div className="px-6 pt-6">

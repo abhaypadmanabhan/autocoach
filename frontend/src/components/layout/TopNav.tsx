@@ -9,6 +9,7 @@ import { useUserStats } from "@/hooks/useDailySprint";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { HudPill } from "@/components/primitives-acx/HudPill";
+import { ThemeToggle } from "@/components/primitives-acx/ThemeToggle";
 import { AppSidebar } from "./AppSidebar";
 
 interface TopNavProps {
@@ -122,6 +123,7 @@ export function TopNav({
           </>
         )}
         {rightContent}
+        <ThemeToggle />
       </div>
     </header>
   );

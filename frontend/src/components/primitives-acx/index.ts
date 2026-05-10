@@ -14,3 +14,4 @@ export { CornerCrosshair, CornerCrosshairFrame } from "./CornerCrosshair";
 export { ScoreGauge } from "./ScoreGauge";
 export { Confetti } from "./Confetti";
 export { KeyboardHints, type KeyboardHint } from "./KeyboardHints";
+export { ThemeToggle } from "./ThemeToggle";
