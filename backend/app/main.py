@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -12,7 +13,6 @@ from app.api.routes import (
     documents,
     quiz,
     sessions,
-    concepts,
     review,
     xp,
     onboarding,
@@ -102,7 +102,6 @@ app.include_router(health.router, tags=["health"])
 app.include_router(documents.router, prefix="/documents", tags=["documents"])
 app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
 app.include_router(sessions.router, prefix="/quiz/sessions", tags=["quiz-sessions"])
-app.include_router(concepts.router, prefix="/concepts", tags=["concepts"])
 app.include_router(review.router, prefix="/review", tags=["review"])
 app.include_router(xp.router, prefix="/xp", tags=["xp"])
 app.include_router(onboarding.router, prefix="/onboarding", tags=["onboarding"])
@@ -114,18 +113,30 @@ async def root():
     return {"message": "AutoCoach API", "docs": "/docs"}
 
 
+# Truncate logged bodies to avoid leaking large payloads / PII into Railway
+# logs, and redact JWT-like tokens an attacker could plant in fields.
+_JWT_RE = re.compile(r"eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+")
+_BODY_LOG_LIMIT = 200
+
+
+def _safe_body_for_log(body) -> str:
+    if isinstance(body, bytes):
+        body = body.decode("utf-8", errors="replace")
+    body = str(body)
+    body = _JWT_RE.sub("<jwt_redacted>", body)
+    if len(body) > _BODY_LOG_LIMIT:
+        body = body[:_BODY_LOG_LIMIT] + "...<truncated>"
+    return body
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     if request.method.upper() == "POST" and request.url.path.endswith("/answer"):
-        body = exc.body
-        if isinstance(body, bytes):
-            body = body.decode("utf-8", errors="replace")
-
         logger.warning(
             "422 validation error on %s %s | body=%s | errors=%s",
             request.method,
             request.url.path,
-            body,
+            _safe_body_for_log(exc.body),
             exc.errors(),
         )
 
