@@ -77,7 +77,7 @@ class QuestionResponse(BaseModel):
 class AnswerSubmit(BaseModel):
     """Request model for submitting an answer."""
 
-    answer: str
+    answer: str = Field(min_length=1, max_length=2000)
     input_method: str = Field(default="typed", pattern="^(typed|click|voice)$")
 
 

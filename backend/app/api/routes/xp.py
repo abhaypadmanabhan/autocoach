@@ -2,7 +2,7 @@
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.api.routes.documents import get_user_id_from_token
@@ -12,9 +12,7 @@ from app.services.usage import get_or_create_daily_usage
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-
-class RedeemXPRequest(BaseModel):
-    amount: int = 100  # Default cost
+XP_REDEMPTION_COST = 100
 
 
 class RedeemXPResponse(BaseModel):
@@ -26,12 +24,8 @@ class RedeemXPResponse(BaseModel):
 
 @router.post("/redeem", response_model=RedeemXPResponse)
 async def redeem_xp(
-    request: RedeemXPRequest = Body(...),
     user_id: UUID = Depends(get_user_id_from_token),
 ):
-    if request.amount != 100:
-        raise HTTPException(status_code=400, detail="Redemption must be 100 XP")
-
     # 1. Check and deduct XP atomically-ish
     # We fetch first to check balance, then update.
     # To prevent race conditions properly we'd use a stored proc or RLS logic,

@@ -71,12 +71,6 @@ def test_redeem_xp_insufficient_balance(mocker):
     assert "Insufficient XP" in res.json()["detail"]
 
 
-def test_redeem_xp_invalid_amount(mocker):
-    res = client.post("/xp/redeem", json={"amount": 200})
-    assert res.status_code == 400
-    assert "Redemption must be 100 XP" in res.json()["detail"]
-
-
 def test_redeem_xp_success(mocker):
     mock_sb = _mock_supabase()
     mocker.patch.object(xp_route, "supabase_admin", mock_sb)

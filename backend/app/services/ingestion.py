@@ -3,6 +3,7 @@
 import logging
 from uuid import UUID
 
+from app.config import get_settings
 from app.core.supabase import supabase_admin
 from app.core.qdrant import store_vectors
 from app.services.text_extraction import extract_text_from_pdf, extract_text_from_pptx
@@ -10,6 +11,14 @@ from app.services.chunking import chunk_text
 from app.services.embeddings import get_embeddings
 
 logger = logging.getLogger(__name__)
+
+# Hard caps to prevent file-bomb / extracted-text-bomb DoS and runaway LLM
+# spend. Client-supplied file_size in /documents/register is untrusted —
+# enforce the real byte count after download.
+_settings = get_settings()
+MAX_DOCUMENT_BYTES = _settings.max_document_mb * 1024 * 1024
+MAX_EXTRACTED_CHARS = 2_000_000
+MAX_CHUNKS = 500
 
 
 def process_document(document_id: str) -> None:
@@ -53,10 +62,21 @@ def process_document(document_id: str) -> None:
         try:
             file_response = supabase_admin.storage.from_("documents").download(file_path)
             file_bytes = file_response
-            logger.info(f"Downloaded file {file_path}, size: {len(file_bytes)} bytes")
+            actual_size = len(file_bytes)
+            logger.info(f"Downloaded file {file_path}, size: {actual_size} bytes")
         except Exception as e:
             logger.error(f"Failed to download file {file_path}: {e}")
             _mark_document_failed(document_id, f"Failed to download file: {str(e)}")
+            return
+
+        if actual_size > MAX_DOCUMENT_BYTES:
+            logger.warning(
+                f"Document {document_id} oversize: {actual_size} > {MAX_DOCUMENT_BYTES} bytes"
+            )
+            _mark_document_failed(
+                document_id,
+                f"File exceeds {_settings.max_document_mb}MB limit",
+            )
             return
 
         # Extract text based on file type
@@ -82,6 +102,15 @@ def process_document(document_id: str) -> None:
 
         logger.info(f"Extracted {len(full_text)} characters, {page_count} pages/slides")
 
+        # Cap extracted text — guards against PDF/PPTX bombs whose decompressed
+        # text expands to GBs from a small input.
+        if len(full_text) > MAX_EXTRACTED_CHARS:
+            logger.warning(
+                f"Document {document_id} extracted text truncated: "
+                f"{len(full_text)} > {MAX_EXTRACTED_CHARS}"
+            )
+            full_text = full_text[:MAX_EXTRACTED_CHARS]
+
         # Chunk the text
         try:
             chunks = chunk_text(full_text)
@@ -89,6 +118,12 @@ def process_document(document_id: str) -> None:
                 logger.error(f"No chunks created from document {document_id}")
                 _mark_document_failed(document_id, "Failed to create text chunks")
                 return
+            if len(chunks) > MAX_CHUNKS:
+                logger.warning(
+                    f"Document {document_id} chunk count capped: "
+                    f"{len(chunks)} > {MAX_CHUNKS}"
+                )
+                chunks = chunks[:MAX_CHUNKS]
             logger.info(f"Created {len(chunks)} chunks")
         except Exception as e:
             logger.error(f"Failed to chunk text for document {document_id}: {e}")
