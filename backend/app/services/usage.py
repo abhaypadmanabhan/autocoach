@@ -183,7 +183,9 @@ def increment_quiz_usage(user_id: UUID) -> None:
 
 def consume_quiz_usage_or_429(user_id: UUID) -> int:
     """Atomically consume one quiz from daily quota or raise 429."""
-    # We need to fetch current usage to know the limit dynamically
+    if is_pro_user(user_id):
+        return 0
+
     usage = get_or_create_daily_usage(user_id)
     allowed = QUIZ_LIMIT + usage.get("extra_quizzes", 0)
 
