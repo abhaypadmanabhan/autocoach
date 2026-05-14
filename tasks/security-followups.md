@@ -2,17 +2,19 @@
 
 Filed 2026-05-11 after full security audit. Criticals + High-severity items already shipped on `main` (see commit history). Items below are residual risk or hardenings to schedule.
 
-## 1. XP redemption race (HIGH — economic exploit, bounded)
+## 1. XP redemption — CAS already atomic, partial-commit residual (LOW)
 
-**File:** `backend/app/api/routes/xp.py:40-73`
+**File:** `backend/app/api/routes/xp.py:25-90`
 
-**Risk:** Two concurrent `POST /xp/redeem` requests from the same user can both pass the optimistic `eq("total_xp", current_xp)` CAS in a narrow MVCC window. Worst case: one extra quiz credit per race round, repeatable. Daily quota still caps total abuse.
+**Original audit claim (wrong):** "Two concurrent requests can both pass the optimistic CAS in a narrow MVCC window."
 
-**Fix:** Move deduct + credit-grant into a single Postgres transaction. Two options:
-- **(a) Stored procedure** — `CREATE FUNCTION redeem_xp(uid uuid, cost int) RETURNS jsonb` that does `UPDATE users SET total_xp = total_xp - cost WHERE id = uid AND total_xp >= cost RETURNING total_xp` then `INSERT/UPSERT` into `user_daily_usage`. Call via `supabase_admin.rpc("redeem_xp", {...})`.
-- **(b) Use `update().select()` returning the new row** — relies on Postgres `UPDATE ... WHERE total_xp >= 100 RETURNING *` which is a single atomic statement. PostgREST should expose this; verify via `supabase_admin.table("users").update({"total_xp": ...}).gte("total_xp", 100).execute()` semantics.
+**Actual behavior:** PostgREST compiles `.update({...}).eq("id", uid).eq("total_xp", current_xp)` into a single `UPDATE users SET total_xp=$1 WHERE id=$2 AND total_xp=$3` statement. Under READ COMMITTED (PostgREST's default isolation), Postgres acquires a row-level lock on the matching row; the losing concurrent UPDATE re-reads the row's post-commit version, the predicate `total_xp=$3` fails, and zero rows are returned. The route then raises 409. Race is impossible.
 
-Test: spin 10 parallel `httpx.AsyncClient` requests against a user with `total_xp=100`; assert exactly one succeeds.
+Verified by `test_redeem_xp_cas_mismatch_returns_409` (added 2026-05-14): mocks the CAS-mismatch case and confirms 409 + zero credit-grant attempts.
+
+**Residual risk:** The deduct (`users.update`) and the credit grant (`user_daily_usage.update`) are two separate statements, not one transaction. Python exceptions between them are caught and the deduct is refunded (`xp.py:79-83`). Process kill / power loss between the two statements leaks 100 XP (one extra quiz credit lost). Bounded — once per occurrence, not amplifiable.
+
+**Future hardening (not urgent):** consolidate deduct + credit into a single Postgres function called via `supabase_admin.rpc("redeem_xp", {...})`. No `.rpc()` precedent in the codebase today; adding one would require an Alembic migration creating the function. Defer until the partial-commit residual actually shows up in logs.
 
 ---
 

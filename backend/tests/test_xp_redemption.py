@@ -110,26 +110,54 @@ def test_redeem_xp_refund_on_failure(mocker):
         "extra_quizzes": 0,
         "date": "2024-01-01"
     })
-    
+
     # 1. Fetch user (sufficient XP)
     mock_sb.table("users").select().eq().single().execute.return_value = MagicMock(
         data={"total_xp": 150}
     )
-    
+
     # 2. Update user (deduct XP) - Success
     mock_sb.table("users").update().eq().eq().execute.return_value = MagicMock(
         data=[{"total_xp": 50}]
     )
-    
+
     # 3. Update daily usage - Failure
     mock_sb.table("user_daily_usage").update().eq().eq().execute.side_effect = Exception("DB Error")
-    
+
+    # Reset the update mock so setup .update() calls above don't inflate the count.
+    mock_sb.table("users").update.reset_mock()
+
     res = client.post("/xp/redeem", json={"amount": 100})
-    
+
     assert res.status_code == 500
     assert "Redemption failed" in res.json()["detail"]
-    
-    # Verify refund was attempted
-    # We expect 2 calls to update: initial deduct and refund
-    assert mock_sb.table("users").update.call_count == 2
+
+    # Verify deduct + refund both fired with correct payloads.
+    update_calls = mock_sb.table("users").update.call_args_list
+    update_payloads = [call.args[0] for call in update_calls if call.args]
+    assert {"total_xp": 50} in update_payloads, f"missing deduct call; got {update_payloads}"
+    assert {"total_xp": 150} in update_payloads, f"missing refund call; got {update_payloads}"
+
+
+def test_redeem_xp_cas_mismatch_returns_409(mocker):
+    """Concurrent-update CAS contract: if the optimistic `eq('total_xp', current_xp)`
+    predicate matches zero rows, the route raises 409 and never grants credit."""
+    mock_sb = _mock_supabase()
+    mocker.patch.object(xp_route, "supabase_admin", mock_sb)
+    grant_credit = mocker.patch("app.api.routes.xp.get_or_create_daily_usage")
+
+    mock_sb.table("users").select().eq().single().execute.return_value = MagicMock(
+        data={"total_xp": 150}
+    )
+
+    # CAS mismatch: another request already deducted, so WHERE total_xp=150 returns no rows.
+    mock_sb.table("users").update().eq().eq().execute.return_value = MagicMock(data=[])
+
+    res = client.post("/xp/redeem", json={"amount": 100})
+
+    assert res.status_code == 409
+    assert "concurrent" in res.json()["detail"].lower()
+    grant_credit.assert_not_called()
+    # And no update on user_daily_usage was attempted.
+    mock_sb.table("user_daily_usage").update.assert_not_called()
 

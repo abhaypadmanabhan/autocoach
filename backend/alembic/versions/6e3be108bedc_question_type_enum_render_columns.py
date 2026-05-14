@@ -23,6 +23,13 @@ QUESTION_TYPE_VALUES = ("text_free", "text_mcq", "text_tf", "rendered")
 
 
 def upgrade() -> None:
+    # Drop stale Supabase auto-named CHECK before backfilling new enum-name values.
+    # Required on fresh DBs; idempotent on already-migrated DBs.
+    op.execute(
+        "ALTER TABLE questions "
+        "DROP CONSTRAINT IF EXISTS questions_question_type_check"
+    )
+
     # 1. Backfill old string values to new enum names BEFORE constraint
     op.execute(
         """

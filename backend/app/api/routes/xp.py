@@ -26,11 +26,12 @@ class RedeemXPResponse(BaseModel):
 async def redeem_xp(
     user_id: UUID = Depends(get_user_id_from_token),
 ):
-    # 1. Check and deduct XP atomically-ish
-    # We fetch first to check balance, then update.
-    # To prevent race conditions properly we'd use a stored proc or RLS logic,
-    # but for now we'll check -> update with condition.
-    
+    # Deduct is atomic: the `.eq("total_xp", current_xp)` predicate runs inside a single
+    # `UPDATE ... WHERE` statement; Postgres row-locks serialize concurrent requests,
+    # and any losing CAS returns zero rows. Deduct + credit are NOT in one transaction —
+    # see tasks/security-followups.md §1 for the residual partial-commit risk.
+
+
     user_res = (
         supabase_admin.table("users")
         .select("total_xp")
