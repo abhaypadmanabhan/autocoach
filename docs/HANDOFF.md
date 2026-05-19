@@ -1,10 +1,12 @@
 # AutoCoach — Engineering Handoff (2026-05-10)
 
+> **UPDATE 2026-05-19 — Self-hosted Langfuse decommissioned.** The co-located Langfuse Railway stack (langfuse-web, langfuse-worker, Postgres, ClickHouse, Redis, MinIO) was 94% of the Railway bill (~$13/cycle, est. ~$38/mo) for a zero-user app. Stack torn down; `LANGFUSE_*` env vars removed from autocoach Railway service → backend SDK runs NOOP, zero observability cost. `docs/specs/langfuse-selfhost.md` is SUPERSEDED. Replacement = Langfuse Cloud free tier, tracked in `tasks/todo.md` (not yet executed). Everything below this banner reflects pre-2026-05-19 state.
+
 ## Current State
-- Stack: Vercel (frontend), Railway (backend FastAPI **+ Langfuse stack co-located**), Supabase (Postgres + auth), Qdrant Cloud (vectors)
+- Stack: Vercel (frontend), Railway (backend FastAPI), Supabase (Postgres + auth), Qdrant Cloud (vectors)
 - Backend URL: https://autocoach-production.up.railway.app
 - Frontend URL: https://autocoach-rho.vercel.app
-- Langfuse UI: https://langfuse-web-production-31ed.up.railway.app (autocoach project)
+- ~~Langfuse UI: https://langfuse-web-production-31ed.up.railway.app~~ — self-hosted stack removed 2026-05-19 (see banner above)
 - Repo: github.com/abhaypadmanabhan/autocoach
 - Migration head: `02968ade0f8e` (no migrations added today)
 - Main HEAD: `f9af8b9` (latest before this HANDOFF commit)
@@ -12,7 +14,7 @@
 
 ## Phase 1.7 — Where We Are Right Now
 - **Backend instrumentation:** merged + deployed, **LIVE** in prod. `LANGFUSE_*` env vars set on autocoach Railway service. Lifespan banner flips to `Langfuse: enabled` (visible thanks to the `force=True` basicConfig fix from PR #9). 6 `@observe()` decorators emitting traces.
-- **Langfuse Railway stack:** **deployed** (2026-05-10). Co-located in `autocoach-production` project per spec §1. Services: langfuse-web, langfuse-worker, Postgres, ClickHouse, Redis, MinIO. Health endpoint `/api/public/health` returns `{"status":"OK","version":"3.173.0"}` for both shallow + `failIfDatabaseUnavailable=true` variants.
+- **Langfuse Railway stack:** ~~deployed 2026-05-10~~ — **DECOMMISSIONED 2026-05-19** (see banner at top of file). 6 services (langfuse-web, langfuse-worker, Postgres, ClickHouse, Redis, MinIO) torn down on cost grounds. Backend SDK now NOOP.
 - **Smoke test:** **passed** (2026-05-10). User observed traces in UI: parent `quiz.generate_questions`, generation child tagged `model=kimi-k2.6`, `environment=production`, `release=<git sha>`. No instrumentation exceptions.
 - **Spec status:** `docs/specs/langfuse-selfhost.md` **executed end-to-end**. Open question §9.4 resolved — health body shape is `{"status":"OK","version":"3.<minor>.<patch>"}`.
 - **Kimi model:** K2.6 still live (no changes today).

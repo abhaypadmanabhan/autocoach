@@ -1,5 +1,14 @@
 # Self-host Langfuse on Railway (Phase 1.7)
 
+> **⚠️ SUPERSEDED 2026-05-19 — DO NOT EXECUTE THIS SPEC.**
+> The self-hosted stack described below was deployed 2026-05-10 and torn down 2026-05-19.
+> Reason: the 6-service stack (ClickHouse alone $8.71/cycle) was 94% of the Railway bill —
+> ~$13/cycle, est. ~$38/mo — to observe a single-user app. Not justified.
+> Replacement decision: **Langfuse Cloud free tier** (50k observations/mo, $0). Env-only
+> swap, no backend code change (the SDK client at `backend/app/observability/langfuse.py`
+> is host-agnostic). Migration tracked in `tasks/todo.md`.
+> This document is kept for historical context only.
+
 ## Context
 
 Phase 1.7 instruments every LLM + retrieval call in the FastAPI backend so we can debug RAG quality, watch token cost, and (later) drive Ragas/DeepEval offline scoring. Decision is locked on **self-hosted Langfuse** (not Cloud, not LangSmith) for data ownership and to keep eval traces co-located with the rest of our infra.
