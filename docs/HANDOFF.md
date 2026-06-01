@@ -19,6 +19,25 @@
 - **Spec status:** `docs/specs/langfuse-selfhost.md` **executed end-to-end**. Open question §9.4 resolved — health body shape is `{"status":"OK","version":"3.<minor>.<patch>"}`.
 - **Kimi model:** K2.6 still live (no changes today).
 - **Next session picks up Phase 1.7 step 3+:** golden eval set construction (3 PDFs × 50 (question, source_chunk, ideal_answer) tuples), Ragas integration, hand-grade for human-vs-LLM-judge agreement.
+- **2026-05-30 update:** plan rewritten to "eval-first, $0, local-only." See `/Users/abhayp/.claude/plans/i-want-you-to-binary-dove.md`. Phase 1.7 step 1 (self-hosted Langfuse) replaced by Langfuse Cloud free tier. Golden set sized down to 30/doc. Ragas runner scaffolded at `backend/evals/` (see below).
+
+## Admin Monitoring (Langfuse Cloud + Ragas, $0)
+
+For a zero-user app, there is no separate admin dashboard or metrics export. The monitoring surface is the **Langfuse Cloud UI** plus a local Ragas runner. Both are free.
+
+**Day-to-day "is RAG healthy?" checks:**
+1. **Trace latency** — Langfuse Cloud → Sessions → sort by latency desc. Look at `quiz.generate_questions` and `retrieval.qdrant` spans. p50 budgets to watch: ingestion `<10s` for ≤20-page PDFs; `retrieval.qdrant` `<500ms`; `quiz.generate_questions` `<3s`.
+2. **Retrieval quality** — Langfuse Cloud → Scores tab → filter by `ragas_eval` trace tag. `context_recall` and `context_precision` are the headline retrieval-quality numbers. Re-run `python -m evals.run_ragas` weekly and watch the trend.
+3. **Answer quality** — same Scores tab, `faithfulness` and `answer_relevancy`. Drops here mean either retrieval is feeding garbage chunks or the LLM is going off-script.
+4. **Regression spotting** — Langfuse Cloud has week-over-week metric charts on the Dashboards tab. A sudden p95 spike on `quiz.generate_questions` is usually Kimi rate-limiting or a slow Qdrant region.
+
+**One-shot baseline** (after `LANGFUSE_*` keys are set and golden set is curated):
+```bash
+cd backend && source venv/bin/activate
+pip install -r evals/requirements.txt          # one-time
+python -m evals.run_ragas --doc all
+```
+Check `backend/evals/results/*.csv` for the per-row breakdown, and the `ragas_eval` trace in Langfuse Cloud for the aggregate.
 
 ## Active Bug — Diagnosed, Fix Shipped
 - **Quiz repetition (HANDOFF #11, original):** within a single 10-Q session, the selector handed the generator the same `focus_concept_id` 3+ times (RAG-components 3×, Drop-D-Tuning verbatim duplicate). Diagnosed via Langfuse trace 2026-05-09: same `concept_id` arg across consecutive `quiz.generate_questions` spans → selection-side, not extraction or generation.
