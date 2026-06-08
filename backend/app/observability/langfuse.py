@@ -61,23 +61,17 @@ def _init_client() -> Optional[Langfuse]:
     application startup.
     """
     settings = get_settings()
-    # TEMP DIAGNOSTIC (2026-06-01): logging at module import time has
-    # historically been swallowed even with basicConfig(force=True) hoisted
-    # above app imports. Print to stdout so we can see WHY init goes NOOP
-    # in Railway logs. Prints lengths only (never full keys). Remove once
-    # we confirm Langfuse Cloud connectivity.
     pub = getattr(settings, "langfuse_public_key", "") or ""
     sec = getattr(settings, "langfuse_secret_key", "") or ""
     host = getattr(settings, "langfuse_host", "") or ""
-    print(
-        f"[langfuse-init] pub_len={len(pub)} sec_len={len(sec)} "
-        f"host={host!r}",
-        flush=True,
+    logger.info(
+        "Langfuse init config: pub_len=%d sec_len=%d host_set=%s",
+        len(pub),
+        len(sec),
+        bool(host),
     )
     missing = _missing_credential(settings)
     if missing is not None:
-        msg = f"[langfuse-init] disabled — {missing} empty"
-        print(msg, flush=True)
         logger.info(
             "Langfuse disabled: %s missing — instrumentation will be a no-op",
             missing,
@@ -101,16 +95,16 @@ def _init_client() -> Optional[Langfuse]:
             release=release,
         )
         client = get_client()
-        print(
-            f"[langfuse-init] client constructed ok host={host!r} "
-            f"environment={environment!r}",
-            flush=True,
+        logger.info(
+            "Langfuse client constructed: environment=%s host_set=%s",
+            environment,
+            bool(host),
         )
         return client
     except Exception as exc:  # pragma: no cover — diagnostic
-        print(f"[langfuse-init] constructor raised: {exc!r}", flush=True)
-        logger.exception(
-            "Langfuse client init failed; instrumentation disabled"
+        logger.warning(
+            "Langfuse client init failed; instrumentation disabled (%s)",
+            type(exc).__name__,
         )
         return None
 

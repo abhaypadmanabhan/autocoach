@@ -19,7 +19,7 @@
 
 # Eval-First Roadmap (2026-05-30)
 
-**Canonical plan:** `/Users/abhayp/.claude/plans/i-want-you-to-binary-dove.md`.
+**Canonical plan:** this repo-visible roadmap section.
 User picks: eval harness first, **strictly $0**, local-only, memory quick wins only,
 no paid rerankers. Phased: P0 Langfuse Cloud → P1 Ragas → P2 latency profiling → P3 memory.
 

@@ -31,8 +31,8 @@ def build_judge_llm():
         temperature=0.0,
         max_tokens=2048,
         # Kimi v2.6 needs `thinking: disabled` for fast non-reasoning output;
-        # ChatOpenAI passes unknown kwargs through `model_kwargs` -> extra_body.
-        model_kwargs={"extra_body": {"thinking": {"type": "disabled"}}},
+        # Moonshot expects this provider-specific field in extra_body.
+        extra_body={"thinking": {"type": "disabled"}},
     )
     return LangchainLLMWrapper(chat)
 

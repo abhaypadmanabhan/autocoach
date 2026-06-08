@@ -123,24 +123,47 @@ def _maybe_upload_to_langfuse(doc: str, df: pd.DataFrame) -> None:
     """Best-effort: push per-row scores to Langfuse if keys present."""
     try:
         from app.observability.langfuse import is_enabled, langfuse  # noqa: WPS433
+        from langfuse import propagate_attributes  # noqa: WPS433
     except Exception:
         return
     if not is_enabled() or langfuse is None:
         logger.info("Langfuse not configured — skipping score upload")
         return
 
-    trace = langfuse.trace(
-        name="ragas_eval",
-        metadata={"doc": doc, "rows": len(df)},
-        tags=["eval", "ragas", doc],
-    )
-    for col in ("context_precision", "context_recall", "faithfulness", "answer_relevancy"):
-        if col not in df.columns:
-            continue
-        mean = float(df[col].dropna().mean()) if not df[col].dropna().empty else 0.0
-        langfuse.score(trace_id=trace.id, name=col, value=mean)
+    trace_id = langfuse.create_trace_id()
+    metadata = {"doc": doc, "rows": len(df)}
+    tags = ["eval", "ragas", doc]
+
+    with propagate_attributes(
+        trace_name="ragas_eval",
+        metadata=metadata,
+        tags=tags,
+    ):
+        with langfuse.start_as_current_observation(
+            name="ragas_eval",
+            as_type="span",
+            trace_context={"trace_id": trace_id},
+            metadata=metadata,
+        ):
+            for col in (
+                "context_precision",
+                "context_recall",
+                "faithfulness",
+                "answer_relevancy",
+            ):
+                if col not in df.columns:
+                    continue
+                scores = df[col].dropna()
+                mean = float(scores.mean()) if not scores.empty else 0.0
+                langfuse.create_score(
+                    trace_id=trace_id,
+                    name=col,
+                    value=mean,
+                    data_type="NUMERIC",
+                    metadata={"doc": doc},
+                )
     langfuse.flush()
-    logger.info("Uploaded Ragas means to Langfuse trace %s", trace.id)
+    logger.info("Uploaded Ragas means to Langfuse trace %s", trace_id)
 
 
 def _summarize(doc: str, df: pd.DataFrame) -> None:
