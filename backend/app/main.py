@@ -3,12 +3,25 @@ import logging
 import re
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request, Response
-from fastapi.exception_handlers import request_validation_exception_handler
-from fastapi.exceptions import RequestValidationError
-from fastapi.middleware.cors import CORSMiddleware
+# Configure logging FIRST, before importing any app modules. The Langfuse
+# singleton runs `_init_client()` at module import time and emits the
+# "Langfuse disabled: X missing" / "Langfuse client init failed" diagnostics
+# via `logger.info` / `logger.exception`. If basicConfig runs after those
+# imports, the root logger still has uvicorn's default handlers at WARNING
+# threshold and the INFO/exception lines are swallowed — we then see only
+# the lifespan banner with no clue why init went NOOP.
+# force=True clears handlers uvicorn attached on import so our INFO-level
+# config takes effect. Named loggers (uvicorn.access, uvicorn.error) keep
+# their own handlers.
+logging.basicConfig(level=logging.INFO, force=True)
+logger = logging.getLogger(__name__)
 
-from app.api.routes import (
+from fastapi import FastAPI, Request, Response  # noqa: E402
+from fastapi.exception_handlers import request_validation_exception_handler  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+from app.api.routes import (  # noqa: E402
     health,
     documents,
     quiz,
@@ -17,16 +30,9 @@ from app.api.routes import (
     xp,
     onboarding,
 )
-from app.config import get_settings
-from app.core.qdrant import keepalive_loop as qdrant_keepalive_loop
-from app.observability.langfuse import flush as langfuse_flush, is_enabled as langfuse_enabled
-
-# Configure logging. force=True clears handlers uvicorn attached to the root
-# logger on import, so our INFO-level config takes effect and lifespan
-# logger.info() calls surface in `railway logs`. Named loggers
-# (uvicorn.access, uvicorn.error) keep their own handlers.
-logging.basicConfig(level=logging.INFO, force=True)
-logger = logging.getLogger(__name__)
+from app.config import get_settings  # noqa: E402
+from app.core.qdrant import keepalive_loop as qdrant_keepalive_loop  # noqa: E402
+from app.observability.langfuse import flush as langfuse_flush, is_enabled as langfuse_enabled  # noqa: E402
 
 settings = get_settings()
 

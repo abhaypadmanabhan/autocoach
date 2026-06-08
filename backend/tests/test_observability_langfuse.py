@@ -9,9 +9,20 @@ Langfuse SDK to avoid opening any real network connections.
 from __future__ import annotations
 
 import os
+import sys
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+if "langfuse" not in sys.modules:
+    langfuse_stub = types.ModuleType("langfuse")
+    langfuse_stub.Langfuse = MagicMock(name="Langfuse")
+    langfuse_stub.get_client = MagicMock(name="get_client")
+    langfuse_stub.observe = lambda *args, **kwargs: (
+        (lambda fn: fn) if not args else args[0]
+    )
+    sys.modules["langfuse"] = langfuse_stub
 
 from app.config import Settings
 from app.observability import langfuse as obs
@@ -228,3 +239,30 @@ def test_constructor_exception_disables_client_without_propagating(caplog):
             obs._reset_for_tests()
             assert obs.is_enabled() is False
             assert obs.langfuse is None
+
+
+def test_init_diagnostics_do_not_print_raw_host_or_exception(caplog):
+    """Init diagnostics must avoid leaking host or exception payloads."""
+    settings = _settings(
+        langfuse_public_key="pk-test",
+        langfuse_secret_key="sk-test",
+        langfuse_host="https://private.langfuse.example/path",
+    )
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("secret constructor payload")
+
+    with patch("app.observability.langfuse.get_settings", return_value=settings):
+        with patch("app.observability.langfuse.Langfuse", side_effect=_boom):
+            with patch("builtins.print") as mock_print:
+                obs._reset_for_tests()
+
+    printed = "\n".join(
+        " ".join(str(part) for part in call.args) for call in mock_print.call_args_list
+    )
+    logs = "\n".join(record.message for record in caplog.records)
+
+    assert "private.langfuse.example" not in printed
+    assert "secret constructor payload" not in printed
+    assert "private.langfuse.example" not in logs
+    assert "secret constructor payload" not in logs

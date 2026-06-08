@@ -61,6 +61,15 @@ def _init_client() -> Optional[Langfuse]:
     application startup.
     """
     settings = get_settings()
+    pub = getattr(settings, "langfuse_public_key", "") or ""
+    sec = getattr(settings, "langfuse_secret_key", "") or ""
+    host = getattr(settings, "langfuse_host", "") or ""
+    logger.info(
+        "Langfuse init config: pub_len=%d sec_len=%d host_set=%s",
+        len(pub),
+        len(sec),
+        bool(host),
+    )
     missing = _missing_credential(settings)
     if missing is not None:
         logger.info(
@@ -85,10 +94,17 @@ def _init_client() -> Optional[Langfuse]:
             environment=environment,
             release=release,
         )
-        return get_client()
-    except Exception:
-        logger.exception(
-            "Langfuse client init failed; instrumentation disabled"
+        client = get_client()
+        logger.info(
+            "Langfuse client constructed: environment=%s host_set=%s",
+            environment,
+            bool(host),
+        )
+        return client
+    except Exception as exc:  # pragma: no cover — diagnostic
+        logger.warning(
+            "Langfuse client init failed; instrumentation disabled (%s)",
+            type(exc).__name__,
         )
         return None
 

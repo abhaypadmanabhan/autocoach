@@ -17,3 +17,6 @@ Autocoach_Design/
 # Local task notes
 tasks/bugs.md
 tasks/design-handoff-prompt.md
+
+# Eval CSV outputs (regenerated per run)
+backend/evals/results/

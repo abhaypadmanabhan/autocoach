@@ -1,0 +1,7 @@
+# Eval-only deps. Kept out of backend/requirements.txt so they do not ship
+# to Railway. Install into the same venv with:
+#   pip install -r backend/evals/requirements.txt
+ragas>=0.2.10
+datasets>=3.0.0
+langchain-openai>=0.2.0
+pandas>=2.2.0
