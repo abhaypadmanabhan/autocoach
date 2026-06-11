@@ -7,6 +7,7 @@ import { Camera, Loader2, Trash2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 
 import { createBrowserClient } from "@/lib/supabase/client";
+import { analytics } from "@/lib/analytics";
 import { useAvatar } from "@/hooks/useAvatar";
 import { useToast } from "@/hooks/useToast";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ import { AppShell, PageContainer } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +38,7 @@ export default function SettingsPage() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [sendingReset, setSendingReset] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [analyticsEnabled, setAnalyticsEnabled] = useState(true);
 
   const { avatarUrl, uploading, uploadAvatar, deleteAvatar } = useAvatar(
     user?.id ?? null,
@@ -47,6 +50,10 @@ export default function SettingsPage() {
       setUser(user);
       setLoadingUser(false);
     });
+  }, []);
+
+  useEffect(() => {
+    setAnalyticsEnabled(!analytics.hasOptedOut());
   }, []);
 
   const initials = (user?.email ?? "??").slice(0, 2).toUpperCase();
@@ -87,6 +94,15 @@ export default function SettingsPage() {
     } finally {
       setSendingReset(false);
     }
+  };
+
+  const onAnalyticsToggle = (enabled: boolean) => {
+    if (enabled) {
+      analytics.optIn();
+    } else {
+      analytics.optOut();
+    }
+    setAnalyticsEnabled(enabled);
   };
 
   const onSignOut = async () => {
@@ -226,6 +242,27 @@ export default function SettingsPage() {
                     Soon
                   </span>
                 </Button>
+              </div>
+            </SettingsRow>
+
+            <SettingsRow label="04 / Privacy">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Label variant="mono">Analytics</Label>
+                  <p className="text-[13px] text-[var(--fg-secondary)] mt-0.5">
+                    Share anonymous usage events to help improve AutoCoach. No
+                    document content or personal data is included.
+                  </p>
+                </div>
+                <Checkbox
+                  id="analytics-enabled"
+                  checked={analyticsEnabled}
+                  onCheckedChange={(checked) =>
+                    onAnalyticsToggle(checked === true)
+                  }
+                  className="rounded-none"
+                  aria-label="Enable analytics"
+                />
               </div>
             </SettingsRow>
 

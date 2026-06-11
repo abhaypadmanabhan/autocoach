@@ -110,4 +110,23 @@ export const analytics = {
             posthog.capture(eventName, sanitizeProps(props));
         }
     },
+
+    hasOptedOut: (): boolean => {
+        if (typeof window === "undefined" || !process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+            return false;
+        }
+        return posthog.has_opted_out_capturing();
+    },
+
+    optIn: () => {
+        if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+            posthog.opt_in_capturing();
+        }
+    },
+
+    optOut: () => {
+        if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+            posthog.opt_out_capturing();
+        }
+    },
 };
