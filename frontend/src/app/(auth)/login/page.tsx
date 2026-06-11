@@ -68,7 +68,7 @@ export default function LoginPage() {
   return (
     <div>
       <div className="mb-7">
-        <h1 className="text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+        <h1 className="font-display uppercase text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
           Welcome back
         </h1>
         <p className="mt-1.5 text-[14px] text-[var(--fg-secondary)]">
@@ -128,7 +128,7 @@ export default function LoginPage() {
             </Label>
             <Link
               href="#"
-              className="text-[11px] text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+              className="text-[11px] text-[var(--accent-text)] hover:text-[var(--ink)] transition-colors"
             >
               Forgot?
             </Link>
@@ -184,7 +184,7 @@ export default function LoginPage() {
         Don&apos;t have an account?{" "}
         <Link
           href="/signup"
-          className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+          className="font-medium text-[var(--accent-text)] hover:text-[var(--ink)] transition-colors"
         >
           Create account
         </Link>

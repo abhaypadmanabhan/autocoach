@@ -3,39 +3,46 @@
 
 /* ============================================================
    AutoCoach — Design tokens
-   Source of truth: Autocoach_Design/styles.css
+   System: Padzy OS / "Quiet Brutalism" (light-only)
+   Ground #F9F1E6 · Ink #171717 · Accent #109462 · Error #C2402A
    ============================================================ */
 
 :root {
   /* surface */
-  --bg-base:        #0A0B0D;
-  --bg-surface:     #111214;
-  --bg-elev:        #16181B;
-  --bg-overlay:     #1B1D21;
-  --bg-inset:       #08090B;
+  --bg-base:        #F9F1E6;
+  --bg-surface:     #F1E8D9;
+  --bg-elev:        #D2CABF;
+  --bg-overlay:     #F9F1E6;
+  --bg-inset:       #EFE5D4;
 
-  /* line */
-  --line-subtle:    #1A1C20;
-  --line-default:   #23262B;
-  --line-strong:    #2E3137;
+  /* line — hairlines are ink at low alpha */
+  --line-subtle:    rgba(23, 23, 23, 0.14);
+  --line-default:   rgba(23, 23, 23, 0.28);
+  --line-strong:    #171717;
 
-  /* fg */
-  --fg-primary:     #ECECEE;
-  --fg-secondary:   #A0A2A8;
-  --fg-tertiary:    #6B6E76;
-  --fg-disabled:    #44464C;
+  /* fg — #95928F reserved for disabled/decorative only (fails 4.5:1 on cream) */
+  --fg-primary:     #171717;
+  --fg-secondary:   #44423E;
+  --fg-tertiary:    #6E6A64;
+  --fg-disabled:    #95928F;
 
-  /* accent + semantic */
-  --accent:         oklch(0.64 0.16 263);
-  --accent-hover:   oklch(0.69 0.16 263);
-  --accent-active:  oklch(0.58 0.16 263);
-  --accent-fade:    color-mix(in oklab, var(--accent) 14%, transparent);
-  --accent-line:    color-mix(in oklab, var(--accent) 36%, transparent);
+  /* accent + semantic — one emerald accent, ruthless restraint */
+  --ink:            #171717;
+  --accent:         #109462;
+  --accent-hover:   #0C7A50;
+  --accent-active:  #0A6443;
+  --accent-fade:    color-mix(in srgb, #109462 12%, transparent);
+  --accent-line:    #109462;
+  --accent-text:    #0B6B47;
 
-  --success:        oklch(0.68 0.10 156);
-  --warning:        oklch(0.74 0.10 75);
-  --danger:         oklch(0.66 0.14 22);
-  --streak:         oklch(0.74 0.14 50);
+  --success:        var(--accent);
+  --warning:        var(--fg-primary);
+  --danger:         #C2402A;
+  --streak:         var(--fg-primary);
+
+  /* hard offset shadow — primary CTA + active quiz card ONLY */
+  --shadow-hard:    4px 4px 0 0 var(--ink);
+  --shadow-hard-sm: 3px 3px 0 0 var(--ink);
 
   /* type scale */
   --t-caption: 12px;
@@ -50,53 +57,17 @@
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
   --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
 
-  /* radius */
-  --r-sm: 4px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+  /* radius — sharp corners; pill kept only for progress fills */
+  --r-sm: 0px; --r-md: 0px; --r-lg: 0px; --r-pill: 999px;
 
   /* motion */
   --ease-swift: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-pad:   cubic-bezier(0.2, 0, 0, 1);
   --d-micro:  180ms;
   --d-layout: 240ms;
   --d-sheet:  320ms;
-}
-
-/* ============================================================
-   Light theme override
-   Source: Autocoach_Design/dashboard-document.html
-   ============================================================ */
-
-[data-theme="light"], .light {
-  --bg-base:        #FFFFFF;
-  --bg-surface:     #FAFAFA;
-  --bg-elev:        #F4F4F5;
-  --bg-overlay:     #FFFFFF;
-  --bg-inset:       #F7F7F8;
-
-  --line-subtle:    #ECECEE;
-  --line-default:   #DCDCE0;
-  --line-strong:    #B4B4B8;
-
-  --fg-primary:     #18181B;
-  --fg-secondary:   #52525B;
-  --fg-tertiary:    #71717A;
-  --fg-disabled:    #A1A1AA;
-
-  --accent:         oklch(0.50 0.18 263);
-  --accent-hover:   oklch(0.45 0.18 263);
-  --accent-active:  oklch(0.40 0.18 263);
-  --accent-fade:    color-mix(in oklab, var(--accent) 10%, transparent);
-  --accent-line:    color-mix(in oklab, var(--accent) 32%, transparent);
-
-  --success:        oklch(0.50 0.13 156);
-  --warning:        oklch(0.60 0.12 75);
-  --danger:         oklch(0.55 0.18 22);
-  --streak:         oklch(0.62 0.18 50);
 
   color-scheme: light;
-}
-
-[data-theme="dark"], .dark {
-  color-scheme: dark;
 }
 
 @theme inline {
@@ -117,7 +88,7 @@
   --color-fg-tertiary: var(--fg-tertiary);
   --color-fg-disabled: var(--fg-disabled);
 
-  /* Brand accent (mock-named "accent" — cool blue) */
+  --color-ink: var(--ink);
   --color-brand: var(--accent);
   --color-brand-hover: var(--accent-hover);
   --color-brand-active: var(--accent-active);
@@ -132,27 +103,28 @@
   /* shadcn semantic aliases */
   --color-background: var(--bg-base);
   --color-foreground: var(--fg-primary);
-  --color-card: var(--bg-surface);
+  --color-card: var(--bg-base);
   --color-card-foreground: var(--fg-primary);
   --color-popover: var(--bg-overlay);
   --color-popover-foreground: var(--fg-primary);
   --color-primary: var(--accent);
-  --color-primary-foreground: #ffffff;
+  --color-primary-foreground: var(--ink);
   --color-secondary: var(--bg-elev);
   --color-secondary-foreground: var(--fg-primary);
   --color-muted: var(--bg-elev);
   --color-muted-foreground: var(--fg-secondary);
-  --color-accent: var(--bg-elev);
+  --color-accent: var(--bg-surface);
   --color-accent-foreground: var(--fg-primary);
   --color-destructive: var(--danger);
-  --color-destructive-foreground: #ffffff;
+  --color-destructive-foreground: #F9F1E6;
   --color-border: var(--line-default);
   --color-input: var(--line-default);
   --color-ring: var(--accent);
 
   /* Fonts */
-  --font-sans: var(--font-geist-sans, "Geist"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: var(--font-geist-mono, "Geist Mono"), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: var(--font-body, "Inter"), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-mono-sp, "Space Mono"), ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: var(--font-display-sp, "Space Grotesk"), var(--font-body, "Inter"), sans-serif;
 
   /* Type scale */
   --text-caption: 12px;
@@ -174,12 +146,16 @@
   --spacing-8: 64px;
   --spacing-9: 96px;
 
-  /* Radii */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  /* Radii — all sharp; Tailwind defaults (xs/xl/2xl/3xl) explicitly zeroed */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
   --radius-pill: 999px;
-  --radius: 8px;
+  --radius: 0px;
 }
 
 /* ============================================================
@@ -197,7 +173,6 @@ body {
   background: var(--bg-base);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "ss01", "cv01";
 }
 
 a { color: inherit; text-decoration: none; }
@@ -210,12 +185,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 
 /* ============================================================
-   Utility classes (mocks)
+   Utility classes
    ============================================================ */
 
 .mono {
   font-family: var(--font-mono);
-  font-feature-settings: "ss03", "zero";
   font-variant-numeric: tabular-nums;
 }
 .caps {
@@ -229,17 +203,48 @@ button { font: inherit; color: inherit; cursor: pointer; }
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  line-height: 1.02;
+}
+.font-display {
+  font-family: var(--font-display);
+}
 .kbd {
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--fg-tertiary);
-  background: var(--bg-base);
+  background: var(--bg-inset);
   border: 1px solid var(--line-default);
   padding: 1px 6px;
-  border-radius: var(--r-sm);
+  border-radius: 0;
   line-height: 1.4;
   display: inline-flex;
   align-items: center;
+}
+
+/* Hard offset shadow — primary CTA + active quiz card only */
+.shadow-hard { box-shadow: var(--shadow-hard); }
+.shadow-hard-sm { box-shadow: var(--shadow-hard-sm); }
+
+/* 2px accent tick on leading edge — active nav / selected state */
+.tick-active { position: relative; }
+.tick-active::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  background: var(--accent);
 }
 
 /* Reduced motion */
@@ -255,32 +260,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background-color: var(--line-default); border-radius: 999px; }
+::-webkit-scrollbar-thumb { background-color: var(--line-default); border-radius: 0; }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--line-strong); }
 
-/* Prevent transition flash on theme change */
-.disable-transitions, .disable-transitions * {
-  transition: none !important;
-}
-
 /* ============================================================
-   Keyframes used by mocks
+   Keyframes
    ============================================================ */
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
-}
-
-@keyframes critical-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 color-mix(in oklab, var(--danger) 50%, transparent);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 0 6px transparent;
-    transform: scale(1.02);
-  }
 }
 
 @keyframes bar-rise {
@@ -314,30 +303,52 @@ button { font: inherit; color: inherit; cursor: pointer; }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
-@keyframes pop-in {
-  0% { opacity: 0; transform: scale(0.92); }
-  60% { opacity: 1; transform: scale(1.02); }
-  100% { transform: scale(1); }
-}
-
 @keyframes ring-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-@keyframes chip-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+/* Padzy signature motions */
+@keyframes hairline-draw {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes node-pop {
+  from { transform: scale(0.6); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Landing background — slow seamless 64px loop */
+@keyframes grid-drift-y {
+  from { transform: translateY(-64px); }
+  to { transform: translateY(0); }
+}
+
+@keyframes node-travel-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(100vw + 64px)); }
+}
+
+@keyframes node-travel-y {
+  from { transform: translateY(-32px); }
+  to { transform: translateY(100vh); }
 }
 
 /* Animation utility classes */
 .anim-auth-in { animation: auth-in 320ms var(--ease-swift) both; }
 .anim-step-in { animation: step-in 280ms var(--ease-swift) both; }
 .anim-modal-in { animation: modal-in 320ms var(--ease-swift) both; }
-.anim-pop-in { animation: pop-in 320ms var(--ease-swift) both; }
 .anim-marg-in { animation: marg-in 320ms var(--ease-swift) both; }
 .anim-bar-rise { animation: bar-rise 600ms var(--ease-swift) both; }
+.anim-hairline-draw { animation: hairline-draw 600ms var(--ease-pad) both; transform-origin: left; }
+.anim-node-pop { animation: node-pop 280ms var(--ease-pad) both; }
 .skel-pulse { animation: skel 1.4s ease-in-out infinite; }
-.critical-pulse { animation: critical-pulse 1s ease-in-out infinite; }
 .ring-spin { animation: ring-spin 4s linear infinite; }
-.chip-float { animation: chip-float 5s ease-in-out infinite; }
+
+/* Landing background layer — slow drift, transform-only (GPU-cheap).
+   Global reduced-motion block above freezes all of these. */
+.anim-grid-drift { animation: grid-drift-y 36s linear infinite; }
+.anim-node-x-1 { animation: node-travel-x 52s linear infinite; }
+.anim-node-x-2 { animation: node-travel-x 67s linear infinite; animation-delay: -28s; }
+.anim-node-x-3 { animation: node-travel-x 45s linear infinite; animation-delay: -36s; }

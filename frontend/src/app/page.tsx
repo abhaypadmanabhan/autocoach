@@ -1,825 +1,902 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
+import { motion, MotionConfig } from "motion/react";
 import {
   ArrowRight,
   Check,
-  ChevronDown,
   FileUp,
-  Brain,
-  Sparkles,
-  Trophy,
-  Zap,
-  Star,
-  Github,
-  Twitter,
-  Linkedin,
+  Network,
+  Repeat,
+  Minus,
+  Menu,
+  X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { BrandMark } from "@/components/primitives-acx/BrandMark";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { BrandMark, LogoGlyph, SignatureMotif } from "@/components/primitives-acx/BrandMark";
 import { Kbd } from "@/components/primitives-acx/Kbd";
-import { LivePill } from "@/components/primitives-acx/LivePill";
-import { ThemeToggle } from "@/components/primitives-acx/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { href: "#features", label: "Features" },
+  { href: "#problem", label: "Problem" },
   { href: "#how", label: "How it works" },
+  { href: "#features", label: "Features" },
+  { href: "#engine", label: "Engine" },
   { href: "#pricing", label: "Pricing" },
   { href: "#faq", label: "FAQ" },
 ];
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--fg-primary)]">
-      <Nav />
-      <Hero />
-      <Problem />
-      <Features />
-      <HowItWorks />
-      <Voices />
-      <Pricing />
-      <Faq />
-      <FinalCTA />
-      <Footer />
+    <MotionConfig reducedMotion="user">
+      <div className="relative min-h-screen bg-[var(--bg-base)] text-[var(--fg-primary)]">
+        <GridBackdrop />
+        <Nav />
+        <main className="relative">
+          <Hero />
+          <Problem />
+          <HowItWorks />
+          <Features />
+          <Engine />
+          <Pricing />
+          <Faq />
+          <FinalCta />
+        </main>
+        <Footer />
+      </div>
+    </MotionConfig>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Background — drifting hairline grid + traveling signature nodes     */
+/* ------------------------------------------------------------------ */
+
+function GridBackdrop() {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+      {/* static vertical hairlines */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(to right, rgba(23,23,23,0.05) 0 1px, transparent 1px 64px)",
+        }}
+      />
+      {/* drifting horizontal hairlines — seamless 64px loop */}
+      <div
+        className="anim-grid-drift absolute left-0 right-0 top-0 h-[calc(100%+128px)]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(to bottom, rgba(23,23,23,0.05) 0 1px, transparent 1px 64px)",
+        }}
+      />
+      {/* traveling nodes — one accent, two ink, very low opacity */}
+      <span className="anim-node-x-1 absolute top-[22%] -left-2 h-1.5 w-1.5 rounded-full bg-[var(--accent)] opacity-40" />
+      <span className="anim-node-x-2 absolute top-[57%] -left-2 h-1.5 w-1.5 rounded-full border border-[var(--ink)] opacity-30" />
+      <span className="anim-node-x-3 absolute top-[81%] -left-2 h-1 w-1 rounded-full bg-[var(--ink)] opacity-20" />
     </div>
   );
 }
 
-function Nav() {
+/* ------------------------------------------------------------------ */
+/* Shared                                                              */
+/* ------------------------------------------------------------------ */
+
+function Reveal({
+  children,
+  className,
+  delay = 0,
+}: {
+  children: ReactNode;
+  className?: string;
+  delay?: number;
+}) {
   return (
-    <header className="sticky top-0 z-40 h-14 border-b border-[var(--line-subtle)] bg-[color-mix(in_oklab,var(--bg-base)_86%,transparent)] backdrop-blur">
-      <div className="max-w-[1280px] mx-auto px-6 flex items-center justify-between h-full">
+    <motion.div
+      className={className}
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.5, delay, ease: [0.2, 0, 0, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+function SectionShell({
+  id,
+  kicker,
+  children,
+  className,
+}: {
+  id?: string;
+  kicker: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <section id={id} className={cn("relative border-t border-[var(--line-subtle)]", className)}>
+      <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 py-16 sm:py-20 lg:py-24">
+        <Reveal>
+          <p className="kicker mb-8">{kicker}</p>
+        </Reveal>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function DisplayHeading({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <h2
+      className={cn(
+        "font-display font-bold uppercase tracking-[-0.02em] leading-[1.02]",
+        "text-[clamp(28px,5vw,52px)] text-[var(--fg-primary)]",
+        className,
+      )}
+    >
+      {children}
+    </h2>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Nav                                                                 */
+/* ------------------------------------------------------------------ */
+
+function Nav() {
+  const [open, setOpen] = useState(false);
+  return (
+    <header className="sticky top-0 z-30 border-b border-[var(--line-subtle)] bg-[var(--bg-base)]">
+      <div className="mx-auto flex h-14 max-w-[1120px] items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5">
-          <BrandMark />
-          <span className="font-mono text-[12.5px] tracking-[0.04em] font-medium">
-            AUTOCOACH
+          <BrandMark size={24} />
+          <span className="font-display font-semibold uppercase tracking-[-0.01em] text-[15px]">
+            AutoCoach
           </span>
         </Link>
-        <nav className="hidden md:flex items-center gap-7">
+        <nav className="hidden md:flex items-center gap-6">
           {NAV_LINKS.map((l) => (
             <a
               key={l.href}
               href={l.href}
-              className="text-[13px] text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] transition-colors"
+              className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] transition-colors"
             >
               {l.label}
             </a>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Sign in</Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/login"
+            className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-secondary)] hover:text-[var(--fg-primary)] transition-colors"
+          >
+            Sign in
+          </Link>
+          <Button size="sm" asChild>
+            <Link href="/signup">Start free</Link>
           </Button>
-          <Button size="sm" asChild className="!bg-[var(--fg-primary)] !text-[var(--bg-base)] hover:!bg-[var(--fg-secondary)]">
-            <Link href="/signup">
-              Get started
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-          </Button>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
+            className="md:hidden grid h-8 w-8 place-items-center border border-[var(--line-default)] text-[var(--fg-primary)]"
+          >
+            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
       </div>
+      {open && (
+        <nav className="md:hidden border-t border-[var(--line-subtle)] bg-[var(--bg-base)]">
+          {NAV_LINKS.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              onClick={() => setOpen(false)}
+              className="block border-b border-[var(--line-subtle)] px-4 py-3 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-secondary)] hover:text-[var(--fg-primary)]"
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
+      )}
     </header>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* 01 — Hero                                                           */
+/* ------------------------------------------------------------------ */
+
 function Hero() {
   return (
-    <section className="px-6 py-16 sm:py-24 lg:py-28">
-      <div className="max-w-[1280px] mx-auto grid lg:grid-cols-[1fr_1.05fr] gap-12 lg:gap-16 items-center">
-        <div>
-          <LivePill className="mb-7">Adaptive · Now in beta</LivePill>
-          <h1 className="text-[40px] sm:text-[48px] lg:text-[56px] font-medium tracking-[-0.038em] leading-[1.04] text-balance text-[var(--fg-primary)]">
-            Drop a document.{" "}
-            <em className="not-italic font-normal text-[var(--fg-tertiary)]">
-              Beat the curve.
-            </em>
-          </h1>
-          <p className="mt-5 text-[16px] leading-[1.55] text-[var(--fg-secondary)] max-w-[460px]">
-            AutoCoach turns your PDFs and slides into adaptive quizzes. Spaced
-            repetition keeps every concept in your head — no flashcards required.
-          </p>
-          <div className="mt-7 flex flex-col sm:flex-row gap-3">
-            <Button
-              asChild
-              className="!bg-[var(--fg-primary)] !text-[var(--bg-base)] hover:!bg-[var(--fg-secondary)] !h-[42px] !px-[18px] !text-[14px]"
-            >
-              <Link href="/signup">
-                Start free
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-            </Button>
-            <Button variant="secondary" size="lg" asChild>
-              <a href="#how">
-                See how it works
-                <Kbd className="ml-1">↓</Kbd>
-              </a>
-            </Button>
+    <section className="relative">
+      <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 lg:pt-28 pb-16 sm:pb-24">
+        <div className="grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16 items-center">
+          <div>
+            <Reveal>
+              <p className="kicker mb-6">01 / AutoCoach</p>
+            </Reveal>
+            <Reveal delay={0.05}>
+              <h1 className="font-display font-bold uppercase tracking-[-0.02em] leading-[0.98] text-[clamp(40px,7vw,84px)]">
+                Read it once.
+                <br />
+                Remember it
+                <br />
+                for good.
+              </h1>
+            </Reveal>
+            <Reveal delay={0.1}>
+              <p className="mt-6 max-w-[52ch] text-[16px] leading-[1.6] text-[var(--fg-secondary)]">
+                AutoCoach turns any PDF or slide deck into an adaptive quiz engine. It
+                extracts the concepts that matter, drills you where you&apos;re weak, and
+                schedules reviews before you forget — so studying compounds instead of
+                evaporating.
+              </p>
+            </Reveal>
+            <Reveal delay={0.15}>
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Button size="xl" asChild>
+                  <Link href="/signup">
+                    Start free
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+                <Button size="xl" variant="outline" asChild>
+                  <a href="#how">See how it works</a>
+                </Button>
+              </div>
+            </Reveal>
+            <Reveal delay={0.2}>
+              <p className="mt-8 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
+                <span className="text-[var(--accent-text)]">●</span> PDF + PPTX
+                <span className="mx-2 text-[var(--fg-disabled)]">·</span>
+                Adaptive engine
+                <span className="mx-2 text-[var(--fg-disabled)]">·</span>
+                Spaced review
+                <span className="mx-2 text-[var(--fg-disabled)]">·</span>
+                No card decks to build
+              </p>
+            </Reveal>
           </div>
-          <div className="mt-7 flex items-center gap-4 font-mono text-[11px] tracking-[0.06em] text-[var(--fg-tertiary)]">
-            <span className="inline-flex gap-0.5 text-[var(--warning)]">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className="h-2.5 w-2.5 fill-current" />
-              ))}
-            </span>
-            <span className="text-[var(--fg-disabled)]">·</span>
-            <span>2,400+ learners</span>
-            <span className="text-[var(--fg-disabled)]">·</span>
-            <span>No credit card</span>
-          </div>
+
+          {/* Active quiz card vignette — the one hard-shadowed artifact */}
+          <Reveal delay={0.15}>
+            <div className="border-2 border-[var(--ink)] bg-[var(--bg-base)] shadow-hard p-5 sm:p-6 max-w-[440px] lg:ml-auto">
+              <p className="kicker">Q.04/10 — B-Trees</p>
+              <p className="mt-3 text-[16px] font-medium leading-snug">
+                Which property keeps a B-tree balanced after insertions?
+              </p>
+              <div className="mt-4 divide-y divide-[var(--line-subtle)] border-t border-b border-[var(--line-subtle)]">
+                {[
+                  { label: "Binary search property", selected: false },
+                  { label: "Heap property", selected: false },
+                  { label: "All leaves at same depth", selected: true },
+                  { label: "No duplicate keys", selected: false },
+                ].map((opt) => (
+                  <div
+                    key={opt.label}
+                    className={cn(
+                      "relative flex items-center gap-3 px-3 py-2.5 text-[13px]",
+                      opt.selected
+                        ? "text-[var(--fg-primary)] font-medium"
+                        : "text-[var(--fg-secondary)]",
+                    )}
+                  >
+                    {opt.selected && (
+                      <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]" />
+                    )}
+                    <span
+                      className={cn(
+                        "h-3 w-3 rounded-full border shrink-0",
+                        opt.selected
+                          ? "border-[var(--accent)] bg-[var(--accent)]"
+                          : "border-[var(--line-default)]",
+                      )}
+                    />
+                    {opt.label}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--accent-text)]">
+                  ● Correct +10 XP
+                </span>
+                <span className="font-mono text-[11px] text-[var(--fg-tertiary)]">
+                  MASTERY 82%
+                </span>
+              </div>
+            </div>
+          </Reveal>
         </div>
-        <HeroPreview />
       </div>
     </section>
   );
 }
 
-function HeroPreview() {
-  const [tab, setTab] = useState<0 | 1 | 2>(0);
-  useEffect(() => {
-    const id = setInterval(() => {
-      setTab((t) => ((t + 1) % 3) as 0 | 1 | 2);
-    }, 4500);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <div
-      className="relative aspect-[4/3.1] rounded-lg border border-[var(--line-subtle)] bg-[var(--bg-surface)] p-4 overflow-hidden"
-      aria-hidden
-    >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex gap-1.5">
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              className={cn(
-                "h-1.5 rounded-full transition-all duration-[180ms]",
-                i === tab
-                  ? "w-4 bg-[var(--accent)]"
-                  : "w-1.5 bg-[var(--line-strong)]",
-              )}
-            />
-          ))}
-        </div>
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
-          {tab === 0 ? "Quiz" : tab === 1 ? "Free response" : "Result"}
-        </span>
-      </div>
-      <div className="h-px bg-[var(--bg-elev)] mb-5 flex gap-1">
-        <div
-          className="h-px bg-[var(--accent)] transition-[width] duration-[240ms]"
-          style={{ width: `${(tab + 1) * 33}%` }}
-        />
-      </div>
-      <div className="relative min-h-[260px]">
-        {tab === 0 && <PreviewMcq />}
-        {tab === 1 && <PreviewFree />}
-        {tab === 2 && <PreviewResult />}
-      </div>
-    </div>
-  );
-}
-
-function PreviewMcq() {
-  return (
-    <div className="anim-step-in">
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--fg-tertiary)] mb-3">
-        Question 03 — Distributed systems
-      </div>
-      <p className="text-[17px] font-medium leading-[1.35] tracking-[-0.012em] text-[var(--fg-primary)] mb-4 text-balance">
-        Which consistency model permits replicas to diverge temporarily?
-      </p>
-      <div className="-mx-2">
-        {[
-          { letter: "A", text: "Linearizability", state: "" },
-          { letter: "B", text: "Sequential consistency", state: "" },
-          { letter: "C", text: "Eventual consistency", state: "correct" },
-          { letter: "D", text: "Strict serializable", state: "selected" },
-        ].map((o) => (
-          <div
-            key={o.letter}
-            className={cn(
-              "relative flex items-center gap-3 px-4 py-2.5",
-              "border-t border-[var(--line-subtle)] last:border-b",
-            )}
-          >
-            <span
-              className={cn(
-                "absolute left-0 top-0 bottom-0 w-0.5",
-                o.state === "correct" && "bg-[var(--success)]",
-                o.state === "selected" && "bg-[var(--accent)]",
-              )}
-            />
-            <span
-              className={cn(
-                "font-mono text-[11px] w-4",
-                o.state === "correct"
-                  ? "text-[var(--success)]"
-                  : o.state === "selected"
-                    ? "text-[var(--accent)]"
-                    : "text-[var(--fg-tertiary)]",
-              )}
-            >
-              {o.letter}
-            </span>
-            <span
-              className={cn(
-                "text-[13px] flex-1",
-                o.state === "correct" || o.state === "selected"
-                  ? "text-[var(--fg-primary)]"
-                  : "text-[var(--fg-secondary)]",
-              )}
-            >
-              {o.text}
-            </span>
-            {o.state === "correct" && (
-              <Check className="h-3.5 w-3.5 text-[var(--success)]" />
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PreviewFree() {
-  return (
-    <div className="anim-step-in">
-      <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--fg-tertiary)] mb-3">
-        Question 04 — Free response
-      </div>
-      <p className="text-[17px] font-medium leading-[1.35] tracking-[-0.012em] text-[var(--fg-primary)] mb-4">
-        In your own words, why does Raft elect a leader?
-      </p>
-      <div className="rounded-md border border-[var(--line-default)] bg-[var(--bg-base)] p-3 min-h-[100px] text-[13px] leading-[1.55] text-[var(--fg-secondary)] mb-3">
-        Raft elects a leader to serialize log appends — only the leader accepts
-        writes, simplifying consensus and ensuring a single source
-        <span className="text-[var(--accent)]">▏</span>
-      </div>
-      <div className="flex items-center justify-between font-mono text-[10.5px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)]">
-        <span>cmd + ↵ submit</span>
-        <span className="tabular-nums">123 chars</span>
-      </div>
-    </div>
-  );
-}
-
-function PreviewResult() {
-  return (
-    <div className="anim-step-in flex flex-col items-center pt-3">
-      <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--fg-tertiary)] mb-2">
-        Score
-      </span>
-      <div className="font-mono text-[44px] tabular-nums text-[var(--success)] tracking-[-0.04em] leading-none mb-2">
-        87%
-      </div>
-      <Badge variant="success">Strong</Badge>
-      <div className="mt-5 grid grid-cols-3 gap-px bg-[var(--line-subtle)] border border-[var(--line-subtle)] rounded-md overflow-hidden w-full max-w-[320px]">
-        {[
-          { l: "Correct", v: "13" },
-          { l: "Wrong", v: "2" },
-          { l: "XP", v: "+130" },
-        ].map((s) => (
-          <div key={s.l} className="bg-[var(--bg-surface)] px-3 py-2.5 text-center">
-            <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)]">
-              {s.l}
-            </p>
-            <p className="font-mono text-[14px] tabular-nums text-[var(--fg-primary)] mt-0.5">
-              {s.v}
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+/* ------------------------------------------------------------------ */
+/* 02 — Problem (forgetting curve)                                     */
+/* ------------------------------------------------------------------ */
 
 function Problem() {
   return (
-    <section className="border-t border-[var(--line-subtle)] py-24 sm:py-32 px-6">
-      <div className="max-w-[1280px] mx-auto grid lg:grid-cols-[0.8fr_1.1fr] gap-12 lg:gap-20 items-center">
+    <SectionShell id="problem" kicker="02 / The problem">
+      <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 items-center">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--fg-tertiary)] mb-7 inline-flex items-center gap-2.5">
-            <span className="inline-block w-3.5 h-0.5 bg-[var(--accent)]" />
-            The forgetting curve
-          </p>
-          <h2 className="text-[32px] sm:text-[40px] font-medium tracking-[-0.028em] leading-[1.12] text-balance">
-            You forget{" "}
-            <span className="font-mono text-[var(--accent)] tracking-[-0.02em]">70%</span>{" "}
-            of what you read in 24 hours.
-          </h2>
-          <p className="mt-5 text-[15px] leading-[1.65] text-[var(--fg-secondary)] max-w-[460px]">
-            Reading is recognition, not retrieval. Without active recall, your brain
-            never forms the durable trace needed to remember a concept past tomorrow.
-          </p>
-          <div className="mt-7 inline-flex items-center gap-3 px-4 py-3 rounded-md border border-[var(--line-default)] bg-[var(--bg-surface)]">
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-[var(--fg-tertiary)] shrink-0">
-              Pivot
-            </span>
-            <p className="text-[13px] text-[var(--fg-primary)]">
-              Adaptive quizzes flip recognition into retrieval — the only known way
-              to flatten the curve.
+          <Reveal>
+            <DisplayHeading>
+              You forget 70% of what you read by tomorrow.
+            </DisplayHeading>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <p className="mt-6 max-w-[52ch] text-[15px] leading-[1.65] text-[var(--fg-secondary)]">
+              Ebbinghaus measured it in 1885 and it hasn&apos;t changed: memory decays on a
+              curve, fastest in the first 24 hours. Re-reading and highlighting feel
+              productive but barely bend it. The only interventions that reliably work are
+              <strong className="text-[var(--fg-primary)]"> active retrieval</strong> — being
+              forced to recall — and{" "}
+              <strong className="text-[var(--fg-primary)]">spaced repetition</strong> —
+              recalling again right before you&apos;d forget.
             </p>
-          </div>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <p className="mt-4 max-w-[52ch] text-[15px] leading-[1.65] text-[var(--fg-secondary)]">
+              AutoCoach builds both into the way you read. Every document becomes a
+              question source; every wrong answer becomes a scheduled comeback.
+            </p>
+          </Reveal>
         </div>
-        <ForgettingCurve />
+        <Reveal delay={0.1}>
+          <ForgettingCurve />
+        </Reveal>
       </div>
-    </section>
+    </SectionShell>
   );
 }
 
 function ForgettingCurve() {
   return (
-    <div className="rounded-lg border border-[var(--line-subtle)] bg-[var(--bg-surface)] p-6 sm:p-8">
-      <div className="grid grid-cols-[42px_1fr] gap-3.5 h-[280px] sm:h-[320px]">
-        <div className="flex flex-col justify-between font-mono text-[10px] text-[var(--fg-tertiary)]">
-          {["100%", "75%", "50%", "25%", "0%"].map((y) => (
-            <span key={y}>{y}</span>
-          ))}
-        </div>
-        <div className="relative">
-          {[0, 25, 50, 75, 100].map((pct) => (
-            <div
-              key={pct}
-              className="absolute left-0 right-0 h-px bg-[var(--line-subtle)]"
-              style={{ top: `${pct}%` }}
-            />
-          ))}
-          <svg
-            viewBox="0 0 400 200"
-            preserveAspectRatio="none"
-            className="absolute inset-0 w-full h-full"
-          >
-            <path
-              d="M 0 10 C 80 100 160 150 400 175"
-              fill="none"
-              stroke="var(--line-strong)"
-              strokeWidth="1.5"
-              strokeDasharray="4 4"
-            />
-            <path
-              d="M 0 10 C 60 30 120 35 180 30 C 240 25 300 22 400 18"
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth="2"
-            />
-            {[
-              { x: 50, label: "1d" },
-              { x: 130, label: "3d" },
-              { x: 230, label: "1w" },
-              { x: 340, label: "30d" },
-            ].map((p) => (
-              <g key={p.label}>
-                <circle cx={p.x} cy={20} r="3" className="fill-[var(--accent)]" />
-              </g>
-            ))}
-          </svg>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4 mt-5 pt-5 border-t border-[var(--line-subtle)]">
-        <Legend dotClass="bg-[var(--line-strong)]" label="Without practice" />
-        <Legend dotClass="bg-[var(--accent)]" label="With AutoCoach" />
-      </div>
-    </div>
+    <figure className="m-0 border border-[var(--line-subtle)] bg-[var(--bg-base)] p-5">
+      <figcaption className="kicker mb-4">Retention over 7 days</figcaption>
+      <svg
+        viewBox="0 0 440 220"
+        className="w-full"
+        role="img"
+        aria-label="Forgetting curve: unaided memory decays to 25% while spaced retrieval keeps retention above 80%"
+      >
+        {/* axes */}
+        <line x1="32" y1="12" x2="32" y2="188" stroke="var(--line-default)" strokeWidth="1" />
+        <line x1="32" y1="188" x2="428" y2="188" stroke="var(--line-default)" strokeWidth="1" />
+        {/* gridlines */}
+        {[56, 100, 144].map((y) => (
+          <line key={y} x1="32" y1={y} x2="428" y2={y} stroke="var(--line-subtle)" strokeWidth="1" />
+        ))}
+        {/* unaided decay */}
+        <path
+          d="M 32 20 C 90 110, 150 150, 240 165 C 310 175, 380 178, 428 180"
+          fill="none"
+          stroke="var(--ink)"
+          strokeWidth="1.5"
+          strokeDasharray="4 4"
+        />
+        {/* with retrieval: sawtooth recoveries */}
+        <path
+          d="M 32 20 C 70 60, 95 80, 120 92 L 120 36 C 160 64, 190 76, 220 84 L 220 40 C 270 60, 310 68, 350 72 L 350 44 C 380 54, 410 58, 428 60"
+          fill="none"
+          stroke="var(--accent)"
+          strokeWidth="2"
+        />
+        {/* intervention nodes */}
+        {[
+          { x: 120, y: 36 },
+          { x: 220, y: 40 },
+          { x: 350, y: 44 },
+        ].map((p) => (
+          <circle key={p.x} cx={p.x} cy={p.y} r="4" fill="var(--accent)" stroke="var(--ink)" strokeWidth="1" />
+        ))}
+        {/* labels */}
+        <text x="428" y="174" textAnchor="end" fontSize="10" fill="var(--fg-tertiary)" fontFamily="var(--font-mono)">
+          UNAIDED — 25%
+        </text>
+        <text x="428" y="52" textAnchor="end" fontSize="10" fill="var(--accent-text)" fontFamily="var(--font-mono)">
+          WITH AUTOCOACH — 84%
+        </text>
+        <text x="36" y="206" fontSize="10" fill="var(--fg-tertiary)" fontFamily="var(--font-mono)">
+          DAY 0
+        </text>
+        <text x="428" y="206" textAnchor="end" fontSize="10" fill="var(--fg-tertiary)" fontFamily="var(--font-mono)">
+          DAY 7
+        </text>
+      </svg>
+    </figure>
   );
 }
 
-function Legend({ dotClass, label }: { dotClass: string; label: string }) {
+/* ------------------------------------------------------------------ */
+/* 03 — How it works                                                   */
+/* ------------------------------------------------------------------ */
+
+const STEPS = [
+  {
+    n: "01",
+    title: "Upload",
+    body: "Drop a PDF or PPTX — lecture notes, a textbook chapter, a spec. AutoCoach extracts the text, chunks it, and indexes every passage for retrieval. Most documents are ready in under a minute.",
+    icon: FileUp,
+  },
+  {
+    n: "02",
+    title: "Extract",
+    body: "An LLM reads the document and pulls out the concepts worth knowing — not keywords, actual ideas. Each concept is linked back to the exact passages that teach it, so every question stays grounded in your source.",
+    icon: Network,
+  },
+  {
+    n: "03",
+    title: "Drill",
+    body: "Start a session. Questions are generated live against your weakest concepts — multiple choice, true/false, and free-text answers graded by AI. Answer, see why, move on. The next question is already waiting.",
+    icon: Repeat,
+  },
+];
+
+function HowItWorks() {
   return (
-    <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)]">
-      <span className={cn("h-0.5 w-4", dotClass)} />
-      {label}
-    </div>
+    <SectionShell id="how" kicker="03 / How it works">
+      <Reveal>
+        <DisplayHeading className="max-w-[24ch]">
+          From document to drill in three steps.
+        </DisplayHeading>
+      </Reveal>
+      <div className="mt-12 grid gap-px border border-[var(--line-subtle)] bg-[var(--line-subtle)] md:grid-cols-3">
+        {STEPS.map((step, i) => (
+          <Reveal key={step.n} delay={i * 0.08} className="bg-[var(--bg-base)]">
+            <div className="p-6 sm:p-8 h-full">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[28px] tabular-nums text-[var(--fg-disabled)]">
+                  {step.n}
+                </span>
+                <step.icon className="h-5 w-5 text-[var(--fg-tertiary)]" strokeWidth={1.5} />
+              </div>
+              <h3 className="mt-6 font-display font-semibold uppercase tracking-[-0.01em] text-[20px]">
+                {step.title}
+              </h3>
+              <p className="mt-3 text-[14px] leading-[1.65] text-[var(--fg-secondary)]">
+                {step.body}
+              </p>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+    </SectionShell>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* 04 — Feature deep-dives                                             */
+/* ------------------------------------------------------------------ */
 
 const FEATURES = [
   {
-    icon: Brain,
-    title: "Concept extraction",
-    desc: "We surface every core idea in your document — no rote summarization.",
+    n: "01",
+    title: "Concept extraction, not flashcard busywork",
+    body: "You never write a card. AutoCoach reads your document and identifies the concepts that actually carry the material, ranks them by importance, and tags the core ones. Every quiz question traces back to a concept, and every concept traces back to the passage it came from.",
+    vignette: (
+      <div className="space-y-2">
+        {[
+          { c: "B-Trees", core: true },
+          { c: "Write-ahead log", core: true },
+          { c: "LSM compaction", core: false },
+        ].map((row) => (
+          <div
+            key={row.c}
+            className="flex items-center justify-between border-b border-[var(--line-subtle)] pb-2 text-[13px]"
+          >
+            <span>{row.c}</span>
+            {row.core ? (
+              <span className="font-mono text-[10px] uppercase tracking-[0.1em] border border-[var(--accent)] text-[var(--accent-text)] px-1.5">
+                Core
+              </span>
+            ) : (
+              <Minus className="h-3 w-3 text-[var(--fg-disabled)]" />
+            )}
+          </div>
+        ))}
+      </div>
+    ),
   },
   {
-    icon: Sparkles,
-    title: "Adaptive sessions",
-    desc: "Difficulty scales to your mastery, focusing time where it matters most.",
+    n: "02",
+    title: "An engine that adapts every single question",
+    body: "The selector watches your mastery per concept and aims each new question at the gap — weighted toward what you miss, with a recency window so sessions never loop the same idea twice in a row. Free-text answers are graded by an LLM that explains exactly what was missing from your answer.",
+    vignette: (
+      <div className="space-y-3 font-mono text-[11px] uppercase tracking-[0.08em]">
+        <p className="text-[var(--fg-tertiary)]">Selector → weakest concept</p>
+        <p className="text-[var(--fg-primary)]">Transactions · mastery 38%</p>
+        <p className="text-[var(--accent-text)]">● Generating question…</p>
+      </div>
+    ),
   },
   {
-    icon: Zap,
-    title: "Spaced retrieval",
-    desc: "Items reappear at the right interval to commit them to long-term memory.",
+    n: "03",
+    title: "A review queue that knows when you'll forget",
+    body: "Every concept you've touched gets a review date based on how well you know it. Open AutoCoach and the day's due reviews are waiting — five minutes of targeted recall instead of an hour of re-reading. Miss one and it comes back sooner; nail it and the interval stretches.",
+    vignette: (
+      <div className="space-y-2 text-[13px]">
+        <div className="flex justify-between border-b border-[var(--line-subtle)] pb-2">
+          <span>Due today</span>
+          <span className="font-mono text-[var(--accent-text)]">7 concepts</span>
+        </div>
+        <div className="flex justify-between border-b border-[var(--line-subtle)] pb-2">
+          <span>Tomorrow</span>
+          <span className="font-mono text-[var(--fg-tertiary)]">3 concepts</span>
+        </div>
+        <div className="flex justify-between pb-1">
+          <span>This week</span>
+          <span className="font-mono text-[var(--fg-tertiary)]">12 concepts</span>
+        </div>
+      </div>
+    ),
   },
   {
-    icon: Trophy,
-    title: "Progress that lasts",
-    desc: "Per-concept mastery tracking, not vanity scores.",
+    n: "04",
+    title: "Keyboard-first sessions, progress you can see",
+    body: "Answer with 1–4, submit with Enter, next question with Space — sessions move at the speed you think. XP, streaks, and per-concept mastery bars make the invisible work of remembering visible, and the dashboard shows exactly which chapters are solid and which are theater.",
+    vignette: (
+      <div className="flex flex-wrap items-center gap-2">
+        <Kbd>1</Kbd>
+        <Kbd>2</Kbd>
+        <Kbd>3</Kbd>
+        <Kbd>4</Kbd>
+        <span className="text-[var(--fg-disabled)] mx-1">·</span>
+        <Kbd>↵</Kbd>
+        <span className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
+          Submit
+        </span>
+      </div>
+    ),
   },
 ];
 
 function Features() {
   return (
-    <section
-      id="features"
-      className="border-t border-[var(--line-subtle)] py-24 sm:py-28 px-6"
-    >
-      <div className="max-w-[1280px] mx-auto">
-        <SectionHead
-          eyebrow="Capabilities"
-          title="Built for retention."
-          accent="Not for reading."
-        />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-12">
-          {FEATURES.map((f) => (
+    <SectionShell id="features" kicker="04 / Features">
+      <Reveal>
+        <DisplayHeading className="max-w-[22ch]">
+          Built for remembering, not for collecting documents.
+        </DisplayHeading>
+      </Reveal>
+      <div className="mt-12 divide-y divide-[var(--line-subtle)] border-t border-b border-[var(--line-subtle)]">
+        {FEATURES.map((f, i) => (
+          <Reveal key={f.n}>
             <div
-              key={f.title}
-              className="rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)] p-5 transition-colors duration-[180ms] hover:border-[var(--line-default)] hover:bg-[var(--bg-surface)]"
+              className={cn(
+                "grid gap-6 py-10 md:grid-cols-[1fr_300px] md:gap-12 items-start",
+                i % 2 === 1 && "md:grid-cols-[300px_1fr]",
+              )}
             >
-              <div className="grid place-items-center h-9 w-9 rounded-md bg-[var(--bg-elev)] border border-[var(--line-default)] mb-4">
-                <f.icon className="h-4 w-4 text-[var(--accent)]" />
+              <div className={cn(i % 2 === 1 && "md:order-2")}>
+                <p className="kicker mb-3">{f.n} /</p>
+                <h3 className="font-display font-semibold uppercase tracking-[-0.01em] text-[20px] leading-tight max-w-[28ch]">
+                  {f.title}
+                </h3>
+                <p className="mt-3 max-w-[58ch] text-[14px] leading-[1.65] text-[var(--fg-secondary)]">
+                  {f.body}
+                </p>
               </div>
-              <h3 className="text-[15px] font-medium text-[var(--fg-primary)] mb-1.5">
-                {f.title}
-              </h3>
-              <p className="text-[13px] leading-[1.55] text-[var(--fg-secondary)]">
-                {f.desc}
-              </p>
+              <div
+                className={cn(
+                  "border border-[var(--line-subtle)] bg-[var(--bg-base)] p-4",
+                  i % 2 === 1 && "md:order-1",
+                )}
+              >
+                {f.vignette}
+              </div>
             </div>
-          ))}
-        </div>
+          </Reveal>
+        ))}
       </div>
-    </section>
+    </SectionShell>
   );
 }
 
-function HowItWorks() {
-  const steps = [
-    {
-      n: "01",
-      icon: FileUp,
-      title: "Drop a PDF or slides",
-      desc: "Upload up to 50MB. We handle text, images, and tables.",
-    },
-    {
-      n: "02",
-      icon: Brain,
-      title: "We extract concepts",
-      desc: "Core ideas surface in seconds, ranked by importance.",
-    },
-    {
-      n: "03",
-      icon: Trophy,
-      title: "You learn by retrieval",
-      desc: "Adaptive sessions, spaced reviews, real mastery.",
-    },
-  ];
+/* ------------------------------------------------------------------ */
+/* 05 — The engine (mastery explainer)                                 */
+/* ------------------------------------------------------------------ */
 
-  return (
-    <section
-      id="how"
-      className="border-t border-[var(--line-subtle)] py-24 sm:py-28 px-6"
-    >
-      <div className="max-w-[1280px] mx-auto">
-        <SectionHead
-          eyebrow="How it works"
-          title="Three steps."
-          accent="About two minutes."
-        />
-        <ol className="grid lg:grid-cols-3 gap-px mt-12 bg-[var(--line-subtle)] border border-[var(--line-subtle)] rounded-md overflow-hidden">
-          {steps.map((s) => (
-            <li
-              key={s.n}
-              className="bg-[var(--bg-base)] p-7 sm:p-9 flex flex-col"
-            >
-              <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)] mb-5">
-                Step {s.n}
-              </span>
-              <s.icon className="h-5 w-5 text-[var(--accent)] mb-4" />
-              <h3 className="text-[20px] font-medium text-[var(--fg-primary)] tracking-[-0.01em] mb-2">
-                {s.title}
-              </h3>
-              <p className="text-[14px] text-[var(--fg-secondary)] leading-[1.55]">
-                {s.desc}
-              </p>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-  );
-}
-
-const VOICES = [
-  {
-    quote: "I went from re-reading PDFs to actually retrieving them. Hit 90%+ on the section that destroyed me last cycle.",
-    name: "Sarah Chen",
-    role: "Med student · USMLE Step 1",
-  },
-  {
-    quote: "The CORE tag is killer. I stopped studying minutiae and started studying the arteries.",
-    name: "Daniel Kim",
-    role: "Bar exam candidate",
-  },
-  {
-    quote: "I run AutoCoach on every system design paper now. Concepts stick like flashcards never did.",
-    name: "Priya Nair",
-    role: "Staff engineer prep",
-  },
+const MASTERY_ROWS = [
+  { concept: "B-Trees", pct: 82 },
+  { concept: "Indexes", pct: 74 },
+  { concept: "Transactions", pct: 38 },
+  { concept: "Replication", pct: 55 },
 ];
 
-function Voices() {
+function Engine() {
   return (
-    <section className="border-t border-[var(--line-subtle)] py-24 sm:py-28 px-6">
-      <div className="max-w-[1280px] mx-auto">
-        <SectionHead
-          eyebrow="Voices"
-          title="From the people fighting"
-          accent="their own material."
-        />
-        <div className="grid lg:grid-cols-3 gap-3 mt-12">
-          {VOICES.map((v) => (
-            <figure
-              key={v.name}
-              className="rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)] p-6 flex flex-col"
-            >
-              <div className="inline-flex gap-0.5 mb-4 text-[var(--warning)]">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="h-3 w-3 fill-current" />
-                ))}
-              </div>
-              <blockquote className="flex-1 text-[14px] leading-[1.6] text-[var(--fg-primary)]">
-                {v.quote}
-              </blockquote>
-              <figcaption className="mt-5 pt-4 border-t border-[var(--line-subtle)]">
-                <p className="text-[13px] font-medium text-[var(--fg-primary)]">
-                  {v.name}
-                </p>
-                <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)] mt-0.5">
-                  {v.role}
-                </p>
-              </figcaption>
-            </figure>
-          ))}
+    <SectionShell id="engine" kicker="05 / The engine">
+      <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 items-center">
+        <div>
+          <Reveal>
+            <DisplayHeading>Mastery is a number, and the engine chases it.</DisplayHeading>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <p className="mt-6 max-w-[52ch] text-[15px] leading-[1.65] text-[var(--fg-secondary)]">
+              Behind every session is a per-concept mastery score, updated after each
+              answer. Correct on a hard free-text question moves it a lot; a lucky
+              multiple-choice guess moves it a little. The selector always aims at your
+              lowest scores, so time spent in AutoCoach goes where it pays the most.
+            </p>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <ul className="mt-6 space-y-2.5 text-[14px] text-[var(--fg-secondary)] list-none p-0">
+              {[
+                "Question difficulty adapts to your score per concept",
+                "Wrong answers shorten the review interval automatically",
+                "Overall mastery shows when you're genuinely exam-ready",
+              ].map((li) => (
+                <li key={li} className="flex items-start gap-2.5">
+                  <Check className="h-4 w-4 mt-0.5 shrink-0 text-[var(--accent-text)]" />
+                  {li}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
         </div>
+        <Reveal delay={0.1}>
+          <div className="border border-[var(--line-subtle)] bg-[var(--bg-elev)] p-5 sm:p-6">
+            <p className="kicker mb-5">Concept mastery</p>
+            <div className="space-y-4">
+              {MASTERY_ROWS.map((row) => (
+                <div key={row.concept}>
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-[13px]">{row.concept}</span>
+                    <span className="font-mono text-[12px] tabular-nums">{row.pct}%</span>
+                  </div>
+                  <div className="h-[8px] border border-[var(--ink)] bg-[var(--bg-base)]">
+                    <div
+                      className="h-full bg-[var(--accent)]"
+                      style={{ width: `${row.pct}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex items-baseline justify-between border-t border-[var(--line-default)] pt-4">
+              <span className="kicker">Overall mastery</span>
+              <span className="font-mono text-[28px] tabular-nums leading-none">62%</span>
+            </div>
+          </div>
+        </Reveal>
       </div>
-    </section>
+    </SectionShell>
   );
 }
 
-const PRICING = [
-  {
-    name: "Free",
-    price: "$0",
-    cadence: "forever",
-    highlight: false,
-    cta: "Start free",
-    href: "/signup",
-    features: [
-      "5 documents per month",
-      "Adaptive sessions",
-      "Spaced review",
-      "Concept dashboard",
-    ],
-  },
-  {
-    name: "Pro",
-    price: "$8",
-    cadence: "per month",
-    highlight: true,
-    cta: "Upgrade later",
-    href: "/signup",
-    features: [
-      "Unlimited documents",
-      "Free response with AI eval",
-      "Advanced concept tagging",
-      "Priority extraction queue",
-      "Export sessions",
-    ],
-  },
+/* ------------------------------------------------------------------ */
+/* 06 — Pricing                                                        */
+/* ------------------------------------------------------------------ */
+
+const FREE_FEATURES = [
+  "3 documents",
+  "2 quiz sessions per day",
+  "Concept extraction + mastery tracking",
+  "Daily review queue",
+];
+
+const PRO_FEATURES = [
+  "Unlimited documents",
+  "Unlimited quiz sessions",
+  "Free-text answers with AI grading",
+  "Priority question generation",
+  "Early access to new question types",
 ];
 
 function Pricing() {
   return (
-    <section
-      id="pricing"
-      className="border-t border-[var(--line-subtle)] py-24 sm:py-28 px-6"
-    >
-      <div className="max-w-[1280px] mx-auto">
-        <SectionHead
-          eyebrow="Pricing"
-          title="Free to start."
-          accent="Pro when you're serious."
-        />
-        <div className="grid sm:grid-cols-2 gap-4 mt-12 max-w-[840px]">
-          {PRICING.map((p) => (
-            <div
-              key={p.name}
-              className={cn(
-                "rounded-md border p-7 flex flex-col gap-5",
-                p.highlight
-                  ? "border-[var(--accent-line)] bg-[var(--accent-fade)]"
-                  : "border-[var(--line-subtle)] bg-[var(--bg-base)]",
-              )}
-            >
-              <div className="flex items-baseline justify-between">
-                <h3 className="text-[18px] font-medium text-[var(--fg-primary)]">
-                  {p.name}
-                </h3>
-                {p.highlight && <Badge variant="accent">Recommended</Badge>}
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="font-mono text-[40px] tabular-nums tracking-[-0.03em] text-[var(--fg-primary)]">
-                  {p.price}
-                </span>
-                <span className="text-[13px] text-[var(--fg-tertiary)]">
-                  {p.cadence}
-                </span>
-              </div>
-              <ul className="space-y-2.5">
-                {p.features.map((f) => (
-                  <li
-                    key={f}
-                    className="flex items-start gap-2 text-[13px] text-[var(--fg-secondary)]"
-                  >
-                    <Check className="h-3.5 w-3.5 mt-0.5 text-[var(--accent)] shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Button
-                asChild
-                variant={p.highlight ? "default" : "secondary"}
-                size="lg"
-                block
-              >
-                <Link href={p.href}>{p.cta}</Link>
-              </Button>
+    <SectionShell id="pricing" kicker="06 / Pricing">
+      <Reveal>
+        <DisplayHeading>Free to start. $8 when it sticks.</DisplayHeading>
+      </Reveal>
+      <div className="mt-12 grid gap-6 md:grid-cols-2 max-w-[880px]">
+        <Reveal>
+          <div className="border border-[var(--line-subtle)] bg-[var(--bg-base)] p-6 sm:p-8 h-full flex flex-col">
+            <p className="kicker">Free</p>
+            <p className="mt-4 font-mono text-[44px] tabular-nums leading-none">
+              $0
+              <span className="text-[14px] text-[var(--fg-tertiary)]"> /forever</span>
+            </p>
+            <p className="mt-3 text-[13px] text-[var(--fg-secondary)]">
+              Everything you need to find out it works.
+            </p>
+            <ul className="mt-6 space-y-2.5 text-[14px] text-[var(--fg-secondary)] flex-1 list-none p-0">
+              {FREE_FEATURES.map((f) => (
+                <li key={f} className="flex items-start gap-2.5">
+                  <span className="font-mono text-[var(--fg-disabled)]">—</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <Button variant="outline" block className="mt-8" asChild>
+              <Link href="/signup">Start free</Link>
+            </Button>
+          </div>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <div className="relative border-2 border-[var(--ink)] bg-[var(--bg-base)] p-6 sm:p-8 h-full flex flex-col">
+            <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]" />
+            <div className="flex items-center justify-between">
+              <p className="kicker">Pro</p>
+              <span className="font-mono text-[10px] uppercase tracking-[0.1em] border border-[var(--accent)] text-[var(--accent-text)] px-1.5 py-px">
+                Recommended
+              </span>
             </div>
-          ))}
-        </div>
+            <p className="mt-4 font-mono text-[44px] tabular-nums leading-none">
+              $8
+              <span className="text-[14px] text-[var(--fg-tertiary)]"> /month</span>
+            </p>
+            <p className="mt-3 text-[13px] text-[var(--fg-secondary)]">
+              For exam season, certification grinds, and people with more than three PDFs.
+            </p>
+            <ul className="mt-6 space-y-2.5 text-[14px] text-[var(--fg-secondary)] flex-1 list-none p-0">
+              {PRO_FEATURES.map((f) => (
+                <li key={f} className="flex items-start gap-2.5">
+                  <Check className="h-4 w-4 mt-0.5 shrink-0 text-[var(--accent-text)]" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <Button block className="mt-8" asChild>
+              <Link href="/signup">Go Pro</Link>
+            </Button>
+          </div>
+        </Reveal>
       </div>
-    </section>
+    </SectionShell>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* 07 — FAQ                                                            */
+/* ------------------------------------------------------------------ */
+
 const FAQS = [
   {
-    q: "How long does extraction take?",
-    a: "Most documents under 50 pages are ready in 30-60 seconds. Larger docs queue and process in parallel.",
+    q: "What file types can I upload?",
+    a: "PDF and PPTX today. Documents are chunked and indexed on upload; most are ready to quiz in under a minute. EPUB and DOCX are on the roadmap.",
   },
   {
-    q: "What file types do you support?",
-    a: "PDF and PowerPoint (.pptx) today. Markdown and EPUB are on the roadmap.",
+    q: "How are questions generated?",
+    a: "Questions are generated live by an LLM against the actual passages of your document — retrieved by semantic search, never from the model's general knowledge alone. That keeps questions specific to what you uploaded, including your professor's exact framing.",
+  },
+  {
+    q: "How does the AI grade free-text answers?",
+    a: "Your answer is compared against the source passage and an ideal answer. You get a verdict plus an explanation of what was missing or wrong — not just a score. Multiple choice and true/false are graded instantly.",
   },
   {
     q: "Is my data private?",
-    a: "Yes. Documents are encrypted at rest. We don't train on your content. You can delete a document and all derived sessions at any time.",
+    a: "Your documents are stored in your account and used only to generate your questions. They're never shared with other users or used to train models. Delete a document and its content, chunks, and index entries are removed.",
   },
   {
-    q: "Can I export my sessions?",
-    a: "Pro users can export sessions and per-concept mastery data as CSV or JSON.",
+    q: "What happens when I get something wrong?",
+    a: "The concept's mastery score drops, the adaptive selector starts targeting it, and its review date moves closer. Wrong answers are the most useful signal in the system — they decide what you see next.",
+  },
+  {
+    q: "Can I cancel Pro anytime?",
+    a: "Yes. Cancel in settings and you keep Pro until the end of the billing period, then drop to the free tier. Your documents and mastery history stay intact.",
   },
 ];
 
 function Faq() {
   return (
-    <section
-      id="faq"
-      className="border-t border-[var(--line-subtle)] py-24 sm:py-28 px-6"
-    >
-      <div className="max-w-[1280px] mx-auto">
-        <SectionHead eyebrow="FAQ" title="Common questions." />
-        <div className="mt-12 max-w-[720px]">
-          {FAQS.map((f) => (
-            <FaqItem key={f.q} q={f.q} a={f.a} />
-          ))}
-        </div>
+    <SectionShell id="faq" kicker="07 / FAQ">
+      <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr] lg:gap-16">
+        <Reveal>
+          <DisplayHeading>Questions, answered.</DisplayHeading>
+        </Reveal>
+        <Reveal delay={0.05}>
+          <Accordion type="single" collapsible className="border-t border-[var(--line-subtle)]">
+            {FAQS.map((f, i) => (
+              <AccordionItem
+                key={f.q}
+                value={`item-${i}`}
+                className="border-b border-[var(--line-subtle)]"
+              >
+                <AccordionTrigger className="py-4 text-left text-[14px] font-medium hover:no-underline">
+                  <span className="flex items-baseline gap-3">
+                    <span className="font-mono text-[11px] text-[var(--fg-disabled)]">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    {f.q}
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent className="pb-5 text-[14px] leading-[1.65] text-[var(--fg-secondary)]">
+                  {f.a}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </Reveal>
       </div>
-    </section>
+    </SectionShell>
   );
 }
 
-function FaqItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="border-b border-[var(--line-subtle)]">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-3 py-4 text-left transition-colors hover:text-[var(--fg-primary)]"
-      >
-        <span className="text-[15px] font-medium text-[var(--fg-primary)]">{q}</span>
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 text-[var(--fg-tertiary)] transition-transform shrink-0",
-            open && "rotate-180",
-          )}
-        />
-      </button>
-      {open && (
-        <p className="pb-5 text-[14px] leading-[1.65] text-[var(--fg-secondary)] anim-step-in">
-          {a}
-        </p>
-      )}
-    </div>
-  );
-}
+/* ------------------------------------------------------------------ */
+/* 08 — Final CTA + Footer                                             */
+/* ------------------------------------------------------------------ */
 
-function FinalCTA() {
+function FinalCta() {
   return (
-    <section className="border-t border-[var(--line-subtle)] py-24 sm:py-32 px-6">
-      <div className="max-w-[820px] mx-auto text-center">
-        <h2 className="text-[36px] sm:text-[44px] font-medium tracking-[-0.028em] leading-[1.12] text-balance">
-          Stop reading.{" "}
-          <em className="not-italic font-normal text-[var(--fg-tertiary)]">
-            Start retrieving.
-          </em>
-        </h2>
-        <p className="mt-4 text-[15px] text-[var(--fg-secondary)] max-w-[480px] mx-auto">
-          Free forever. No credit card. Drop your first document in 30 seconds.
-        </p>
-        <Button
-          asChild
-          className="mt-8 !bg-[var(--fg-primary)] !text-[var(--bg-base)] hover:!bg-[var(--fg-secondary)] !h-12 !px-6 !text-[14px]"
-        >
-          <Link href="/signup">
-            Start free
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </Button>
+    <SectionShell kicker="08 / Start">
+      <div aria-hidden className="pointer-events-none absolute right-[4%] top-1/2 hidden -translate-y-1/2 opacity-[0.08] lg:block">
+        <LogoGlyph size={320} />
       </div>
-    </section>
-  );
-}
-
-function SectionHead({
-  eyebrow,
-  title,
-  accent,
-}: {
-  eyebrow: string;
-  title: string;
-  accent?: string;
-}) {
-  return (
-    <div className="flex items-baseline justify-between flex-wrap gap-4">
-      <div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--fg-tertiary)] mb-3">
-          {eyebrow}
-        </p>
-        <h2 className="text-[32px] sm:text-[36px] font-medium tracking-[-0.028em] leading-[1.18] text-balance max-w-[720px]">
-          {title}{" "}
-          {accent && (
-            <em className="not-italic font-normal text-[var(--fg-tertiary)]">
-              {accent}
-            </em>
-          )}
-        </h2>
+      <div className="relative py-6 sm:py-10">
+        <Reveal>
+          <h2 className="font-display font-bold uppercase tracking-[-0.02em] leading-[0.98] text-[clamp(36px,6.5vw,72px)] max-w-[16ch]">
+            The next thing you read, keep.
+          </h2>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <div className="mt-8 flex flex-wrap items-center gap-4">
+            <Button size="xl" asChild>
+              <Link href="/signup">
+                Start free
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+            <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
+              No credit card · First quiz in 2 minutes
+            </span>
+          </div>
+        </Reveal>
       </div>
-    </div>
+    </SectionShell>
   );
 }
 
 function Footer() {
   return (
-    <footer className="border-t border-[var(--line-subtle)] px-6 py-12">
-      <div className="max-w-[1280px] mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-        <div className="flex items-center gap-2.5">
-          <BrandMark />
-          <span className="font-mono text-[12.5px] tracking-[0.04em] font-medium">
-            AUTOCOACH
-          </span>
+    <footer className="relative border-t border-[var(--line-subtle)] bg-[var(--bg-base)]">
+      <div className="mx-auto max-w-[1120px] px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <BrandMark size={22} />
+              <span className="font-display font-semibold uppercase tracking-[-0.01em]">
+                AutoCoach
+              </span>
+            </div>
+            <p className="mt-3 max-w-[40ch] text-[12px] leading-[1.6] text-[var(--fg-tertiary)]">
+              Adaptive quizzes from your own documents. Read once, remember for good.
+            </p>
+          </div>
+          <SignatureMotif width={110} className="hidden sm:block opacity-70" />
         </div>
-        <div className="flex items-center gap-3 text-[var(--fg-tertiary)]">
-          <a
-            href="#"
-            aria-label="Twitter"
-            className="hover:text-[var(--fg-primary)] transition-colors"
-          >
-            <Twitter className="h-3.5 w-3.5" />
-          </a>
-          <a
-            href="#"
-            aria-label="LinkedIn"
-            className="hover:text-[var(--fg-primary)] transition-colors"
-          >
-            <Linkedin className="h-3.5 w-3.5" />
-          </a>
-          <a
-            href="#"
-            aria-label="GitHub"
-            className="hover:text-[var(--fg-primary)] transition-colors"
-          >
-            <Github className="h-3.5 w-3.5" />
-          </a>
+        <div className="mt-8 flex flex-col gap-4 border-t border-[var(--line-subtle)] pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <nav className="flex flex-wrap gap-x-5 gap-y-2">
+            {NAV_LINKS.map((l) => (
+              <a
+                key={l.href}
+                href={l.href}
+                className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] transition-colors"
+              >
+                {l.label}
+              </a>
+            ))}
+          </nav>
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--fg-disabled)]">
+            © 2026 AutoCoach
+          </p>
         </div>
-        <p className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)]">
-          © 2026 AutoCoach
-        </p>
       </div>
     </footer>
   );

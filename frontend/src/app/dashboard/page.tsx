@@ -76,8 +76,9 @@ function DashboardContent() {
         <Section className="mt-2">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
             <div>
+              <p className="kicker mb-2">01 / DASHBOARD</p>
               <LivePill>Welcome back</LivePill>
-              <h1 className="mt-3 text-[36px] sm:text-[44px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+              <h1 className="mt-3 font-display uppercase text-[36px] sm:text-[44px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
                 Ready to learn?
               </h1>
               <p className="mt-2 text-[15px] text-[var(--fg-secondary)] max-w-[520px]">
@@ -97,14 +98,15 @@ function DashboardContent() {
 
         {/* Stats */}
         <Section>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <StatCell label="Documents" value={totalDocuments} />
-            <StatCell label="Ready" value={readyDocuments} />
-            <StatCell label="Concepts practiced" value={sessionsTotal} />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-px border border-[var(--line-subtle)] bg-[var(--line-subtle)]">
+            <StatCell label="Documents" value={totalDocuments} className="border-0" />
+            <StatCell label="Ready" value={readyDocuments} className="border-0" />
+            <StatCell label="Concepts practiced" value={sessionsTotal} className="border-0" />
             <StatCell
               label="Avg mastery"
               value={Math.round(avgMastery)}
               unit="%"
+              className="border-0"
             />
           </div>
         </Section>
@@ -112,9 +114,7 @@ function DashboardContent() {
         {/* Continue learning */}
         {recentDocument && (
           <Section>
-            <h2 className="mb-3 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
-              Continue learning
-            </h2>
+            <h2 className="kicker mb-3">Continue learning</h2>
             <div className="flex items-center justify-between gap-4 p-4 rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)]">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="grid place-items-center h-10 w-10 rounded-md bg-[var(--bg-elev)] border border-[var(--line-default)] shrink-0">
@@ -144,18 +144,14 @@ function DashboardContent() {
 
         {/* Smart review */}
         <Section>
-          <h2 className="mb-3 font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
-            Smart review
-          </h2>
+          <h2 className="kicker mb-3">Smart review</h2>
           <SmartReviewCard />
         </Section>
 
         {/* Documents grid */}
         <Section>
           <div className="flex items-baseline justify-between mb-3">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
-              Your documents
-            </h2>
+            <h2 className="kicker">Your documents</h2>
             <span className="font-mono text-[11px] tabular-nums text-[var(--fg-tertiary)]">
               {documents.length}
             </span>
@@ -168,7 +164,7 @@ function DashboardContent() {
               ))}
             </div>
           ) : error ? (
-            <div className="p-5 rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[13px] text-[var(--danger)]">
+            <div className="p-5 border border-[var(--danger)] bg-transparent font-mono text-[12px] uppercase tracking-[0.04em] text-[var(--danger)]">
               {`Failed to load documents: ${error}`}
             </div>
           ) : (
@@ -247,11 +243,16 @@ function DocCard({
             <div className="flex items-baseline justify-between mb-1.5">
               <MilestoneBadge level={milestoneFromMastery(mastery)} mastery={mastery} />
             </div>
-            <div className="h-1 rounded-full bg-[var(--bg-elev)] overflow-hidden">
-              <div
-                className="h-full bg-[var(--accent)] rounded-full transition-[width] duration-[240ms]"
-                style={{ width: `${mastery}%` }}
-              />
+            <div className="flex items-center gap-2">
+              <div className="h-[8px] flex-1 border border-[var(--ink)] bg-transparent overflow-hidden">
+                <div
+                  className="h-full bg-[var(--accent)] transition-[width] duration-[240ms]"
+                  style={{ width: `${mastery}%` }}
+                />
+              </div>
+              <span className="font-mono text-[11px] tabular-nums text-[var(--fg-secondary)]">
+                {Math.round(mastery)}%
+              </span>
             </div>
           </div>
         ) : (

@@ -17,9 +17,8 @@ export function KeyboardHints({
     <div
       className={cn(
         "fixed bottom-4 left-1/2 -translate-x-1/2 z-30 hidden md:flex",
-        "items-center gap-4 px-4 py-2 rounded-full",
-        "border border-[var(--line-default)] bg-[var(--bg-overlay)]/85 backdrop-blur",
-        "shadow-[0_4px_12px_rgba(0,0,0,0.3)]",
+        "items-center gap-4 px-4 py-2 rounded-none",
+        "border border-[var(--line-default)] bg-[var(--bg-base)]",
         className,
       )}
     >

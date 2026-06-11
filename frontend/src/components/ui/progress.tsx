@@ -22,7 +22,7 @@ const Progress = React.forwardRef<
         "relative w-full overflow-hidden",
         isHairline
           ? "h-px bg-[var(--line-subtle)]"
-          : "h-1 rounded-full bg-[var(--bg-elev)]",
+          : "h-[8px] rounded-none border border-[var(--ink)] bg-[var(--bg-base)]",
         className,
       )}
       {...props}
@@ -31,7 +31,6 @@ const Progress = React.forwardRef<
         className={cn(
           "h-full w-full flex-1 bg-[var(--accent)] transition-[transform] duration-[240ms]",
           "[transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
-          isHairline ? "" : "rounded-full",
           indicatorClassName,
         )}
         style={{ transform: `translateX(-${100 - (value || 0)}%)` }}

@@ -111,7 +111,8 @@ export default function UploadPage() {
     <AppShell title="Upload" eyebrow="Workspace" showBack backHref="/dashboard">
       <PageContainer size="md">
         <Section className="mt-2">
-          <h1 className="text-[36px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+          <p className="kicker mb-2">03 / UPLOAD</p>
+          <h1 className="font-display uppercase text-[36px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
             What do you want to study?
           </h1>
           <p className="mt-2 text-[15px] text-[var(--fg-secondary)]">
@@ -126,13 +127,13 @@ export default function UploadPage() {
             onDrop={onDrop}
             onClick={() => !pickedFile && inputRef.current?.click()}
             className={cn(
-              "relative isolate min-h-[420px] rounded-md p-8",
+              "relative isolate min-h-[420px] p-8",
               "border bg-[var(--bg-base)]",
-              "transition-[border-color,background-color,transform] duration-[240ms]",
+              "transition-[border-color,background-color] duration-[240ms]",
               !pickedFile && "cursor-pointer",
               isDragging
-                ? "border-[var(--accent)] bg-[var(--accent-fade)] scale-[1.005]"
-                : "border-dashed border-[var(--line-default)] hover:border-[var(--line-strong)]",
+                ? "border-[var(--accent)] bg-[var(--accent-fade)]"
+                : "border-dashed border-[var(--ink)]",
             )}
           >
             <CornerCrosshair corner="tl" />
@@ -153,7 +154,7 @@ export default function UploadPage() {
                 <>
                   <div
                     className={cn(
-                      "grid place-items-center h-16 w-16 rounded-full mb-5",
+                      "grid place-items-center h-16 w-16 mb-5",
                       "border bg-[var(--bg-elev)]",
                       isDragging
                         ? "border-[var(--accent)] text-[var(--accent)]"
@@ -167,7 +168,7 @@ export default function UploadPage() {
                   </h3>
                   <p className="text-[13px] text-[var(--fg-tertiary)]">
                     or{" "}
-                    <span className="text-[var(--accent)]">click to browse</span>
+                    <span className="text-[var(--accent-text)]">click to browse</span>
                   </p>
                   <p className="mt-6 inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)]">
                     <FileText className="h-3 w-3" />
@@ -188,13 +189,16 @@ export default function UploadPage() {
 
               {pickedFile && isReady && (
                 <>
-                  <div className="grid place-items-center h-16 w-16 rounded-full mb-5 border border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--success)_10%,var(--bg-elev))]">
-                    <CheckCircle2 className="h-7 w-7 text-[var(--success)]" />
+                  <div className="grid place-items-center h-16 w-16 mb-5 border border-[var(--ink)] bg-[var(--bg-elev)]">
+                    <CheckCircle2 className="h-7 w-7 text-[var(--accent-text)]" />
                   </div>
                   <h3 className="text-[18px] font-medium text-[var(--fg-primary)] mb-1.5">
                     {pickedFile.name}
                   </h3>
-                  <p className="text-[13px] text-[var(--success)] font-medium">Ready</p>
+                  <p className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--accent-text)]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" aria-hidden />
+                    Ready
+                  </p>
                   <p className="mt-2 text-[12px] text-[var(--fg-tertiary)]">
                     Redirecting to your document…
                   </p>
@@ -203,13 +207,14 @@ export default function UploadPage() {
 
               {pickedFile && isFailed && (
                 <>
-                  <div className="grid place-items-center h-16 w-16 rounded-full mb-5 border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_10%,var(--bg-elev))]">
+                  <div className="grid place-items-center h-16 w-16 mb-5 border border-[var(--danger)] bg-[var(--bg-elev)]">
                     <AlertTriangle className="h-7 w-7 text-[var(--danger)]" />
                   </div>
                   <h3 className="text-[18px] font-medium text-[var(--fg-primary)] mb-1.5">
                     {pickedFile.name}
                   </h3>
-                  <p className="text-[13px] text-[var(--danger)] font-medium mb-1">
+                  <p className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--danger)] mb-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--danger)]" aria-hidden />
                     {uploadError ?? document?.error_message ?? "Processing failed"}
                   </p>
                   {document?.error_message && (
@@ -299,8 +304,8 @@ function ProcessingOrb({
       <p className="font-mono text-[11px] tabular-nums text-[var(--fg-tertiary)] mb-4">
         {(bytes / 1024 / 1024).toFixed(2)} MB
       </p>
-      <p className="text-[13px] text-[var(--fg-secondary)] mb-3">{message}…</p>
-      <div className="w-60 h-px bg-[var(--line-subtle)] overflow-hidden">
+      <p className="font-mono text-[11px] uppercase tracking-[0.06em] text-[var(--fg-secondary)] mb-3">{message}…</p>
+      <div className="w-60 h-[8px] border border-[var(--ink)] bg-transparent overflow-hidden">
         <div
           className="h-full bg-[var(--accent)] transition-[width] duration-[240ms]"
           style={{ width: `${Math.min(100, pct)}%` }}

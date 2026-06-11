@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { BrandMark } from "@/components/primitives-acx/BrandMark";
-import { ThemeToggle } from "@/components/primitives-acx/ThemeToggle";
 import { ToastProvider } from "@/components/ui/Toast";
 import { analytics } from "@/lib/analytics";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -89,15 +88,20 @@ export default function OnboardingPage() {
         <header className="flex items-center h-14 px-6 border-b border-[var(--line-subtle)]">
           <div className="flex items-center gap-2">
             <BrandMark />
-            <span className="font-semibold tracking-[-0.01em] text-[var(--fg-primary)]">
+            <span className="font-display uppercase font-semibold tracking-[-0.01em] text-[var(--fg-primary)]">
               AutoCoach
             </span>
           </div>
-          <div className="ml-auto flex items-center gap-3">
-            <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
-              Step {step} / 3
+          <div className="ml-auto flex items-center gap-4">
+            <span className={cn("kicker", step === 1 ? "text-[var(--ink)]" : "text-[var(--fg-tertiary)]")}>
+              01 / GOAL
             </span>
-            <ThemeToggle />
+            <span className={cn("kicker", step === 2 ? "text-[var(--ink)]" : "text-[var(--fg-tertiary)]")}>
+              02 / LEVEL
+            </span>
+            <span className={cn("kicker", step === 3 ? "text-[var(--ink)]" : "text-[var(--fg-tertiary)]")}>
+              03 / CADENCE
+            </span>
           </div>
         </header>
 
@@ -118,10 +122,10 @@ export default function OnboardingPage() {
               {step === 1 && (
                 <section className="space-y-6">
                   <header>
-                    <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
-                      01 — Goal
+                    <span className="kicker">
+                      01 / GOAL
                     </span>
-                    <h1 className="mt-2 text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+                    <h1 className="mt-2 font-display uppercase text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
                       What do you want to learn?
                     </h1>
                     <p className="mt-2 text-[15px] text-[var(--fg-secondary)]">
@@ -158,10 +162,10 @@ export default function OnboardingPage() {
               {step === 2 && (
                 <section className="space-y-6">
                   <header>
-                    <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
-                      02 — Level
+                    <span className="kicker">
+                      02 / LEVEL
                     </span>
-                    <h1 className="mt-2 text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+                    <h1 className="mt-2 font-display uppercase text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
                       What&apos;s your current level?
                     </h1>
                     <p className="mt-2 text-[15px] text-[var(--fg-secondary)]">
@@ -177,19 +181,17 @@ export default function OnboardingPage() {
                           type="button"
                           onClick={() => setLevel(opt.id)}
                           className={cn(
-                            "text-left p-4 rounded-md border bg-[var(--bg-base)]",
+                            "relative text-left p-4 bg-[var(--bg-base)]",
                             "transition-[border-color,background-color] duration-[180ms]",
                             active
-                              ? "border-[var(--accent)] bg-[var(--accent-fade)]"
-                              : "border-[var(--line-default)] hover:border-[var(--line-strong)] hover:bg-[var(--bg-elev)]",
+                              ? "border-2 border-[var(--ink)]"
+                              : "border border-[var(--line-default)] hover:border-[var(--line-strong)] hover:bg-[var(--bg-surface)]",
                           )}
                         >
-                          <span
-                            className={cn(
-                              "block font-medium text-[14px]",
-                              active ? "text-[var(--accent)]" : "text-[var(--fg-primary)]",
-                            )}
-                          >
+                          {active && (
+                            <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]" />
+                          )}
+                          <span className="block font-medium text-[14px] text-[var(--ink)]">
                             {opt.label}
                           </span>
                           <span className="block text-[13px] text-[var(--fg-secondary)] mt-0.5">
@@ -205,10 +207,10 @@ export default function OnboardingPage() {
               {step === 3 && (
                 <section className="space-y-6">
                   <header>
-                    <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
-                      03 — Cadence
+                    <span className="kicker">
+                      03 / CADENCE
                     </span>
-                    <h1 className="mt-2 text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+                    <h1 className="mt-2 font-display uppercase text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
                       How much time per day?
                     </h1>
                     <p className="mt-2 text-[15px] text-[var(--fg-secondary)]">
@@ -224,20 +226,18 @@ export default function OnboardingPage() {
                           type="button"
                           onClick={() => setMinutes(opt.id as 15 | 30 | 60)}
                           className={cn(
-                            "flex items-center justify-between p-4 rounded-md border bg-[var(--bg-base)]",
+                            "relative flex items-center justify-between p-4 bg-[var(--bg-base)]",
                             "transition-[border-color,background-color] duration-[180ms]",
                             active
-                              ? "border-[var(--accent)] bg-[var(--accent-fade)]"
-                              : "border-[var(--line-default)] hover:border-[var(--line-strong)] hover:bg-[var(--bg-elev)]",
+                              ? "border-2 border-[var(--ink)]"
+                              : "border border-[var(--line-default)] hover:border-[var(--line-strong)] hover:bg-[var(--bg-surface)]",
                           )}
                         >
+                          {active && (
+                            <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]" />
+                          )}
                           <div className="text-left">
-                            <span
-                              className={cn(
-                                "block font-medium text-[14px]",
-                                active ? "text-[var(--accent)]" : "text-[var(--fg-primary)]",
-                              )}
-                            >
+                            <span className="block font-medium text-[14px] text-[var(--ink)]">
                               {opt.label} / day
                             </span>
                             <span className="block text-[13px] text-[var(--fg-secondary)] mt-0.5">

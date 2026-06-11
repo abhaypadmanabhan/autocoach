@@ -1,6 +1,6 @@
 export { HudPill } from "./HudPill";
 export { HudAvatar } from "./HudAvatar";
-export { BrandMark } from "./BrandMark";
+export { BrandMark, LogoGlyph, SignatureMotif } from "./BrandMark";
 export { MilestoneBadge } from "./MilestoneBadge";
 export { ImportanceDots } from "./ImportanceDots";
 export { CoreBadge } from "./CoreBadge";
@@ -14,4 +14,3 @@ export { CornerCrosshair, CornerCrosshairFrame } from "./CornerCrosshair";
 export { ScoreGauge } from "./ScoreGauge";
 export { Confetti } from "./Confetti";
 export { KeyboardHints, type KeyboardHint } from "./KeyboardHints";
-export { ThemeToggle } from "./ThemeToggle";

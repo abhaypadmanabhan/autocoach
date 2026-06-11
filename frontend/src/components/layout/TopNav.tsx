@@ -9,7 +9,6 @@ import { useUserStats } from "@/hooks/useDailySprint";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { HudPill } from "@/components/primitives-acx/HudPill";
-import { ThemeToggle } from "@/components/primitives-acx/ThemeToggle";
 import { AppSidebar } from "./AppSidebar";
 
 interface TopNavProps {
@@ -47,7 +46,7 @@ export function TopNav({
     <header
       className={cn(
         "sticky top-0 z-20 flex items-center justify-between h-14 px-4 sm:px-6",
-        "border-b border-[var(--line-subtle)] bg-[var(--bg-base)]/85 backdrop-blur",
+        "border-b border-[var(--line-subtle)] bg-[var(--bg-base)]",
         className,
       )}
     >
@@ -123,7 +122,6 @@ export function TopNav({
           </>
         )}
         {rightContent}
-        <ThemeToggle />
       </div>
     </header>
   );

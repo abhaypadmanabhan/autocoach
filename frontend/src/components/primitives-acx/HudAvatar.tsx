@@ -19,13 +19,13 @@ export function HudAvatar({
       type="button"
       style={{ width: size, height: size }}
       className={cn(
-        "rounded-full grid place-items-center",
-        "bg-[linear-gradient(135deg,oklch(0.55_0.10_263),oklch(0.45_0.06_263))]",
-        "border border-[var(--line-default)]",
-        "font-mono text-[11px] text-white",
-        "transition-[border-color] duration-[180ms]",
-        "hover:border-[var(--line-strong)]",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]",
+        "rounded-none grid place-items-center",
+        "bg-[var(--bg-elev)]",
+        "border border-[var(--ink)]",
+        "font-mono text-[11px] text-[var(--fg-primary)]",
+        "transition-[border-color,background-color] duration-[120ms]",
+        "hover:bg-[var(--bg-surface)]",
+        "focus-visible:outline-none focus-visible:border-[var(--accent)]",
         className,
       )}
       {...props}

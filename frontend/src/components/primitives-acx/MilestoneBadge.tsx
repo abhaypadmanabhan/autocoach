@@ -16,11 +16,9 @@ interface MilestoneBadgeProps {
 
 const levelColor: Record<MilestoneLevel, string> = {
   apprentice: "border-[var(--line-default)] text-[var(--fg-secondary)]",
-  scholar: "border-[var(--accent-line)] text-[var(--accent)]",
-  expert:
-    "border-[color-mix(in_oklab,var(--warning)_30%,var(--line-default))] text-[var(--warning)]",
-  master:
-    "border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] text-[var(--success)]",
+  scholar: "border-[var(--accent)] text-[var(--accent-text)]",
+  expert: "border-[var(--line-strong)] text-[var(--fg-primary)]",
+  master: "border-[var(--accent)] text-[var(--accent-text)]",
 };
 
 export function MilestoneBadge({
@@ -34,7 +32,7 @@ export function MilestoneBadge({
     <span
       className={cn(
         "inline-flex items-center gap-2",
-        "h-[22px] px-2.5 rounded-full border bg-[var(--bg-elev)]",
+        "h-[22px] px-2.5 rounded-none border bg-transparent",
         "font-mono text-[11px] uppercase tracking-[0.12em]",
         levelColor[resolvedLevel],
         className,

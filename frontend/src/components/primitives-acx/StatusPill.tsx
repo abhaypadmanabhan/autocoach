@@ -2,24 +2,25 @@ import { cn } from "@/lib/utils";
 
 type Variant = "ready" | "processing" | "failed" | "pending";
 
-const variantStyles: Record<Variant, { color: string; label: string }> = {
+const variantStyles: Record<Variant, { color: string; dot: string; label: string }> = {
   ready: {
-    color:
-      "border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--success)_8%,var(--bg-elev))] text-[var(--success)]",
+    color: "text-[var(--accent-text)]",
+    dot: "bg-[var(--accent)]",
     label: "Ready",
   },
   processing: {
-    color:
-      "border-[color-mix(in_oklab,var(--warning)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--warning)_8%,var(--bg-elev))] text-[var(--warning)]",
+    color: "text-[var(--fg-secondary)]",
+    dot: "bg-[var(--fg-secondary)]",
     label: "Processing",
   },
   failed: {
-    color:
-      "border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[var(--danger)]",
+    color: "text-[var(--danger)]",
+    dot: "bg-[var(--danger)]",
     label: "Failed",
   },
   pending: {
-    color: "border-[var(--line-default)] bg-[var(--bg-elev)] text-[var(--fg-secondary)]",
+    color: "text-[var(--fg-tertiary)]",
+    dot: "bg-[var(--fg-tertiary)]",
     label: "Pending",
   },
 };
@@ -37,13 +38,13 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 h-[22px] px-2.5 rounded-full border",
+        "inline-flex items-center gap-1.5",
         "font-mono text-[11px] uppercase tracking-[0.06em]",
         v.color,
         className,
       )}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
+      <span className={cn("h-1.5 w-1.5 rounded-full", v.dot)} aria-hidden />
       {label ?? v.label}
     </span>
   );

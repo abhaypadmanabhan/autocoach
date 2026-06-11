@@ -32,9 +32,9 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       "inline-flex items-baseline gap-2 whitespace-nowrap pb-[10px] -mb-px",
-      "border-b border-transparent",
-      "text-[13px] font-medium text-[var(--fg-tertiary)]",
-      "transition-[color,border-color] duration-[180ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+      "border-b-2 border-transparent",
+      "font-mono text-[12px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)]",
+      "transition-[color,border-color] duration-[120ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)]",
       "hover:text-[var(--fg-secondary)]",
       "data-[state=active]:text-[var(--fg-primary)] data-[state=active]:border-[var(--accent)]",
       "focus-visible:outline-none",

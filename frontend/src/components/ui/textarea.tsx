@@ -9,7 +9,7 @@ const Textarea = React.forwardRef<
   return (
     <textarea
       className={cn(
-        "flex min-h-24 w-full rounded-md border border-[var(--line-default)] bg-[var(--bg-base)] px-3 py-[10px] text-[14px] leading-[1.55]",
+        "flex min-h-24 w-full rounded-none border-2 border-[var(--ink)] bg-[var(--bg-base)] px-3 py-[10px] text-[14px] leading-[1.55]",
         "text-[var(--fg-primary)] placeholder:text-[var(--fg-tertiary)]",
         "font-sans resize-y",
         "transition-[border-color] duration-[180ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",

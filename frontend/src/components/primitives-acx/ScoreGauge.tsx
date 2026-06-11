@@ -46,7 +46,7 @@ export function ScoreGauge({
               y={baseY - 60 - targetH}
               width={Math.max(2, barWidth - 4)}
               height={targetH}
-              rx={2}
+              rx={0}
               className={cn(
                 "anim-bar-rise origin-bottom",
                 isCorrect ? "fill-[var(--accent)]" : "fill-[var(--line-default)]",

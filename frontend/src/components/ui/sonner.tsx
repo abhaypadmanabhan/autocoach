@@ -1,27 +1,26 @@
 "use client";
 
-import { useTheme } from "next-themes";
 import { Toaster as Sonner } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { resolvedTheme } = useTheme();
   return (
     <Sonner
-      theme={(resolvedTheme as ToasterProps["theme"]) ?? "dark"}
+      theme="light"
       position="bottom-center"
       className="toaster group"
       toastOptions={{
         classNames: {
           toast:
-            "group toast border border-[var(--line-default)] bg-[var(--bg-overlay)] text-[var(--fg-primary)] text-[13px] rounded-md shadow-[0_10px_32px_rgba(0,0,0,0.4)]",
-          description: "text-[var(--fg-secondary)]",
+            "group toast border border-[var(--ink)] bg-[var(--bg-base)] text-[var(--fg-primary)] text-[13px] rounded-none",
+          title: "font-mono text-[12px] uppercase tracking-[0.06em]",
+          description: "text-[var(--fg-secondary)] font-sans normal-case tracking-normal",
           actionButton:
-            "bg-[var(--accent)] text-white",
+            "bg-[var(--accent)] text-[var(--ink)] rounded-none border border-[var(--ink)]",
           cancelButton:
-            "bg-[var(--bg-elev)] text-[var(--fg-secondary)]",
-          success: "[&_[data-icon]]:text-[var(--success)]",
+            "bg-[var(--bg-elev)] text-[var(--fg-secondary)] rounded-none",
+          success: "[&_[data-icon]]:text-[var(--accent)]",
           error: "[&_[data-icon]]:text-[var(--danger)]",
         },
       }}

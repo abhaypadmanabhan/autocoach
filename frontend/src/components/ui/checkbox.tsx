@@ -19,7 +19,7 @@ const Checkbox = React.forwardRef<
       "hover:border-[var(--line-strong)]",
       "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]",
       "disabled:cursor-not-allowed disabled:opacity-50",
-      "data-[state=checked]:bg-[var(--accent)] data-[state=checked]:border-[var(--accent)] data-[state=checked]:text-white",
+      "data-[state=checked]:bg-[var(--accent)] data-[state=checked]:border-[var(--accent)] data-[state=checked]:text-[var(--bg-base)]",
       className,
     )}
     {...props}

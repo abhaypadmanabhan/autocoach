@@ -95,10 +95,10 @@ export default function SignupPage() {
   if (success) {
     return (
       <div className="text-center py-4">
-        <div className="mx-auto h-14 w-14 rounded-full grid place-items-center bg-[color-mix(in_oklab,var(--success)_8%,var(--bg-elev))] border border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] mb-5">
+        <div className="mx-auto h-14 w-14 grid place-items-center bg-[color-mix(in_oklab,var(--success)_8%,var(--bg-elev))] border border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] mb-5">
           <CheckCircle2 className="h-6 w-6 text-[var(--success)]" />
         </div>
-        <h2 className="text-[24px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] mb-2">
+        <h2 className="font-display uppercase text-[24px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] mb-2">
           Check your inbox
         </h2>
         <p className="text-[14px] text-[var(--fg-secondary)] mb-3">
@@ -113,7 +113,7 @@ export default function SignupPage() {
         </p>
         <Link
           href="/login"
-          className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+          className="inline-flex items-center gap-2 text-[13px] font-medium text-[var(--accent-text)] hover:text-[var(--ink)] transition-colors"
         >
           ← Back to login
         </Link>
@@ -124,7 +124,7 @@ export default function SignupPage() {
   return (
     <div>
       <div className="mb-7">
-        <h1 className="text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+        <h1 className="font-display uppercase text-[28px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
           Create account
         </h1>
         <p className="mt-1.5 text-[14px] text-[var(--fg-secondary)]">
@@ -214,7 +214,7 @@ export default function SignupPage() {
                     return (
                       <div
                         key={seg}
-                        className="flex-1 h-[3px] rounded-full bg-[var(--bg-elev)] overflow-hidden"
+                        className="flex-1 h-[3px] bg-[var(--bg-elev)] overflow-hidden"
                       >
                         <div
                           className={`h-full transition-all duration-300 ${filled ? strength.classes.split(" ")[0] : ""}`}
@@ -256,11 +256,11 @@ export default function SignupPage() {
             className="text-[12px] text-[var(--fg-secondary)] leading-relaxed cursor-pointer"
           >
             I agree to the{" "}
-            <Link href="#" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
+            <Link href="#" className="text-[var(--accent-text)] hover:text-[var(--ink)]">
               Terms
             </Link>{" "}
             and{" "}
-            <Link href="#" className="text-[var(--accent)] hover:text-[var(--accent-hover)]">
+            <Link href="#" className="text-[var(--accent-text)] hover:text-[var(--ink)]">
               Privacy Policy
             </Link>
           </label>
@@ -295,7 +295,7 @@ export default function SignupPage() {
         Already have an account?{" "}
         <Link
           href="/login"
-          className="font-medium text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+          className="font-medium text-[var(--accent-text)] hover:text-[var(--ink)] transition-colors"
         >
           Sign in
         </Link>

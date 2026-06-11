@@ -6,33 +6,35 @@ import { cn } from "@/lib/utils";
 const badgeVariants = cva(
   [
     "inline-flex items-center gap-1.5",
-    "h-[22px] px-[10px] rounded-full",
+    "h-[22px] px-2 rounded-none",
     "font-mono text-[11px] uppercase tracking-[0.06em]",
     "border",
-    "transition-colors duration-[180ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+    "transition-colors duration-[120ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)]",
   ].join(" "),
   {
     variants: {
       variant: {
         default:
-          "border-[var(--line-default)] bg-[var(--bg-elev)] text-[var(--fg-secondary)]",
+          "border-[var(--line-default)] bg-transparent text-[var(--fg-secondary)]",
         accent:
-          "border-[var(--accent-line)] bg-[var(--accent-fade)] text-[var(--accent)]",
+          "border-[var(--accent)] bg-transparent text-[var(--accent-text)]",
         success:
-          "border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--success)_8%,var(--bg-elev))] text-[var(--success)]",
+          "border-[var(--accent)] bg-transparent text-[var(--accent-text)]",
         warning:
-          "border-[color-mix(in_oklab,var(--warning)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--warning)_8%,var(--bg-elev))] text-[var(--warning)]",
+          "border-[var(--line-strong)] bg-transparent text-[var(--fg-primary)]",
         danger:
-          "border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[var(--danger)]",
+          "border-[var(--danger)] bg-transparent text-[var(--danger)]",
         streak:
-          "border-[color-mix(in_oklab,var(--streak)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--streak)_8%,var(--bg-elev))] text-[var(--streak)]",
+          "border-[var(--line-strong)] bg-transparent text-[var(--fg-primary)]",
         outline:
           "border-[var(--line-default)] bg-transparent text-[var(--fg-primary)]",
         // Legacy aliases used in older components — map to new variants
         secondary:
-          "border-[var(--line-default)] bg-[var(--bg-elev)] text-[var(--fg-secondary)]",
+          "border-[var(--line-default)] bg-transparent text-[var(--fg-secondary)]",
         destructive:
-          "border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[var(--danger)]",
+          "border-[var(--danger)] bg-transparent text-[var(--danger)]",
+        // Mono status text + dot, no frame — quiet status replacement for pills
+        dot: "border-transparent px-0 text-[var(--fg-secondary)]",
       },
     },
     defaultVariants: {

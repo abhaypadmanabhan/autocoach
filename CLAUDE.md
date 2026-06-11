@@ -181,6 +181,7 @@ Frontend needs `NEXT_PUBLIC_BACKEND_URL` and Supabase publishable keys.
 - **`render_kind`/`render_payload` columns** exist but unused until Phase 2 (Mermaid + Plotly).
 - **Service-role client bypasses RLS** — every backend query MUST `.eq("user_id", str(user_id))`. Audit any new route.
 - **In-memory rate limiter (`core/rate_limit.py`) is per-worker** — multi-replica deploys multiply the effective limit. Daily quotas (Postgres-backed) are the real gate.
+- **Frontend design system is "Quiet Brutalism" (Padzy OS), light-only** — warm cream `#F9F1E6` ground, ink `#171717`, single emerald accent `#109462`, error `#C2402A`. Fonts: Space Grotesk (display) / Inter (body) / Space Mono (all data) via `next/font/google`. ALL radii are 0 (zeroed in `globals.css` `@theme`). Hard offset shadow (`.shadow-hard`, 4px ink, zero blur) is reserved for primary CTA buttons + the active quiz card ONLY. No blurred shadows, gradients, `backdrop-blur`, pills, or dark mode (next-themes removed). Any future `shadcn add` pulls rounded/shadowed defaults — audit and brutalize before committing. Status = mono text + dot (`StatusPill`), section labels = numbered mono kickers (`.kicker`, e.g. `01 / DASHBOARD`), active state = 2px green left tick.
 
 ## Specs
 

@@ -4,9 +4,9 @@ export function CoreBadge({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center px-1.5 py-px rounded-sm",
-        "border border-[var(--accent-line)] bg-[var(--accent-fade)]",
-        "font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--accent)]",
+        "inline-flex items-center px-1.5 py-px rounded-none",
+        "border border-[var(--accent)] bg-transparent",
+        "font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--accent-text)]",
         className,
       )}
     >

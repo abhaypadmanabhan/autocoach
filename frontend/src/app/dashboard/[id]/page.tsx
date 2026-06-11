@@ -142,6 +142,7 @@ export default function DocumentDetailPage({
             </div>
           ) : document ? (
             <div className="space-y-3">
+              <p className="kicker">02 / DOCUMENT</p>
               <div className="flex items-center gap-3 text-[12px] font-mono uppercase tracking-[0.08em] text-[var(--fg-tertiary)]">
                 <span>{document.file_type?.replace(/^application\//, "").toUpperCase() || "DOC"}</span>
                 <span className="text-[var(--fg-disabled)]">·</span>
@@ -149,7 +150,7 @@ export default function DocumentDetailPage({
                 <span className="text-[var(--fg-disabled)]">·</span>
                 <span>Uploaded {formatRelative(document.created_at)}</span>
               </div>
-              <h1 className="text-[40px] sm:text-[56px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] leading-[1.1]">
+              <h1 className="font-display uppercase text-[40px] sm:text-[56px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] leading-[1.1]">
                 {document.ai_title ?? document.filename}
               </h1>
               <div className="flex items-center gap-3 pt-1">
@@ -162,7 +163,7 @@ export default function DocumentDetailPage({
               </div>
             </div>
           ) : (
-            <div className="p-5 rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[var(--danger)] flex items-start gap-3">
+            <div className="p-5 border border-[var(--danger)] bg-transparent text-[var(--danger)] flex items-start gap-3">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
               <p className="text-[13px]">Document not found.</p>
             </div>
@@ -183,7 +184,7 @@ export default function DocumentDetailPage({
                   <PlayCircle className="h-4 w-4" />
                   Start session
                 </span>
-                <span className="font-mono text-[11px] text-white/70">10 questions</span>
+                <span className="font-mono text-[11px] text-[var(--ink)] opacity-70">10 questions</span>
               </Button>
               <Button
                 variant="secondary"
@@ -208,9 +209,9 @@ export default function DocumentDetailPage({
 
         {document?.status === "processing" && (
           <Section>
-            <div className="p-5 rounded-md border border-[color-mix(in_oklab,var(--warning)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--warning)_8%,var(--bg-elev))] flex items-center gap-3">
-              <Loader2 className="h-4 w-4 text-[var(--warning)] animate-spin" />
-              <p className="text-[13px] text-[var(--warning)]">
+            <div className="p-5 border border-[var(--line-default)] bg-transparent flex items-center gap-3">
+              <Loader2 className="h-4 w-4 text-[var(--ink)] animate-spin" />
+              <p className="font-mono text-[12px] uppercase tracking-[0.04em] text-[var(--ink)]">
                 Document is processing. Concepts will appear when ready.
               </p>
             </div>
@@ -219,7 +220,7 @@ export default function DocumentDetailPage({
 
         {document?.status === "failed" && (
           <Section>
-            <div className="p-5 rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] flex items-start gap-3">
+            <div className="p-5 border border-[var(--danger)] bg-transparent flex items-start gap-3">
               <AlertTriangle className="h-4 w-4 text-[var(--danger)] mt-0.5" />
               <div className="flex-1">
                 <p className="text-[14px] font-medium text-[var(--danger)]">
@@ -239,9 +240,7 @@ export default function DocumentDetailPage({
         {/* Concepts */}
         <Section>
           <div className="flex items-baseline justify-between mb-3">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
-              Concepts
-            </h2>
+            <h2 className="kicker">Concepts</h2>
             <span className="font-mono text-[11px] tabular-nums text-[var(--fg-tertiary)]">
               {sortedConcepts.length}
             </span>
@@ -314,9 +313,9 @@ export default function DocumentDetailPage({
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <div className="h-1 w-20 rounded-full bg-[var(--bg-elev)] overflow-hidden">
+                            <div className="h-[8px] w-20 border border-[var(--ink)] bg-transparent overflow-hidden">
                               <div
-                                className="h-full bg-[var(--accent)] rounded-full"
+                                className="h-full bg-[var(--accent)]"
                                 style={{ width: `${mastery}%` }}
                               />
                             </div>

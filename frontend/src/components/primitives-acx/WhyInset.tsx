@@ -12,7 +12,7 @@ export function WhyInset({
   return (
     <div
       className={cn(
-        "p-3 px-4 rounded-md bg-[var(--bg-inset)] border border-[var(--line-subtle)]",
+        "p-3 px-4 rounded-none bg-[var(--bg-inset)] border border-[var(--line-subtle)] border-l-2 border-l-[var(--accent)]",
         className,
       )}
     >

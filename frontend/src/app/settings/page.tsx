@@ -109,7 +109,14 @@ export default function SettingsPage() {
           </div>
         ) : (
           <div className="space-y-10 mt-2">
-            <SettingsRow label="Profile">
+            <header className="pb-2">
+              <p className="kicker">04 / SETTINGS</p>
+              <h1 className="mt-2 font-display uppercase tracking-[-0.02em] text-[24px] text-[var(--ink)]">
+                Settings
+              </h1>
+            </header>
+
+            <SettingsRow label="01 / Profile">
               <div className="flex items-start gap-5">
                 <div className="relative">
                   <button
@@ -117,9 +124,9 @@ export default function SettingsPage() {
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                     className={cn(
-                      "relative h-24 w-24 rounded-full overflow-hidden",
-                      "border border-[var(--line-default)] bg-[linear-gradient(135deg,oklch(0.55_0.10_263),oklch(0.45_0.06_263))]",
-                      "grid place-items-center font-mono text-[20px] text-white",
+                      "relative h-24 w-24 overflow-hidden",
+                      "border border-[var(--line-default)] bg-[var(--bg-elev)]",
+                      "grid place-items-center font-mono text-[20px] text-[var(--ink)]",
                       "transition-[border-color] duration-[180ms] hover:border-[var(--line-strong)]",
                       "disabled:cursor-wait",
                     )}
@@ -136,11 +143,11 @@ export default function SettingsPage() {
                     ) : (
                       <span>{initials}</span>
                     )}
-                    <span className="absolute inset-0 grid place-items-center bg-black/50 opacity-0 hover:opacity-100 transition-opacity">
+                    <span className="absolute inset-0 grid place-items-center bg-[rgba(23,23,23,0.4)] opacity-0 hover:opacity-100 transition-opacity">
                       {uploading ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        <Loader2 className="h-4 w-4 animate-spin text-[var(--bg-base)]" />
                       ) : (
-                        <Camera className="h-4 w-4 text-white" />
+                        <Camera className="h-4 w-4 text-[var(--bg-base)]" />
                       )}
                     </span>
                   </button>
@@ -171,7 +178,7 @@ export default function SettingsPage() {
               </div>
             </SettingsRow>
 
-            <SettingsRow label="Security">
+            <SettingsRow label="02 / Security">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[14px] font-medium text-[var(--fg-primary)]">
@@ -198,7 +205,7 @@ export default function SettingsPage() {
               </div>
             </SettingsRow>
 
-            <SettingsRow label="Subscription">
+            <SettingsRow label="03 / Subscription">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -222,10 +229,10 @@ export default function SettingsPage() {
               </div>
             </SettingsRow>
 
-            <SettingsRow label="Account">
-              <div className="flex items-center justify-between gap-4">
+            <SettingsRow label="Danger zone" danger>
+              <div className="flex items-center justify-between gap-4 border-2 border-[var(--danger)] p-4">
                 <div>
-                  <p className="text-[14px] font-medium text-[var(--fg-primary)]">
+                  <p className="text-[14px] font-medium text-[var(--danger)]">
                     Sign out
                   </p>
                   <p className="text-[13px] text-[var(--fg-secondary)] mt-0.5">
@@ -265,14 +272,16 @@ export default function SettingsPage() {
 
 function SettingsRow({
   label,
+  danger,
   children,
 }: {
   label: string;
+  danger?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <section className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4 md:gap-8 pt-8 border-t border-[var(--line-subtle)] first:border-t-0 first:pt-0">
-      <h2 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)] pt-1">
+      <h2 className={cn("kicker pt-1", danger && "text-[var(--danger)]")}>
         {label}
       </h2>
       <div>{children}</div>

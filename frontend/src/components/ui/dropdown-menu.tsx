@@ -34,7 +34,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
 DropdownMenuSubTrigger.displayName = DropdownMenuPrimitive.SubTrigger.displayName;
 
 const contentBase =
-  "z-50 min-w-[8rem] overflow-hidden rounded-md border border-[var(--line-default)] bg-[var(--bg-overlay)] p-1 text-[var(--fg-primary)] shadow-[0_10px_32px_rgba(0,0,0,0.4)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95";
+  "z-50 min-w-[8rem] overflow-hidden rounded-md border border-[var(--ink)] bg-[var(--bg-base)] p-1 text-[var(--fg-primary)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95";
 
 const DropdownMenuSubContent = React.forwardRef<
   React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,

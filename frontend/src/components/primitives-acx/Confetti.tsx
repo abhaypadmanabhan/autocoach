@@ -14,19 +14,17 @@ export function Confetti({ score, threshold = 80 }: ConfettiProps) {
   useEffect(() => {
     if (fired.current) return;
     if (score < threshold) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     fired.current = true;
-
-    const accent = "#5b8cff";
-    const success = "#7ed7a3";
 
     const fire = (originX: number) => {
       confetti({
-        particleCount: 60,
+        particleCount: 40,
         spread: 60,
         startVelocity: 32,
         origin: { x: originX, y: 0.7 },
-        colors: [accent, success, "#ffffff"],
-        scalar: 0.85,
+        colors: ["#109462", "#171717", "#C2402A"],
+        scalar: 0.8,
       });
     };
 

@@ -34,13 +34,13 @@ export function HudPill({
       type="button"
       className={cn(
         "inline-flex items-center gap-1.5",
-        "h-[30px] px-3 rounded-full",
-        "border border-[var(--line-default)] bg-[var(--bg-elev)]",
+        "h-[28px] px-2.5 rounded-none",
+        "border border-[var(--line-default)] bg-transparent",
         "font-mono text-[12px] tabular-nums",
         "text-[var(--fg-secondary)]",
-        "transition-[border-color,background-color] duration-[180ms] [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
-        "hover:border-[var(--line-strong)]",
-        "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[var(--accent)]",
+        "transition-[border-color,background-color] duration-[120ms] [transition-timing-function:cubic-bezier(0.2,0,0,1)]",
+        "hover:border-[var(--ink)]",
+        "focus-visible:outline-none focus-visible:border-[var(--accent)]",
         variant === "streak" && "[&_svg]:text-[var(--streak)]",
         variant === "xp" && "[&_svg]:text-[var(--fg-secondary)]",
         "[&_svg]:h-3 [&_svg]:w-3",

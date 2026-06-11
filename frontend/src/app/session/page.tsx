@@ -291,13 +291,13 @@ function SessionContent() {
           remaining !== null ? (
             <span
               className={cn(
-                "inline-flex items-center gap-1.5 h-[30px] px-3 rounded-full border font-mono text-[12px] tabular-nums",
+                "inline-flex items-center gap-1.5 h-[30px] px-3 border font-mono text-[12px] tabular-nums",
                 timerStatus === "critical" &&
-                  "border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[var(--danger)] critical-pulse",
+                  "border-[var(--danger)] text-[var(--danger)]",
                 timerStatus === "warning" &&
-                  "border-[color-mix(in_oklab,var(--warning)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--warning)_8%,var(--bg-elev))] text-[var(--warning)]",
+                  "border-[var(--ink)] text-[var(--ink)]",
                 timerStatus === "normal" &&
-                  "border-[var(--line-default)] bg-[var(--bg-elev)] text-[var(--fg-secondary)]",
+                  "border-[var(--line-default)] text-[var(--fg-secondary)]",
               )}
             >
               {formatTime(remaining)}
@@ -337,7 +337,7 @@ function SessionContent() {
                 showFeedback ? "lg:grid-cols-[1fr_320px]" : "grid-cols-1",
               )}
             >
-              <div className="rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)] p-6 sm:p-8">
+              <div className="border-2 border-[var(--ink)] shadow-hard bg-[var(--bg-base)] p-6 sm:p-8">
                 <QuestionView
                   question={question}
                   answer={answer}
@@ -387,19 +387,26 @@ function SessionContent() {
                 <aside className="anim-marg-in space-y-4 lg:pl-2">
                   <div
                     className={cn(
-                      "p-4 rounded-md border",
+                      "p-4 border",
                       lastResult.is_correct
-                        ? "border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--success)_8%,var(--bg-elev))]"
-                        : "border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))]",
+                        ? "border-[var(--accent)]"
+                        : "border-[var(--danger)]",
                     )}
                   >
                     <div className="flex items-center gap-2">
                       {lastResult.is_correct ? (
-                        <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />
+                        <CheckCircle2 className="h-4 w-4 text-[var(--accent-text)]" />
                       ) : (
                         <XCircle className="h-4 w-4 text-[var(--danger)]" />
                       )}
-                      <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--fg-tertiary)]">
+                      <span
+                        className={cn(
+                          "font-mono text-[11px] uppercase tracking-[0.08em]",
+                          lastResult.is_correct
+                            ? "text-[var(--accent-text)]"
+                            : "text-[var(--danger)]",
+                        )}
+                      >
                         {lastResult.is_correct ? "Correct" : "Incorrect"}
                       </span>
                       {lastResult.xp_awarded != null && lastResult.xp_awarded !== 0 && (
@@ -421,7 +428,7 @@ function SessionContent() {
                     </div>
                   )}
 
-                  <div className="space-y-1.5">
+                  <div className="space-y-1.5 border-l-2 border-[var(--accent)] bg-[var(--bg-inset)] pl-3 py-2">
                     <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
                       Correct answer
                     </span>
@@ -462,9 +469,9 @@ function SessionContent() {
       )}
 
       {timeUp && (
-        <div className="fixed inset-0 z-40 grid place-items-center bg-black/70 backdrop-blur-sm">
-          <div className="text-center px-6">
-            <div className="mx-auto h-14 w-14 rounded-full grid place-items-center bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] mb-4">
+        <div className="fixed inset-0 z-40 grid place-items-center bg-[rgba(23,23,23,0.4)]">
+          <div className="text-center px-8 py-8 border-2 border-[var(--ink)] bg-[var(--bg-base)]">
+            <div className="mx-auto h-14 w-14 grid place-items-center border border-[var(--danger)] mb-4">
               <AlertCircle className="h-6 w-6 text-[var(--danger)]" />
             </div>
             <h2 className="text-[24px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] mb-2">
@@ -530,30 +537,34 @@ function QuestionView({
                 disabled={disabled && !showFeedback}
                 onClick={() => setAnswer(opt, "click")}
                 className={cn(
-                  "group w-full flex items-start gap-3 text-left p-3.5 rounded-md border bg-[var(--bg-base)]",
+                  "group relative w-full flex items-start gap-3 text-left p-3.5 border bg-[var(--bg-base)]",
                   "transition-[border-color,background-color] duration-[180ms]",
                   !showFeedback &&
                     !selected &&
-                    "border-[var(--line-default)] hover:border-[var(--line-strong)] hover:bg-[var(--bg-elev)]",
-                  !showFeedback && selected && "border-[var(--accent)] bg-[var(--accent-fade)]",
-                  correct &&
-                    "border-[color-mix(in_oklab,var(--success)_50%,var(--line-default))] bg-[color-mix(in_oklab,var(--success)_10%,var(--bg-elev))]",
-                  wrong &&
-                    "border-[color-mix(in_oklab,var(--danger)_50%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_10%,var(--bg-elev))]",
+                    "border-[var(--line-default)] hover:border-[var(--ink)]",
+                  !showFeedback && selected && "border-2 border-[var(--ink)]",
+                  correct && "border-2 border-[var(--accent)]",
+                  wrong && "border-2 border-[var(--danger)]",
                   disabled && !showFeedback && "opacity-60 cursor-not-allowed",
                 )}
               >
+                {!showFeedback && selected && (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]"
+                  />
+                )}
                 <span
                   className={cn(
-                    "shrink-0 h-6 w-6 grid place-items-center rounded-sm border font-mono text-[11px]",
+                    "shrink-0 h-6 w-6 grid place-items-center border font-mono text-[11px]",
                     !showFeedback &&
                       !selected &&
                       "border-[var(--line-default)] text-[var(--fg-tertiary)] group-hover:text-[var(--fg-secondary)]",
                     !showFeedback &&
                       selected &&
-                      "border-[var(--accent)] bg-[var(--accent)] text-white",
-                    correct && "border-[var(--success)] bg-[var(--success)] text-white",
-                    wrong && "border-[var(--danger)] bg-[var(--danger)] text-white",
+                      "border-[var(--ink)] bg-[var(--ink)] text-[#F9F1E6]",
+                    correct && "border-[var(--accent)] bg-[var(--accent)] text-[var(--ink)]",
+                    wrong && "border-[var(--danger)] bg-[var(--danger)] text-[#F9F1E6]",
                   )}
                 >
                   {letter}
@@ -561,7 +572,7 @@ function QuestionView({
                 <span className="text-[14px] flex-1 text-[var(--fg-primary)]">
                   {opt}
                 </span>
-                {correct && <CheckCircle2 className="h-4 w-4 text-[var(--success)]" />}
+                {correct && <CheckCircle2 className="h-4 w-4 text-[var(--accent-text)]" />}
                 {wrong && <XCircle className="h-4 w-4 text-[var(--danger)]" />}
               </button>
             );
@@ -598,13 +609,19 @@ function QuestionView({
                 disabled={disabled && !showFeedback}
                 onClick={() => setAnswer(opt, "click")}
                 className={cn(
-                  "p-4 rounded-md border bg-[var(--bg-base)] transition-[border-color,background-color] duration-[180ms]",
-                  !showFeedback && !selected && "border-[var(--line-default)] hover:border-[var(--line-strong)]",
-                  !showFeedback && selected && "border-[var(--accent)] bg-[var(--accent-fade)] text-[var(--accent)]",
-                  correct && "border-[color-mix(in_oklab,var(--success)_50%,var(--line-default))] text-[var(--success)]",
-                  wrong && "border-[color-mix(in_oklab,var(--danger)_50%,var(--line-default))] text-[var(--danger)]",
+                  "relative p-4 border bg-[var(--bg-base)] transition-[border-color,background-color] duration-[180ms]",
+                  !showFeedback && !selected && "border-[var(--line-default)] hover:border-[var(--ink)]",
+                  !showFeedback && selected && "border-2 border-[var(--ink)] text-[var(--ink)]",
+                  correct && "border-2 border-[var(--accent)] text-[var(--accent-text)]",
+                  wrong && "border-2 border-[var(--danger)] text-[var(--danger)]",
                 )}
               >
+                {!showFeedback && selected && (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]"
+                  />
+                )}
                 <span className="font-mono text-[13px] uppercase tracking-[0.06em]">
                   {opt}
                 </span>
@@ -643,8 +660,8 @@ function ErrorState({
   onExit: () => void;
 }) {
   return (
-    <div className="rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] p-8 text-center">
-      <div className="mx-auto h-12 w-12 rounded-full grid place-items-center bg-[color-mix(in_oklab,var(--danger)_15%,var(--bg-elev))] mb-4">
+    <div className="border-2 border-[var(--danger)] bg-[var(--bg-base)] p-8 text-center">
+      <div className="mx-auto h-12 w-12 grid place-items-center border border-[var(--danger)] mb-4">
         <AlertCircle className="h-5 w-5 text-[var(--danger)]" />
       </div>
       <h2 className="text-[20px] font-medium text-[var(--fg-primary)] mb-2">
@@ -670,9 +687,9 @@ function CompletionState({
   onView: () => void;
 }) {
   return (
-    <div className="rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)] p-12 text-center">
-      <div className="mx-auto h-14 w-14 rounded-full grid place-items-center bg-[color-mix(in_oklab,var(--success)_10%,var(--bg-elev))] border border-[color-mix(in_oklab,var(--success)_30%,var(--line-default))] mb-5">
-        <CheckCircle2 className="h-6 w-6 text-[var(--success)]" />
+    <div className="border border-[var(--line-subtle)] bg-[var(--bg-base)] p-12 text-center">
+      <div className="mx-auto h-14 w-14 grid place-items-center border border-[var(--accent)] mb-5">
+        <CheckCircle2 className="h-6 w-6 text-[var(--accent-text)]" />
       </div>
       <h2 className="text-[24px] font-medium tracking-[-0.02em] text-[var(--fg-primary)] mb-2">
         Session complete

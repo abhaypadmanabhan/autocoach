@@ -129,7 +129,7 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
           className="flex items-center gap-2"
         >
           <BrandMark />
-          <span className="font-semibold tracking-[-0.01em]">AutoCoach</span>
+          <span className="font-display font-semibold uppercase tracking-[-0.01em]">AutoCoach</span>
         </Link>
       </div>
 
@@ -171,13 +171,14 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
         )}
         {!isLoading && !error && sortedDocuments.length > 0 && (
           <div className="space-y-5 pt-1">
-            {groupOrder.map((group) => {
+            {groupOrder
+              .filter((group) => grouped[group]?.length)
+              .map((group, groupIdx) => {
               const docs = grouped[group];
-              if (!docs?.length) return null;
               return (
                 <div key={group} className="space-y-0.5">
-                  <h3 className="px-3 mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)]">
-                    {group}
+                  <h3 className="px-3 mb-1.5 kicker">
+                    {String(groupIdx + 1).padStart(2, "0")} / {group}
                   </h3>
                   {docs.map((doc) => {
                     const isActive = activeDocId === doc.id;
@@ -193,7 +194,7 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
                         )}
                       >
                         {isActive && (
-                          <span className="absolute left-[-6px] top-1.5 bottom-1.5 w-0.5 rounded-r-sm bg-[var(--accent)]" />
+                          <span className="absolute left-0 top-0 bottom-0 w-0.5 bg-[var(--accent)]" />
                         )}
                         <Link
                           href={`/dashboard/${doc.id}`}
@@ -298,7 +299,7 @@ export function AppSidebar({ className, onNavigate }: AppSidebarProps) {
                 e.preventDefault();
                 handleDelete();
               }}
-              className="!bg-transparent !text-[var(--danger)] !border !border-[color-mix(in_oklab,var(--danger)_30%,transparent)] hover:!bg-[color-mix(in_oklab,var(--danger)_10%,transparent)]"
+              className="!bg-transparent !text-[var(--danger)] !shadow-none !border-2 !border-[var(--danger)] hover:!bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] active:!translate-x-0 active:!translate-y-[1px]"
             >
               {deleting ? (
                 <>

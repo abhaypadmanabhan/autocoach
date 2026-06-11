@@ -105,12 +105,12 @@ function ResultsContent() {
 
   if (loading) {
     return (
-      <AppShell title="Results" eyebrow="Session" showBack backHref="/dashboard">
+      <AppShell title="Results" eyebrow="03 / RESULTS" showBack backHref="/dashboard">
         <PageContainer size="lg">
           <Section className="mt-2">
             <div className="flex flex-col items-center gap-4 py-8">
-              <Skeleton className="h-32 w-72 rounded-md" />
-              <Skeleton className="h-6 w-40 rounded-full" />
+              <Skeleton className="h-32 w-72" />
+              <Skeleton className="h-6 w-40" />
             </div>
           </Section>
         </PageContainer>
@@ -120,10 +120,10 @@ function ResultsContent() {
 
   if (!session) {
     return (
-      <AppShell title="Results" eyebrow="Session" showBack backHref="/dashboard">
+      <AppShell title="Results" eyebrow="03 / RESULTS" showBack backHref="/dashboard">
         <PageContainer size="lg">
           <Section className="mt-2">
-            <div className="rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] p-6 text-center">
+            <div className="border-2 border-[var(--danger)] bg-[var(--bg-base)] p-6 text-center">
               <p className="text-[14px] text-[var(--danger)] mb-3">
                 {sessionError ? getErrorMessage(sessionError) : "Session not found"}
               </p>
@@ -143,7 +143,7 @@ function ResultsContent() {
   return (
     <AppShell
       title={document?.ai_title ?? document?.filename ?? "Session"}
-      eyebrow="Results"
+      eyebrow="03 / RESULTS"
       showBack
       backHref="/dashboard"
     >
@@ -152,9 +152,7 @@ function ResultsContent() {
         {/* Hero score */}
         <Section className="mt-2">
           <div className="flex flex-col items-center text-center">
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)] mb-3">
-              Final score
-            </span>
+            <p className="kicker mb-3">Final score</p>
             <ScoreGauge score={scorePercent} perQuestion={perQuestion} size="lg" />
             <Badge variant={grade.variant} className="mt-4">
               {grade.label}
@@ -194,9 +192,7 @@ function ResultsContent() {
         {/* Review */}
         {questions.length > 0 && (
           <Section>
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)] mb-4">
-              Review
-            </h2>
+            <h2 className="kicker mb-4">Review</h2>
             <Tabs defaultValue="all">
               <TabsList>
                 <TabsTrigger value="all" count={total}>
@@ -243,7 +239,7 @@ function Stat({
       <span
         className={cn(
           "font-mono text-[24px] tabular-nums tracking-[-0.02em]",
-          accent ? "text-[var(--accent)]" : "text-[var(--fg-primary)]",
+          accent ? "text-[var(--accent-text)]" : "text-[var(--fg-primary)]",
         )}
       >
         {value}
@@ -290,10 +286,10 @@ function ReviewRow({ q }: { q: ReviewItem }) {
       >
         <span
           className={cn(
-            "shrink-0 grid place-items-center h-6 w-6 rounded-sm",
+            "shrink-0 grid place-items-center h-6 w-6",
             q.is_correct
-              ? "bg-[color-mix(in_oklab,var(--success)_15%,var(--bg-elev))] text-[var(--success)]"
-              : "bg-[color-mix(in_oklab,var(--danger)_15%,var(--bg-elev))] text-[var(--danger)]",
+              ? "text-[var(--accent-text)]"
+              : "text-[var(--danger)]",
           )}
         >
           {q.is_correct ? (
