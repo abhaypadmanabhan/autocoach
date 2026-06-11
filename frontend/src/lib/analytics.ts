@@ -67,6 +67,7 @@ export const analytics = {
             posthog.init(key, {
                 api_host: host,
                 capture_pageview: false, // We'll manage this if needed
+                disable_session_recording: true,
             });
             isInitialized = true;
             (window as any).posthog = posthog;
