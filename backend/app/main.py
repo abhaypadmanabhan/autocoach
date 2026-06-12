@@ -44,15 +44,14 @@ sentry_enabled = False
 if settings.sentry_dsn:
     try:
         import sentry_sdk
-        from sentry_sdk.integrations.fastapi import FastAPIIntegration
         sentry_sdk.init(
             dsn=settings.sentry_dsn,
             environment=settings.environment,
-            integrations=[FastAPIIntegration()],
         )
         sentry_enabled = True
     except Exception as e:
         logger.warning("Sentry client init failed: %s", e)
+
 
 
 @asynccontextmanager
