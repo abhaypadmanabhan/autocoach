@@ -220,13 +220,26 @@ def _parse_llm_questions(
     return valid_questions
 
 
+def _call_quiz_llm(system_prompt: str, user_prompt: str) -> str:
+    """Call Kimi for quiz generation, falling back to OpenAI on failure."""
+    try:
+        response = call_kimi(system_prompt, user_prompt)
+    except Exception as e:
+        logger.warning("Kimi quiz generation failed, trying OpenAI fallback: %s", e)
+        response = ""
+
+    if response:
+        return response
+
+    logger.warning("Kimi quiz generation returned empty response, trying OpenAI fallback")
+    return call_openai(system_prompt, user_prompt, temperature=0.7)
+
+
 def _retry_generation_once(
     user_prompt: str, focus_concept_ids: list[str] | None = None
 ) -> list[dict]:
     logger.warning("LLM quiz output failed validation, retrying generation once")
-    retry_response = call_kimi(QUIZ_SYSTEM_PROMPT, user_prompt)
-    if not retry_response:
-        retry_response = call_openai(QUIZ_SYSTEM_PROMPT, user_prompt, temperature=0.7)
+    retry_response = _call_quiz_llm(QUIZ_SYSTEM_PROMPT, user_prompt)
     if not retry_response:
         return []
     return _parse_llm_questions(retry_response, focus_concept_ids=focus_concept_ids)
@@ -350,11 +363,7 @@ Return ONLY a valid JSON array with no markdown formatting."""
 
         # Call LLM
         logger.info(f"Calling Kimi API to generate {num_questions} questions")
-        response = call_kimi(QUIZ_SYSTEM_PROMPT, user_prompt)
-
-        if not response:
-            logger.warning("Kimi API returned empty response, trying OpenAI fallback")
-            response = call_openai(QUIZ_SYSTEM_PROMPT, user_prompt, temperature=0.7)
+        response = _call_quiz_llm(QUIZ_SYSTEM_PROMPT, user_prompt)
 
         if not response:
             logger.error("Both LLM APIs returned empty responses")
@@ -389,9 +398,7 @@ Return ONLY a valid JSON array with no markdown formatting."""
                         "Every question MUST directly reference the target concept in the question text. "
                         "Do not create questions about general topics."
                     )
-                    retry_response = call_kimi(QUIZ_SYSTEM_PROMPT, stronger_prompt)
-                    if not retry_response:
-                        retry_response = call_openai(QUIZ_SYSTEM_PROMPT, stronger_prompt, temperature=0.7)
+                    retry_response = _call_quiz_llm(QUIZ_SYSTEM_PROMPT, stronger_prompt)
 
                     if retry_response:
                         try:

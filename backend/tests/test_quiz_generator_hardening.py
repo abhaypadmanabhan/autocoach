@@ -73,3 +73,36 @@ def test_generate_quiz_rejects_mcq_without_exactly_four_options(monkeypatch):
 
     assert result == []
     assert calls == ["kimi", "kimi"]
+
+
+def test_generate_quiz_uses_openai_fallback_when_kimi_raises(monkeypatch):
+    openai_calls = []
+    valid = json.dumps([_mcq_question(concept_id=None)])
+
+    monkeypatch.setattr(
+        quiz_generator,
+        "retrieve_relevant_chunks",
+        lambda **_kwargs: [{"content": "Replication improves availability."}],
+    )
+    monkeypatch.setattr(
+        quiz_generator,
+        "call_kimi",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("kimi down")),
+    )
+
+    def fake_call_openai(_system_prompt, _user_prompt, temperature):
+        openai_calls.append(temperature)
+        return valid
+
+    monkeypatch.setattr(quiz_generator, "call_openai", fake_call_openai)
+
+    result = quiz_generator.generate_quiz_questions(
+        document_id="doc-1",
+        num_questions=1,
+        difficulty="medium",
+        question_types=["text_mcq"],
+    )
+
+    assert len(result) == 1
+    assert result[0]["question_text"] == "What does replication improve?"
+    assert openai_calls == [0.7]
