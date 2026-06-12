@@ -65,6 +65,10 @@ class Settings(BaseSettings):
     langfuse_host: str = ""
     langfuse_environment: str = "development"
 
+    # Sentry
+    sentry_dsn: str | None = None
+
+
     def get_cors_origins(self) -> List[str]:
         """Build list of allowed CORS origins based on environment."""
         origins: List[str] = [
