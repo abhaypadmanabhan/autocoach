@@ -67,6 +67,7 @@ export const analytics = {
             posthog.init(key, {
                 api_host: host,
                 capture_pageview: false, // We'll manage this if needed
+                disable_session_recording: true,
             });
             isInitialized = true;
             (window as any).posthog = posthog;
@@ -107,6 +108,25 @@ export const analytics = {
             process.env.NEXT_PUBLIC_POSTHOG_KEY
         ) {
             posthog.capture(eventName, sanitizeProps(props));
+        }
+    },
+
+    hasOptedOut: (): boolean => {
+        if (typeof window === "undefined" || !process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+            return false;
+        }
+        return posthog.has_opted_out_capturing();
+    },
+
+    optIn: () => {
+        if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+            posthog.opt_in_capturing();
+        }
+    },
+
+    optOut: () => {
+        if (typeof window !== "undefined" && process.env.NEXT_PUBLIC_POSTHOG_KEY) {
+            posthog.opt_out_capturing();
         }
     },
 };
