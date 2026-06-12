@@ -7,7 +7,7 @@ export const metadata: Metadata = {
 };
 
 const LAST_UPDATED = "June 11, 2026";
-const CONTACT_EMAIL = "abhaykerala@gmail.com";
+const CONTACT_EMAIL = "abhaypadmanabhan98@gmail.com";
 
 function Section({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
   return (
@@ -120,8 +120,9 @@ export default function TermsPage() {
           <p>
             We may update these terms; the date above reflects the latest revision and material
             changes will be announced in the app. Continued use after changes means acceptance.
-            These terms are governed by the laws of the operator&rsquo;s jurisdiction, without
-            regard to conflict-of-law rules. Questions:{" "}
+            These terms are governed by the laws of the State of California, USA, without
+            regard to conflict-of-law rules, and any disputes will be resolved in the state
+            or federal courts located in California. Questions:{" "}
             <a className="text-[var(--accent-text)]" href={`mailto:${CONTACT_EMAIL}`}>
               {CONTACT_EMAIL}
             </a>
