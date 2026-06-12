@@ -39,6 +39,21 @@ settings = get_settings()
 # Compute allowed origins BEFORE app creation
 cors_origins = settings.get_cors_origins()
 
+# Sentry initialization
+sentry_enabled = False
+if settings.sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastAPIIntegration
+        sentry_sdk.init(
+            dsn=settings.sentry_dsn,
+            environment=settings.environment,
+            integrations=[FastAPIIntegration()],
+        )
+        sentry_enabled = True
+    except Exception as e:
+        logger.warning("Sentry client init failed: %s", e)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -51,7 +66,11 @@ async def lifespan(app: FastAPI):
     logger.info(
         f"Langfuse: {'enabled' if langfuse_enabled() else 'disabled (NOOP)'}"
     )
+    logger.info(
+        f"Sentry: {'enabled' if sentry_enabled else 'disabled (no DSN)'}"
+    )
     logger.info("=" * 50)
+
 
     keepalive_task = asyncio.create_task(
         qdrant_keepalive_loop(settings.qdrant_keepalive_interval_s)
