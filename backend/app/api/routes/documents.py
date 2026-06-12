@@ -41,6 +41,10 @@ settings = get_settings()
 
 # Constants for file validation
 ALLOWED_EXTENSIONS = {".pdf", ".pptx"}
+ALLOWED_CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
 MAX_FILE_SIZE_MB = settings.max_document_mb
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
@@ -113,6 +117,13 @@ async def upload_document(
             detail=f"Invalid file type. Only {', '.join(ALLOWED_EXTENSIONS)} files are allowed.",
         )
 
+    expected_content_type = ALLOWED_CONTENT_TYPES[file_ext]
+    if file.content_type != expected_content_type:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid content type. Expected {expected_content_type}.",
+        )
+
     # Enforce document quota before reading file
     enforce_max_documents(user_id, settings.max_documents_per_user)
 
@@ -151,16 +162,13 @@ async def upload_document(
         )
 
         if hasattr(storage_response, "error") and storage_response.error:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Storage upload failed: {storage_response.error}",
-            )
+            logger.error("Supabase storage upload failed: %s", storage_response.error)
+            raise HTTPException(status_code=500, detail="Upload failed")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail="Failed to upload file to storage"
-        )
+        logger.error("Supabase storage upload raised: %s", e)
+        raise HTTPException(status_code=500, detail="Upload failed")
 
     try:
         # Insert record into documents table
@@ -235,6 +243,9 @@ async def register_document(
             status_code=400,
             detail=f"Invalid file type. Only {', '.join(ALLOWED_EXTENSIONS)} files are allowed.",
         )
+
+    if ".." in request.file_path.split("/"):
+        raise HTTPException(status_code=400, detail="Invalid file path.")
 
     # Validate file path ownership - must start with user's ID
     if not request.file_path.startswith(f"{user_id}/"):
@@ -920,5 +931,4 @@ async def get_document_progress(
         raise HTTPException(
             status_code=500, detail="Failed to get document progress"
         )
-
 

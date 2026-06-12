@@ -80,7 +80,9 @@ async def redeem_xp(
     except Exception as e:
         logger.error(f"Failed to grant credit after deducting XP for user {user_id}: {e}")
         # Attempt refund
-        supabase_admin.table("users").update({"total_xp": current_xp}).eq("id", str(user_id)).execute()
+        supabase_admin.table("users").update({"total_xp": current_xp}).eq(
+            "id", str(user_id)
+        ).eq("total_xp", new_xp).execute()
         raise HTTPException(status_code=500, detail="Redemption failed. XP refunded.")
 
     return RedeemXPResponse(

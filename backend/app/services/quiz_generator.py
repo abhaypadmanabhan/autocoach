@@ -3,7 +3,10 @@
 import json
 import logging
 
+from pydantic import ValidationError
+
 from app.core.supabase import supabase_admin
+from app.models.quiz import LLMQuestion
 from app.observability.langfuse import observe
 from app.services.retrieval import retrieve_relevant_chunks
 from app.services.llm import call_kimi, call_openai
@@ -182,7 +185,9 @@ def validate_question_alignment(question: dict, concept_names: list[str]) -> boo
     return False
 
 
-def _parse_llm_questions(response: str) -> list[dict]:
+def _parse_llm_questions(
+    response: str, focus_concept_ids: list[str] | None = None
+) -> list[dict]:
     """Parse and validate LLM JSON response into question dicts."""
     cleaned_response = response.strip()
     if cleaned_response.startswith("```json"):
@@ -200,11 +205,44 @@ def _parse_llm_questions(response: str) -> list[dict]:
         return []
 
     valid_questions = []
-    for q in questions:
-        if isinstance(q, dict) and "question_text" in q and "question_type" in q:
-            valid_questions.append(q)
+    try:
+        for q in questions:
+            valid_questions.append(
+                LLMQuestion.model_validate(
+                    q,
+                    context={"focus_concept_ids": focus_concept_ids or []},
+                ).model_dump(mode="json", exclude_none=True)
+            )
+    except ValidationError as e:
+        logger.warning("LLM quiz output failed validation: %s", e)
+        return []
 
     return valid_questions
+
+
+def _call_quiz_llm(system_prompt: str, user_prompt: str) -> str:
+    """Call Kimi for quiz generation, falling back to OpenAI on failure."""
+    try:
+        response = call_kimi(system_prompt, user_prompt)
+    except Exception as e:
+        logger.warning("Kimi quiz generation failed, trying OpenAI fallback: %s", e)
+        response = ""
+
+    if response:
+        return response
+
+    logger.warning("Kimi quiz generation returned empty response, trying OpenAI fallback")
+    return call_openai(system_prompt, user_prompt, temperature=0.7)
+
+
+def _retry_generation_once(
+    user_prompt: str, focus_concept_ids: list[str] | None = None
+) -> list[dict]:
+    logger.warning("LLM quiz output failed validation, retrying generation once")
+    retry_response = _call_quiz_llm(QUIZ_SYSTEM_PROMPT, user_prompt)
+    if not retry_response:
+        return []
+    return _parse_llm_questions(retry_response, focus_concept_ids=focus_concept_ids)
 
 
 @observe(name="quiz.generate_questions", as_type="generation")
@@ -325,11 +363,7 @@ Return ONLY a valid JSON array with no markdown formatting."""
 
         # Call LLM
         logger.info(f"Calling Kimi API to generate {num_questions} questions")
-        response = call_kimi(QUIZ_SYSTEM_PROMPT, user_prompt)
-
-        if not response:
-            logger.warning("Kimi API returned empty response, trying OpenAI fallback")
-            response = call_openai(QUIZ_SYSTEM_PROMPT, user_prompt, temperature=0.7)
+        response = _call_quiz_llm(QUIZ_SYSTEM_PROMPT, user_prompt)
 
         if not response:
             logger.error("Both LLM APIs returned empty responses")
@@ -337,7 +371,15 @@ Return ONLY a valid JSON array with no markdown formatting."""
 
         # Parse JSON response
         try:
-            valid_questions = _parse_llm_questions(response)
+            valid_questions = _parse_llm_questions(
+                response, focus_concept_ids=focus_concept_ids
+            )
+            if not valid_questions:
+                valid_questions = _retry_generation_once(
+                    user_prompt, focus_concept_ids=focus_concept_ids
+                )
+                if not valid_questions:
+                    return []
 
             # Validate alignment for targeted mode
             if target_concepts and valid_questions:
@@ -356,13 +398,14 @@ Return ONLY a valid JSON array with no markdown formatting."""
                         "Every question MUST directly reference the target concept in the question text. "
                         "Do not create questions about general topics."
                     )
-                    retry_response = call_kimi(QUIZ_SYSTEM_PROMPT, stronger_prompt)
-                    if not retry_response:
-                        retry_response = call_openai(QUIZ_SYSTEM_PROMPT, stronger_prompt, temperature=0.7)
+                    retry_response = _call_quiz_llm(QUIZ_SYSTEM_PROMPT, stronger_prompt)
 
                     if retry_response:
                         try:
-                            retry_questions = _parse_llm_questions(retry_response)
+                            retry_questions = _parse_llm_questions(
+                                retry_response,
+                                focus_concept_ids=focus_concept_ids,
+                            )
                             if retry_questions:
                                 valid_questions = retry_questions
                                 logger.info(f"Regeneration produced {len(retry_questions)} questions")
