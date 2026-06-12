@@ -256,11 +256,11 @@ export default function SignupPage() {
             className="text-[12px] text-[var(--fg-secondary)] leading-relaxed cursor-pointer"
           >
             I agree to the{" "}
-            <Link href="#" className="text-[var(--accent-text)] hover:text-[var(--ink)]">
+            <Link href="/terms" className="text-[var(--accent-text)] hover:text-[var(--ink)]">
               Terms
             </Link>{" "}
             and{" "}
-            <Link href="#" className="text-[var(--accent-text)] hover:text-[var(--ink)]">
+            <Link href="/privacy" className="text-[var(--accent-text)] hover:text-[var(--ink)]">
               Privacy Policy
             </Link>
           </label>

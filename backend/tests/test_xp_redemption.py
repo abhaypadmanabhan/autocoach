@@ -138,6 +138,15 @@ def test_redeem_xp_refund_on_failure(mocker):
     assert {"total_xp": 50} in update_payloads, f"missing deduct call; got {update_payloads}"
     assert {"total_xp": 150} in update_payloads, f"missing refund call; got {update_payloads}"
 
+    first_eq_calls = mock_sb.table("users").update.return_value.eq.call_args_list
+    second_eq_calls = (
+        mock_sb.table("users").update.return_value.eq.return_value.eq.call_args_list
+    )
+    eq_predicates = [
+        call.args for call in [*first_eq_calls, *second_eq_calls] if call.args
+    ]
+    assert ("total_xp", 50) in eq_predicates
+
 
 def test_redeem_xp_cas_mismatch_returns_409(mocker):
     """Concurrent-update CAS contract: if the optimistic `eq('total_xp', current_xp)`
@@ -160,4 +169,3 @@ def test_redeem_xp_cas_mismatch_returns_409(mocker):
     grant_credit.assert_not_called()
     # And no update on user_daily_usage was attempted.
     mock_sb.table("user_daily_usage").update.assert_not_called()
-

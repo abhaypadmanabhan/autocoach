@@ -1,3 +1,10 @@
+# Agent C — Ops & Launch Prep (2026-06-11)
+
+- [ ] C1: Account deletion admin script (`backend/scripts/delete_user.py`)
+- [ ] C2: Sentry backend integration (`backend/app/main.py`, `backend/app/config.py`, `backend/requirements.txt`)
+
+---
+
 # Sprint Resume Feature Plan
 
 ## Requirements

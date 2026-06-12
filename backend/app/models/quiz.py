@@ -1,8 +1,9 @@
 """Pydantic models for quiz generation and sessions."""
 
+from typing import Annotated
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 
 class QuestionType(str, Enum):
@@ -39,6 +40,47 @@ class QuestionSchema(BaseModel):
     options: list[str] | None = None
     correct_answer: str
     explanation: str | None = None
+
+
+OptionText = Annotated[str, Field(min_length=1, max_length=500)]
+
+
+class LLMQuestion(BaseModel):
+    """Validated shape for a single question returned by an LLM."""
+
+    question_type: QuestionType
+    question_text: str = Field(min_length=1, max_length=2000)
+    options: list[OptionText] | None = None
+    correct_answer: str = Field(min_length=1, max_length=2000)
+    explanation: str | None = Field(default=None, max_length=2000)
+    concept_id: str | None = None
+
+    @field_validator("concept_id")
+    @classmethod
+    def concept_id_must_be_allowed(
+        cls, value: str | None, info: ValidationInfo
+    ) -> str | None:
+        allowed = set((info.context or {}).get("focus_concept_ids") or [])
+        if value and allowed and value not in allowed:
+            raise ValueError("concept_id is not in focus_concept_ids")
+        return value
+
+    @model_validator(mode="after")
+    def validate_type_specific_fields(self) -> "LLMQuestion":
+        if self.question_type == QuestionType.TEXT_MCQ:
+            if self.options is None or len(self.options) != 4:
+                raise ValueError("text_mcq questions must include exactly 4 options")
+            normalized_answer = self.correct_answer.strip().upper()
+            if len(normalized_answer) > 1 and normalized_answer[1] in {")", ".", " "}:
+                normalized_answer = normalized_answer[0]
+            if normalized_answer not in {"A", "B", "C", "D"}:
+                raise ValueError("text_mcq correct_answer must identify A, B, C, or D")
+
+        if self.question_type == QuestionType.TEXT_TF:
+            if self.correct_answer.strip().lower() not in {"true", "false"}:
+                raise ValueError("text_tf correct_answer must be true or false")
+
+        return self
 
 
 class QuizGenerateResponse(BaseModel):
