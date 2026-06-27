@@ -1,3 +1,48 @@
+# CTO Reconcile + Hygiene Sprint (2026-06-27)
+
+**Mode:** plan-first. Nothing below executes until user approves. Scope locked by user:
+(1) reconcile dev↔main, (2) fix stale-doc "lies" + investigate plan_type bug. No dead-code
+deletion this pass (that goes to GitHub Issues for the fleet).
+
+## Findings (verified read-only, 2026-06-27)
+- `main` tree == `dev` tree (both `b791f3ba`). Divergence is **history-only**, content byte-identical.
+  PR #15 squashed dev's launch-hardening onto main; dev kept granular commits. → reconcile is low-risk,
+  zero content conflicts possible.
+- Branches main / dev / feat/ios-mobile-app all intact, clean, synced to origin. One legit worktree (mobile).
+- No `.github/workflows` — **zero CI**. Deploy = Railway + Vercel auto-deploy on push. (Out of scope this pass.)
+- 0 open GitHub Issues; ~20-item backlog ready to port (separate pass).
+
+## Step 1 — Reconcile dev↔main (back-merge, then fast-forward)
+Trees identical, so merge produces no conflicts; main stays at the same content (Railway redeploy = no-op
+alembic, just a restart). Pushing main is the one irreversible/prod-facing action — confirm before push.
+- [ ] 1a `git checkout dev && git merge --no-ff main -m "chore: back-merge main (#15 squash + deploy trigger) into dev — content already in sync"`  (brings 0af92a5 + 82b3976 into dev ancestry)
+- [ ] 1b `git checkout main && git merge dev`  (fast-forwards: dev now contains main → ff, main==dev)
+- [ ] 1c verify: `git diff main dev` empty AND `git rev-parse main dev` equal
+- [ ] 1d `git push origin dev` then `git push origin main`  ← prod deploy trigger; confirm first
+- [ ] 1e post-deploy check: `curl .../health?deep=true` → 200, `railway run alembic current` → head
+
+## Step 2 — Fix stale docs ("lies") + investigate plan_type
+- [ ] 2a CLAUDE.md: delete the "migration 6e3be108bedc is buggy / missing DROP CONSTRAINT / WILL fail /
+      Followup #1" gotcha. Verified false — DROP CONSTRAINT IF EXISTS present at lines 28-31 before the UPDATE.
+- [ ] 2b CLAUDE.md: change "4 pre-existing failures in tasks/bugs.md" → "65 passed (bugs.md, resolved 2026-05-14)".
+      Also note: `tasks/bugs.md` is gitignored yet referenced as tracked — decide track-or-stop-referencing.
+- [ ] 2c HANDOFF.md: same two stale claims appear there — align.
+- [x] 2d plan_type — **INVESTIGATED 2026-06-27, NOT A BUG.** Live probe (`railway run` vs prod Supabase):
+      `users.plan_type` EXISTS, sample value `'free'`. `is_pro_user` works correctly. The subagent was wrong —
+      it assumed SQLAlchemy models = source of truth, but the live `users` table carries columns alembic
+      doesn't track. Live `users` cols: `avatar_url, created_at, email, full_name, id, last_sprint_date,
+      plan_type, streak_count, total_xp, updated_at`. → **Real issue = schema drift** (live DB ⟂ ORM/migrations),
+      NOT a broken Pro path. No code fix. Follow-up (→ Issue): add `plan_type` (+ other untracked cols) to
+      `db/models.py` and a no-op alembic sync migration so a from-scratch rebuild matches prod. Tech-debt, P3.
+
+## Deferred to GitHub Issues (NOT this pass)
+- Dead code: legacy `/quiz/generate` route + 3 helpers; ~800 LOC frontend; dead DB columns.
+- Scale: single-worker / blocking-sync-in-async; `time.sleep` long-poll; inline LLM in create_session.
+- Stand up minimal CI (pytest + tsc + ruff/eslint) — prereq for the fleet workflow.
+- Build `/morning-patch` orchestrator (see memory: fleet-orchestration-topology).
+
+---
+
 # Agent C — Ops & Launch Prep (2026-06-11)
 
 - [ ] C1: Account deletion admin script (`backend/scripts/delete_user.py`)

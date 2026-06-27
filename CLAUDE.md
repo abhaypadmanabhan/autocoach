@@ -34,7 +34,7 @@ npx tsc --noEmit # Type check
 source venv/bin/activate
 uvicorn app.main:app --reload  # Dev server at localhost:8000, docs at /docs
 alembic upgrade head           # Run migrations (uses local DATABASE_URL)
-pytest                         # Run tests (4 pre-existing failures in tasks/bugs.md)
+pytest                         # Run tests (65 passed as of 2026-05-14; history in tasks/bugs.md)
 ```
 
 ## Architecture
@@ -177,7 +177,7 @@ Frontend needs `NEXT_PUBLIC_BACKEND_URL` and Supabase publishable keys.
 - **`railway.toml` startCommand auto-runs alembic on every deploy.** CWD is `backend/` (per nixpacks Python inference). DO NOT add `cd backend &&`.
 - **Alembic uses `SUPABASE_POOLER_URL`** (Session pooler, port 5432, IPv4) NOT `DATABASE_URL` (direct host, IPv6, unreachable from Railway egress). Fallback chain in `backend/alembic/env.py`.
 - **CSP set in `frontend/next.config.ts` only.** Allows: Railway backend, Supabase, PostHog (`us.i.posthog.com`, `us-assets.i.posthog.com`). Do not add `app.posthog.com`.
-- **Migration `6e3be108bedc` is buggy** — missing `DROP CONSTRAINT IF EXISTS questions_question_type_check` before `UPDATE`. Fresh deploys to clean DBs WILL fail. Followup #1.
+- **Migration `6e3be108bedc` drops the stale Supabase CHECK** (`DROP CONSTRAINT IF EXISTS questions_question_type_check`, lines 28-31) before backfilling the enum — idempotent, safe on fresh + already-migrated DBs. (Previously flagged here as missing this; verified present 2026-06-27, gotcha was stale.)
 - **`render_kind`/`render_payload` columns** exist but unused until Phase 2 (Mermaid + Plotly).
 - **Service-role client bypasses RLS** — every backend query MUST `.eq("user_id", str(user_id))`. Audit any new route.
 - **In-memory rate limiter (`core/rate_limit.py`) is per-worker** — multi-replica deploys multiply the effective limit. Daily quotas (Postgres-backed) are the real gate.
@@ -188,7 +188,7 @@ Frontend needs `NEXT_PUBLIC_BACKEND_URL` and Supabase publishable keys.
 - `docs/specs/langfuse-selfhost.md` — Phase 1.7 self-hosted Langfuse on Railway. **SUPERSEDED 2026-05-19** — stack decommissioned on cost grounds; kept for history only.
 - `docs/specs/kimi-k2.6-migration.md` — K2.5 → K2.6 model bump
 - `docs/HANDOFF.md` — engineering handoff, "Phase 1.7 — Where We Are Right Now" is the canonical session-start read
-- `tasks/bugs.md` — pre-existing test failures filed as tickets
+- `tasks/bugs.md` — test-failure tickets, all resolved 2026-05-14 (65 passed). NOTE: gitignored, absent in fresh clones
 - `tasks/lessons.md` — captured corrections (per global instructions)
 
 ## Phase 1.7 Status (current sprint — Eval & Observability)

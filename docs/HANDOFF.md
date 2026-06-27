@@ -67,7 +67,7 @@ Check `evals/results/*.csv` for the per-row breakdown, and the `ragas_eval` trac
 - `POST .../answer` HTTP 200 ✅ — eval round-trip works
 - No `Kimi response model=... expected kimi-k2.6` warning fired → K2.6 confirmed served (no silent downgrade)
 - No Langfuse exceptions, no Tracebacks
-- Pytest: 57 passed / 3 failed / 1 error (pre-existing failures filed in `tasks/bugs.md`)
+- Pytest: 65 passed (the prior 3 failures / 1 error all resolved 2026-05-14; see `tasks/bugs.md`)
 
 ## What Shipped Earlier (5 PRs, pre-2026-05-08)
 - **PR1 (#4):** Deleted ~20K LOC dead code (mobile/, next-app/, dev/blocks, daily-sprint, analytics, config, feedback, voice, summary_generator, etc.)
@@ -90,11 +90,11 @@ Check `evals/results/*.csv` for the per-row breakdown, and the `ragas_eval` trac
 - **`railway.toml` startCommand auto-runs alembic on every deploy.** CWD is `backend/` (per nixpacks Python inference). DO NOT add `cd backend &&` — that breaks prod, twice today.
 - **Alembic uses `SUPABASE_POOLER_URL`** (Session pooler, port 5432, IPv4) NOT `DATABASE_URL` (direct host, IPv6, unreachable from Railway egress). Fallback chain in `backend/alembic/env.py`.
 - **CSP set in `frontend/next.config.ts` only.** Allows: Railway backend, Supabase, PostHog (`us.i.posthog.com` + `us-assets.i.posthog.com`). Do not add `app.posthog.com` (not needed).
-- **`question_type` column is now real Postgres enum (`question_type_enum`).** Old migration `6e3be108bedc` is buggy: missing `DROP CONSTRAINT IF EXISTS questions_question_type_check` before UPDATE. Fresh deploys to clean DBs WILL fail. Fix as small ticket.
+- **`question_type` column is now real Postgres enum (`question_type_enum`).** Migration `6e3be108bedc` drops the stale Supabase CHECK before backfilling (`DROP CONSTRAINT IF EXISTS questions_question_type_check`, lines 28-31) — verified present 2026-06-27, safe on fresh + migrated DBs. (Earlier "buggy/WILL fail" note was stale.)
 - **Render columns (`render_kind`, `render_payload`)** exist in schema but unused until Phase 2 ships executable questions.
 
 ## Known Followups (file as TODO/ticket, not blocking)
-1. Fix migration `6e3be108bedc` — add `DROP CONSTRAINT IF EXISTS` as first line of `upgrade()`
+1. ~~Fix migration `6e3be108bedc`~~ — **RESOLVED**: `DROP CONSTRAINT IF EXISTS` already present (lines 28-31). Verified 2026-06-27.
 2. Move `text_free` answer eval to background (currently ~2s p50 inline; PR4 didn't background it)
 3. Drop orphan `daily_sprints` table (intentionally left in DB by PR3, no code references)
 4. Harden `useUploadDocument.ts:90,93` — `.includes()` defensive pattern same as the bug we fixed in `useDocumentSummary`
@@ -102,12 +102,12 @@ Check `evals/results/*.csv` for the per-row breakdown, and the `ragas_eval` trac
 6. Dashboard root cleanup — audit `WeakConceptsWidget` for orphan endpoints, kill if dead (was out of scope for PR5)
 7. Langfuse: `embeddings.get_embeddings` `@observe` captures full 100×1536 float vectors per call (~600KB raw per trace). Now that Langfuse is live, measure actual trace size; if problematic, set `capture_input=False, capture_output=False` on that decorator. Don't fix preemptively.
 8. ~~App lifespan logs swallowed in production~~ — **fixed PR #9 (2026-05-10)**.
-9. Pre-existing test failures (filed in `tasks/bugs.md`):
-   - `test_usage_limits::test_consume_quiz_usage_bypasses_limit_for_pro_user` — pro-bypass test hits real Supabase; FK violation. Pre-existing since 2026-02-16 (`66ead90`).
-   - `test_usage_service::test_consume_quiz_usage_pro_bypass` — same root cause. Pre-existing since 2026-02-13 (`c890156`).
-   - `test_xp_redemption::test_redeem_xp_refund_on_failure` — asserts 2 `users.update` calls, prod makes 3. Pre-existing since 2026-02-16 (`9b4cb5b`).
-   - `test_onboarding::test_onboarding_flow` — missing `async_client` fixture. Pre-existing since 2026-02-23 (`4b18382`).
-10. CI audit — confirm pytest runs on PR and blocks on failure. As of 2026-05-10 still unverified whether `.github/workflows/*.yml` gates merges on the backend test suite. If not, the 4 pre-existing failures could mask real regressions.
+9. ~~Pre-existing test failures~~ — **ALL RESOLVED 2026-05-14, 65 passed** (`tasks/bugs.md`). Kept for history:
+   - `test_usage_limits::test_consume_quiz_usage_bypasses_limit_for_pro_user` — fixed: pro short-circuit moved to top of `consume_quiz_usage_or_429`.
+   - `test_usage_service::test_consume_quiz_usage_pro_bypass` — same fix.
+   - `test_xp_redemption::test_redeem_xp_refund_on_failure` — fixed.
+   - `test_onboarding::test_onboarding_flow` — rewritten to TestClient + mocked `supabase_admin`.
+10. CI audit — **confirmed 2026-06-27: NO `.github/workflows/` exists. Zero CI.** Deploy is Railway + Vercel auto-deploy on push only; nothing gates merges on pytest/tsc/lint. Standing up a minimal CI gate is a prereq for the multi-agent merge workflow.
 11. ~~Quiz repetition~~ — **diagnosed + fixed PR #10 (2026-05-10)**. Verify after a fresh 10-Q session against the original repeating doc — confirm `focus_concept_id` differs across consecutive `quiz.generate_questions` spans in Langfuse.
 12. ~~Langfuse SDK auth-warning per call~~ — **self-resolved**. NOOP-mode warnings stopped firing once we left NOOP. Future-proof only if creds get rotated wrong; not worth pre-silencing.
 13. **New:** Qdrant Cloud cluster suspension — keep-alive (PR #12, default 5min ping) prevents it but is per-replica + per-process. If autocoach scales to multiple workers, multiple pings (idempotent). If we move off Cloud free tier, drop the keep-alive.
