@@ -52,7 +52,10 @@ jobs:
       - name: pytest
         # `python -m pytest` (not bare `pytest`) so cwd (backend/) lands on
         # sys.path and `import app` resolves — there is no conftest/rootdir hook.
-        run: python -m pytest -q
+        # Skip the eval-harness test: it imports evals/run_ragas.py (pandas/ragas
+        # from the separate backend/evals/requirements.txt). It gets its own gate
+        # under issue #20 when the eval deps are wired into CI.
+        run: python -m pytest -q --ignore=tests/test_evals_review_fixes.py
 
   frontend:
     name: frontend · tsc + eslint
