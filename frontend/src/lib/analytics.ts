@@ -70,7 +70,7 @@ export const analytics = {
                 disable_session_recording: true,
             });
             isInitialized = true;
-            (window as any).posthog = posthog;
+            (window as Window & { posthog?: typeof posthog }).posthog = posthog;
             console.log("[posthog] init ok with host:", host);
         } else {
             console.warn("[posthog] init failed", {

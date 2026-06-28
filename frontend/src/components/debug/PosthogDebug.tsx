@@ -9,7 +9,7 @@ export function PosthogDebug() {
             console.log("[posthog-debug]", {
                 keyPresent: !!process.env.NEXT_PUBLIC_POSTHOG_KEY,
                 host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-                hasWindowPosthog: typeof window !== "undefined" && !!(window as any).posthog
+                hasWindowPosthog: typeof window !== "undefined" && !!(window as Window & { posthog?: unknown }).posthog
             });
         }, 100);
 
