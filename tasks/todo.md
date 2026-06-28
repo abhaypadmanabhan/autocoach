@@ -41,6 +41,24 @@ alembic, just a restart). Pushing main is the one irreversible/prod-facing actio
 - Stand up minimal CI (pytest + tsc + ruff/eslint) — prereq for the fleet workflow.
 - Build `/morning-patch` orchestrator (see memory: fleet-orchestration-topology).
 
+## New backlog additions (2026-06-27, user) — to port as Issues
+- [ ] **#NEW-1** `feat(quiz): rotating learning tips during launch + cut latency` — P2, area:frontend(+backend), M.
+      First question is generated inline/sync (`session_manager.py:303`), so `POST /quiz/sessions/` blocks ~3-10s;
+      only a generic spinner (`session/page.tsx:318`). Build a rotating tips carousel during
+      `sessionLoading || questionLoading` (new `frontend/src/lib/tips.ts`). Separately investigate shaving the
+      delay (move first-Q gen off the blocking path / optimistic create). Tips loader is shared with #NEW-4 review.
+- [ ] **#NEW-2** `chore(ui): tighten dashboard layout, reclaim wasted vertical space` — P3, area:frontend, S/M.
+      `dashboard/page.tsx` → `AppShell`/`Section`. Biggest gaps = section margins `my-8 sm:my-10 lg:my-12` (32-48px)
+      + tall hero. Audit within Quiet-Brutalism constraints. (Good candidate for visual-companion review.)
+- [ ] **#NEW-3** `fix(ui): refine oversized login inputs` — P3, area:frontend, S.
+      `ui/input.tsx:11`: `h-9` (36px) + `text-[13px]` + `border-2`, no size variants → reads big. Shrink baseline
+      or add a `size` prop; apply on login email/password.
+- [ ] **#NEW-4** `feat(review): wire Smart Review MVP (functional end-to-end)` — P1, area:full-stack, L.
+      Due-detection works (`concepts.py:445`) but the review session is unwired (`mode=review` unhandled).
+      Design APPROVED 2026-06-27 → `docs/superpowers/specs/2026-06-27-smart-review-mvp-design.md`.
+      MVP: reuse quiz engine scoped to due concepts · global button auto-picks most-due doc · free (no quota hit) ·
+      add `quiz_sessions.session_type`. SM-2/FSRS, cross-doc, replay-wrong = explicitly out of scope (future issues).
+
 ---
 
 # Agent C — Ops & Launch Prep (2026-06-11)
