@@ -27,7 +27,7 @@ def enforce_quiz_rate_limit(user_id=Depends(get_user_id_from_token)):
 
 
 @router.post("/generate", response_model=QuizGenerateResponse)
-async def generate_quiz(
+def generate_quiz(
     request: QuizGenerateRequest, user_id=Depends(enforce_quiz_rate_limit)
 ):
     """
