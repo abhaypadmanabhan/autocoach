@@ -91,7 +91,7 @@ export default function LoginPage() {
 
       {serverError && (
         <div
-          className="mb-5 flex items-start gap-2 px-3 py-2.5 rounded-md border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[13px] text-[var(--danger)]"
+          className="mb-5 flex items-start gap-2 px-3 py-2.5 rounded-none border border-[color-mix(in_oklab,var(--danger)_30%,var(--line-default))] bg-[color-mix(in_oklab,var(--danger)_8%,var(--bg-elev))] text-[13px] text-[var(--danger)]"
           role="alert"
         >
           <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -112,6 +112,7 @@ export default function LoginPage() {
             placeholder="you@example.com"
             {...register("email")}
             aria-invalid={!!errors.email}
+            className="h-8 text-[12px] font-mono"
           />
           {errors.email && (
             <p className="text-[12px] text-[var(--danger)] flex items-center gap-1.5">
@@ -141,13 +142,13 @@ export default function LoginPage() {
               placeholder="••••••••"
               {...register("password")}
               aria-invalid={!!errors.password}
-              className="pr-10"
+              className="h-8 text-[12px] font-mono pr-8"
             />
             <button
               type="button"
               onClick={() => setShowPassword((s) => !s)}
               aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute right-2 top-1/2 -translate-y-1/2 grid place-items-center h-7 w-7 rounded-sm text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] transition-colors"
+              className="absolute right-1 top-1/2 -translate-y-1/2 grid place-items-center h-6 w-6 rounded-none text-[var(--fg-tertiary)] hover:text-[var(--fg-primary)] transition-colors"
             >
               {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
             </button>
