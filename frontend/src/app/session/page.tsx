@@ -21,6 +21,12 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { analytics } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import {
+  LEARNING_TIP_ROTATION_MS,
+  LEARNING_TIPS,
+  getNextTipIndex,
+  getRotatingTip,
+} from "@/lib/tips";
 import { ToastProvider } from "@/components/ui/Toast";
 import type { AnswerResult, CurrentQuestion, QuestionType } from "@/lib/types";
 
@@ -316,9 +322,7 @@ function SessionContent() {
           )}
         >
           {sessionLoading || questionLoading ? (
-            <div className="rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)] p-8 flex items-center justify-center">
-              <Loader2 className="h-5 w-5 animate-spin text-[var(--fg-tertiary)]" />
-            </div>
+            <QuizLoadingTips />
           ) : sessionError || questionError ? (
             <ErrorState
               message={sessionError ?? questionError ?? "Failed to load session"}
@@ -648,6 +652,88 @@ function questionTypeLabel(t: QuestionType) {
     default:
       return "Question";
   }
+}
+
+function QuizLoadingTips() {
+  const [tipIndex, setTipIndex] = useState(0);
+  const tip = getRotatingTip(LEARNING_TIPS, tipIndex) ?? LEARNING_TIPS[0];
+
+  useEffect(() => {
+    if (LEARNING_TIPS.length <= 1) return;
+
+    const intervalId = window.setInterval(() => {
+      setTipIndex((currentIndex) =>
+        getNextTipIndex(currentIndex, LEARNING_TIPS.length),
+      );
+    }, LEARNING_TIP_ROTATION_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  if (!tip) return null;
+
+  return (
+    <section
+      aria-busy="true"
+      aria-label={`Loading quiz. Learning tip ${tipIndex + 1} of ${LEARNING_TIPS.length}: ${tip.title}`}
+      className="relative border-2 border-[var(--ink)] bg-[var(--bg-base)]"
+    >
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 w-0.5 bg-[var(--accent)]"
+      />
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--line-default)] px-5 py-3 sm:px-6">
+        <p className="kicker">01 / QUIZ LAUNCH</p>
+        <p className="font-mono text-[11px] uppercase tracking-[0.08em] tabular-nums text-[var(--fg-tertiary)]">
+          Rotates 03.5s
+        </p>
+      </div>
+
+      <div className="grid gap-6 p-5 sm:grid-cols-[minmax(0,1fr)_132px] sm:p-6">
+        <div className="flex min-h-[180px] flex-col justify-center">
+          <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
+            {tip.label}
+          </p>
+          <h2 className="mt-3 font-display text-[24px] font-medium uppercase leading-[1.14] text-[var(--fg-primary)] sm:text-[28px]">
+            {tip.title}
+          </h2>
+          <p className="mt-3 max-w-[560px] text-[15px] leading-[1.7] text-[var(--fg-secondary)]">
+            {tip.body}
+          </p>
+        </div>
+
+        <div className="border-t border-[var(--line-subtle)] pt-4 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+          <p className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
+            Tip
+          </p>
+          <p className="mt-2 font-mono text-[42px] leading-none tabular-nums text-[var(--fg-primary)]">
+            {String(tipIndex + 1).padStart(2, "0")}
+          </p>
+          <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.08em] tabular-nums text-[var(--fg-tertiary)]">
+            of {String(LEARNING_TIPS.length).padStart(2, "0")}
+          </p>
+        </div>
+      </div>
+
+      <div
+        aria-hidden
+        className="grid border-t border-[var(--line-default)]"
+        style={{
+          gridTemplateColumns: `repeat(${LEARNING_TIPS.length}, minmax(0, 1fr))`,
+        }}
+      >
+        {LEARNING_TIPS.map((learningTip, index) => (
+          <span
+            key={learningTip.id}
+            className={cn(
+              "h-1 border-r border-[var(--bg-base)] bg-[var(--line-subtle)] last:border-r-0",
+              index === tipIndex && "bg-[var(--accent)]",
+            )}
+          />
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function ErrorState({
