@@ -71,17 +71,17 @@ function DashboardContent() {
 
   return (
     <AppShell title="Dashboard" eyebrow="Workspace">
-      <PageContainer size="lg">
+      <PageContainer size="lg" className="py-4 sm:py-5 lg:py-6">
         {/* Hero */}
-        <Section className="mt-2">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-5">
+        <Section className="mt-2 my-4 sm:my-5 lg:my-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <p className="kicker mb-2">01 / DASHBOARD</p>
+              <p className="kicker mb-1.5">01 / DASHBOARD</p>
               <LivePill>Welcome back</LivePill>
-              <h1 className="mt-3 font-display uppercase text-[36px] sm:text-[44px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
+              <h1 className="mt-2 font-display uppercase text-[28px] sm:text-[34px] font-medium tracking-[-0.02em] text-[var(--fg-primary)]">
                 Ready to learn?
               </h1>
-              <p className="mt-2 text-[15px] text-[var(--fg-secondary)] max-w-[520px]">
+              <p className="mt-1.5 text-[15px] text-[var(--fg-secondary)] max-w-[520px]">
                 Pick up where you left off, review what&apos;s due, or upload a new
                 document and start a fresh session.
               </p>
@@ -97,27 +97,27 @@ function DashboardContent() {
         </Section>
 
         {/* Stats */}
-        <Section>
+        <Section className="my-4 sm:my-5 lg:my-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-px border border-[var(--line-subtle)] bg-[var(--line-subtle)]">
-            <StatCell label="Documents" value={totalDocuments} className="border-0" />
-            <StatCell label="Ready" value={readyDocuments} className="border-0" />
-            <StatCell label="Concepts practiced" value={sessionsTotal} className="border-0" />
+            <StatCell label="Documents" value={totalDocuments} className="border-0 rounded-none !p-3" />
+            <StatCell label="Ready" value={readyDocuments} className="border-0 rounded-none !p-3" />
+            <StatCell label="Concepts practiced" value={sessionsTotal} className="border-0 rounded-none !p-3" />
             <StatCell
               label="Avg mastery"
               value={Math.round(avgMastery)}
               unit="%"
-              className="border-0"
+              className="border-0 rounded-none !p-3"
             />
           </div>
         </Section>
 
         {/* Continue learning */}
         {recentDocument && (
-          <Section>
-            <h2 className="kicker mb-3">Continue learning</h2>
-            <div className="flex items-center justify-between gap-4 p-4 rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)]">
+          <Section className="my-4 sm:my-5 lg:my-6">
+            <h2 className="kicker mb-2">Continue learning</h2>
+            <div className="flex items-center justify-between gap-4 p-3 border border-[var(--line-subtle)] bg-[var(--bg-base)]">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="grid place-items-center h-10 w-10 rounded-md bg-[var(--bg-elev)] border border-[var(--line-default)] shrink-0">
+                <div className="grid place-items-center h-8 w-8 bg-[var(--bg-elev)] border border-[var(--line-default)] shrink-0">
                   <FileText className="h-4 w-4 text-[var(--fg-secondary)]" />
                 </div>
                 <div className="min-w-0">
@@ -143,14 +143,14 @@ function DashboardContent() {
         )}
 
         {/* Smart review */}
-        <Section>
-          <h2 className="kicker mb-3">Smart review</h2>
+        <Section className="my-4 sm:my-5 lg:my-6">
+          <h2 className="kicker mb-2">Smart review</h2>
           <SmartReviewCard />
         </Section>
 
         {/* Documents grid */}
-        <Section>
-          <div className="flex items-baseline justify-between mb-3">
+        <Section className="my-4 sm:my-5 lg:my-6">
+          <div className="flex items-baseline justify-between mb-2">
             <h2 className="kicker">Your documents</h2>
             <span className="font-mono text-[11px] tabular-nums text-[var(--fg-tertiary)]">
               {documents.length}
@@ -158,17 +158,17 @@ function DashboardContent() {
           </div>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} className="h-32 rounded-md" />
+                <Skeleton key={i} className="h-24 rounded-none" />
               ))}
             </div>
           ) : error ? (
-            <div className="p-5 border border-[var(--danger)] bg-transparent font-mono text-[12px] uppercase tracking-[0.04em] text-[var(--danger)]">
+            <div className="p-4 border border-[var(--danger)] bg-transparent font-mono text-[12px] uppercase tracking-[0.04em] text-[var(--danger)]">
               {`Failed to load documents: ${error}`}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {documents.map((doc) => {
                 const progress = progressDocs.find(
                   (p) => p.document_id === doc.id,
@@ -186,8 +186,8 @@ function DashboardContent() {
               <Link
                 href="/upload"
                 className={cn(
-                  "group flex flex-col items-center justify-center gap-2 p-5",
-                  "min-h-[8rem] rounded-md border border-dashed border-[var(--line-default)]",
+                  "group flex flex-col items-center justify-center gap-2 p-4",
+                  "min-h-[6rem] border border-dashed border-[var(--line-default)]",
                   "text-[var(--fg-tertiary)] hover:text-[var(--fg-secondary)] hover:border-[var(--line-strong)] hover:bg-[var(--bg-surface)]",
                   "transition-colors duration-[180ms]",
                 )}
@@ -222,19 +222,19 @@ function DocCard({
         if (status !== "ready") e.preventDefault();
       }}
       className={cn(
-        "group relative flex flex-col p-4 rounded-md border border-[var(--line-subtle)] bg-[var(--bg-base)]",
+        "group relative flex flex-col p-3 border border-[var(--line-subtle)] bg-[var(--bg-base)]",
         "transition-[border-color,background-color] duration-[180ms]",
         "hover:border-[var(--line-default)] hover:bg-[var(--bg-surface)]",
         status !== "ready" && "cursor-default",
       )}
     >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="grid place-items-center h-8 w-8 rounded-md bg-[var(--bg-elev)] border border-[var(--line-default)]">
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="grid place-items-center h-8 w-8 bg-[var(--bg-elev)] border border-[var(--line-default)]">
           <FileText className="h-3.5 w-3.5 text-[var(--fg-secondary)]" />
         </div>
         <StatusPill variant={statusVariant} />
       </div>
-      <p className="text-[14px] font-medium text-[var(--fg-primary)] line-clamp-2 mb-3">
+      <p className="text-[14px] font-medium text-[var(--fg-primary)] line-clamp-2 mb-2">
         {title}
       </p>
       <div className="mt-auto">
