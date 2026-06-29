@@ -12,6 +12,7 @@ from fastapi import (
     BackgroundTasks,
     Response,
 )
+from starlette.concurrency import run_in_threadpool
 
 import logging
 
@@ -76,7 +77,11 @@ async def get_user_id_from_token(authorization: str = Header(...)) -> UUID:
     token = authorization.replace("Bearer ", "")
 
     try:
-        user_response = supabase_admin.auth.get_user(token)
+        # `supabase_admin.auth.get_user` is a blocking sync HTTP call. This
+        # dependency is an `async def` resolved on the event loop, so running
+        # the call inline would freeze the loop for every authenticated
+        # request. Offload it to the threadpool so the loop stays free.
+        user_response = await run_in_threadpool(supabase_admin.auth.get_user, token)
         if not user_response or not user_response.user:
             raise HTTPException(status_code=401, detail="Invalid or expired token")
         return UUID(user_response.user.id)

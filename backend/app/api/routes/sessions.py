@@ -1,4 +1,12 @@
-"""Quiz session API routes."""
+"""Quiz session API routes.
+
+NOTE (scale / event-loop, #18): these route handlers are intentionally plain
+`def`, not `async def`. They call blocking sync I/O (Supabase, Qdrant, the LLM
+via `session_manager`). FastAPI/Starlette runs sync handlers in a threadpool,
+so that blocking work stays OFF the single event loop. Keep new handlers here
+sync unless they are fully async (await-only) — adding `async` in front of a
+handler that calls blocking `session_manager` functions re-freezes the loop.
+"""
 
 import logging
 
@@ -45,7 +53,7 @@ def enforce_quiz_rate_limit(user_id=Depends(get_user_id_from_token)):
 
 
 @router.post("/", response_model=dict)
-async def create_quiz_session(
+def create_quiz_session(
     request: QuizSessionCreate, user_id=Depends(enforce_quiz_rate_limit)
 ):
     """
@@ -139,7 +147,7 @@ async def create_quiz_session(
 
 
 @router.get("/{session_id}", response_model=SessionStatus)
-async def get_session_status(session_id: UUID, user_id=Depends(enforce_quiz_rate_limit)):
+def get_session_status(session_id: UUID, user_id=Depends(enforce_quiz_rate_limit)):
     """
     Get the status of a quiz session.
 
@@ -184,7 +192,7 @@ async def get_session_status(session_id: UUID, user_id=Depends(enforce_quiz_rate
 
 
 @router.get("/{session_id}/current", response_model=QuestionResponse)
-async def get_current_quiz_question(
+def get_current_quiz_question(
     session_id: UUID, user_id=Depends(enforce_quiz_rate_limit)
 ):
     """
@@ -248,7 +256,7 @@ async def get_current_quiz_question(
 
 
 @router.post("/{session_id}/answer", response_model=AnswerResponse)
-async def submit_quiz_answer(
+def submit_quiz_answer(
     session_id: UUID,
     question_id: UUID,
     answer_data: AnswerSubmit,
@@ -298,7 +306,7 @@ async def submit_quiz_answer(
 
 
 @router.get("/{session_id}/next", response_model=NextQuestionResponse)
-async def get_next_question(
+def get_next_question(
     session_id: UUID,
     wait_ms: int = Query(default=5000, ge=0, le=10000),
     user_id=Depends(enforce_quiz_rate_limit),

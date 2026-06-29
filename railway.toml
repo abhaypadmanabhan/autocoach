@@ -2,4 +2,10 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1"
+# --workers raised 1 -> 2 (#18) now that blocking I/O is off the event loop
+# (route handlers run in Starlette's threadpool; auth offloaded). Conservative
+# bump for process-level parallelism; each worker is a full app process, so
+# raise further only after confirming container memory headroom. NOTE: the
+# in-memory rate limiter is per-worker, so effective rate limit scales with
+# worker count — daily Postgres quotas remain the real gate.
+startCommand = "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2"
