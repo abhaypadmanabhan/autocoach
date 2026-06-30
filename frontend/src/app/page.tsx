@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { type ReactNode, useState } from "react";
-import { motion, MotionConfig } from "motion/react";
+import { type ReactNode, useRef, useState } from "react";
+import { motion, MotionConfig, useInView } from "motion/react";
 import {
   ArrowRight,
   Check,
@@ -685,8 +685,8 @@ function Engine() {
 /* ------------------------------------------------------------------ */
 
 const FREE_FEATURES = [
-  "3 documents",
-  "2 quiz sessions per day",
+  "2 documents",
+  "5 quiz sessions per day",
   "Concept extraction + mastery tracking",
   "Daily review queue",
 ];
@@ -700,6 +700,9 @@ const PRO_FEATURES = [
 ];
 
 function Pricing() {
+  const priceRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(priceRef, { once: true, margin: "-60px" });
+
   return (
     <SectionShell id="pricing" kicker="06 / Pricing">
       <Reveal>
@@ -738,12 +741,27 @@ function Pricing() {
                 Recommended
               </span>
             </div>
-            <p className="mt-4 font-mono text-[44px] tabular-nums leading-none">
-              $8
-              <span className="text-[14px] text-[var(--fg-tertiary)]"> /month</span>
-            </p>
+            <div ref={priceRef} className="relative mt-4 inline-block">
+              <p className="font-mono text-[44px] tabular-nums leading-none">
+                $8
+                <span className="text-[14px] text-[var(--fg-tertiary)]"> /month</span>
+              </p>
+              <div
+                className="pointer-events-none absolute inset-0 flex items-center"
+                aria-hidden
+              >
+                <span className="inline-block w-[110%] -rotate-[10deg] origin-left">
+                  <span
+                    className={cn(
+                      "block h-[2px] w-full bg-[var(--ink)] origin-left scale-x-0",
+                      isInView && "anim-hairline-draw",
+                    )}
+                  />
+                </span>
+              </div>
+            </div>
             <p className="mt-3 text-[13px] text-[var(--fg-secondary)]">
-              For exam season, certification grinds, and people with more than three PDFs.
+              For exam season, certification grinds, and people with more than two PDFs.
             </p>
             <ul className="mt-6 space-y-2.5 text-[14px] text-[var(--fg-secondary)] flex-1 list-none p-0">
               {PRO_FEATURES.map((f) => (
@@ -753,9 +771,12 @@ function Pricing() {
                 </li>
               ))}
             </ul>
-            <Button block className="mt-8" asChild>
-              <Link href="/signup">Go Pro</Link>
-            </Button>
+            <div
+              aria-disabled="true"
+              className="mt-8 w-full border border-[var(--line-default)] px-1.5 py-2.5 text-center font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)] pointer-events-none select-none"
+            >
+              Coming soon
+            </div>
           </div>
         </Reveal>
       </div>
