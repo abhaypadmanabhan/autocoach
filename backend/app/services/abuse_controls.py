@@ -4,9 +4,13 @@ from uuid import UUID
 from fastapi import HTTPException
 
 from app.core.supabase import supabase_admin
+from app.services.usage import has_unlimited
 
 
 def enforce_max_documents(user_id: UUID, max_documents: int) -> None:
+    if has_unlimited(user_id):
+        return
+
     response = (
         supabase_admin.table("documents")
         .select("id")

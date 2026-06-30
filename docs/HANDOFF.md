@@ -2,6 +2,8 @@
 
 > **UPDATE 2026-05-19 — Self-hosted Langfuse decommissioned.** The co-located Langfuse Railway stack (langfuse-web, langfuse-worker, Postgres, ClickHouse, Redis, MinIO) was 94% of the Railway bill (~$13/cycle, est. ~$38/mo) for a zero-user app. Stack torn down; `LANGFUSE_*` env vars removed from autocoach Railway service → backend SDK runs NOOP, zero observability cost. `docs/specs/langfuse-selfhost.md` is SUPERSEDED. Replacement = Langfuse Cloud free tier, tracked in `tasks/todo.md` (not yet executed). Everything below this banner reflects pre-2026-05-19 state.
 
+> **UPDATE 2026-06-30 — Admin/owner unlimited override (#40).** Daily quiz quota and document-count quota now use `has_unlimited(user_id)`, which grants unlimited access when either `users.plan_type = 'pro'` or the user's email appears in the backend `ADMIN_EMAILS` env var. To grant the owner, set `ADMIN_EMAILS=abhaykerala@gmail.com` on the backend service and restart/redeploy; append additional comma-separated emails for named users. To revoke an env grant, remove the email and restart/redeploy. To grant via DB instead, run `update public.users set plan_type = 'pro' where email = '<user@example.com>';`; revoke with `update public.users set plan_type = 'free' where email = '<user@example.com>';`. Payments remain off; this is only an entitlement override. #31 guard: if `users.plan_type` is absent, `is_pro_user()` returns `False` rather than raising, so use `ADMIN_EMAILS` until the column exists. The 60/min quiz rate limiter is intentionally unchanged and still applies.
+
 ## Current State
 - Stack: Vercel (frontend), Railway (backend FastAPI), Supabase (Postgres + auth), Qdrant Cloud (vectors)
 - Backend URL: https://autocoach-production.up.railway.app

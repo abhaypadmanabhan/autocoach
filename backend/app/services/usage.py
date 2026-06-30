@@ -3,6 +3,7 @@ from uuid import UUID
 
 from fastapi import HTTPException
 
+from app.config import get_settings
 from app.core.supabase import supabase_admin
 
 # Limits
@@ -79,7 +80,33 @@ def is_pro_user(user_id: str | UUID) -> bool:
         data = _as_dict(getattr(res, "data", None))
         return is_pro(data.get("plan_type"))
     except Exception:
+        # #31: some DBs may not have users.plan_type yet; fail closed, never 500.
         return False
+
+
+def is_admin_user(user_id: str | UUID) -> bool:
+    """Check if user email is configured for unlimited access."""
+    admin_emails = get_settings().get_admin_emails()
+    if not admin_emails:
+        return False
+
+    try:
+        res = (
+            supabase_admin.table("users")
+            .select("email")
+            .eq("id", str(user_id))
+            .single()
+            .execute()
+        )
+        email = str(_as_dict(getattr(res, "data", None)).get("email") or "")
+        return email.strip().lower() in admin_emails
+    except Exception:
+        return False
+
+
+def has_unlimited(user_id: str | UUID) -> bool:
+    """Return whether the user bypasses usage quotas."""
+    return is_pro_user(user_id) or is_admin_user(user_id)
 
 
 def _build_limit_error(limit_type: str, limit: int, message: str) -> HTTPException:
@@ -103,8 +130,8 @@ def _consume_usage_or_raise(
     message: str,
 ) -> int:
     """Atomically increment usage with optimistic retry and limit enforcement."""
-    # Pro users bypass limits and don't increment counters
-    if is_pro_user(user_id):
+    # Unlimited users bypass limits and don't increment counters.
+    if has_unlimited(user_id):
         return 0
 
     today = _get_today_str()
@@ -183,7 +210,7 @@ def increment_quiz_usage(user_id: UUID) -> None:
 
 def consume_quiz_usage_or_429(user_id: UUID) -> int:
     """Atomically consume one quiz from daily quota or raise 429."""
-    if is_pro_user(user_id):
+    if has_unlimited(user_id):
         return 0
 
     usage = get_or_create_daily_usage(user_id)
