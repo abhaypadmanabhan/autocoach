@@ -92,3 +92,64 @@ def test_selector_standard_mode_unaffected():
         chosen = session_manager._select_next_concept("sess", USER, DOC_A)
     assert chosen["id"] == C1
     due_mock.assert_not_called()  # never consults due set in standard mode
+
+
+# --- Route: review branch + quota carve-out -------------------------------
+
+from fastapi.testclient import TestClient
+
+
+def _client_with_user():
+    import app.config
+    from unittest.mock import MagicMock as MM
+    app.config.get_settings = lambda: MM(
+        supabase_url="http://test", supabase_publishable_key="test",
+        supabase_secret_key="test", qdrant_url="http://test", qdrant_api_key="test",
+        kimi_api_key="test", max_document_mb=10, max_documents_per_user=10,
+        max_quiz_sessions_per_day=5, quiz_requests_per_minute=60, environment="test",
+    )
+    from app.main import app
+    from app.api.routes.documents import get_user_id_from_token
+
+    async def _override():
+        return USER
+
+    app.dependency_overrides[get_user_id_from_token] = _override
+    return TestClient(app)
+
+
+def test_review_session_skips_quota(mocker):
+    client = _client_with_user()
+    from app.api.routes import sessions as sessions_route
+
+    mocker.patch.object(sessions_route, "pick_review_document", return_value=(DOC_A, [C1, C2]))
+    create_mock = mocker.patch.object(
+        sessions_route, "create_session",
+        return_value={"session_id": "sess-rev", "document_id": DOC_A,
+                      "difficulty": "medium", "total_questions": 2, "first_question": None},
+    )
+    consume_mock = mocker.patch.object(sessions_route, "consume_quiz_usage_or_429")
+
+    resp = client.post("/quiz/sessions/", json={"mode": "review"})
+
+    assert resp.status_code == 200
+    consume_mock.assert_not_called()                      # review is FREE
+    create_mock.assert_called_once()
+    kwargs = create_mock.call_args.kwargs
+    assert kwargs["session_type"] == "review"
+    assert kwargs["document_id"] == DOC_A
+    assert kwargs["num_questions"] == 2                    # min(len(due), 10)
+
+
+def test_review_session_404_when_nothing_due(mocker):
+    client = _client_with_user()
+    from app.api.routes import sessions as sessions_route
+    mocker.patch.object(sessions_route, "pick_review_document", return_value=None)
+    resp = client.post("/quiz/sessions/", json={"mode": "review"})
+    assert resp.status_code == 404
+
+
+def test_standard_session_requires_document_id(mocker):
+    client = _client_with_user()
+    resp = client.post("/quiz/sessions/", json={"num_questions": 5})  # no document_id
+    assert resp.status_code == 400

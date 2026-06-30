@@ -31,6 +31,7 @@ from app.services.session_manager import (
     get_current_question,
     generate_next_question_bg,
     wait_for_next_question,
+    pick_review_document,
 )
 from app.services.usage import consume_quiz_usage_or_429
 from app.api.routes.documents import get_user_id_from_token
@@ -70,6 +71,30 @@ def create_quiz_session(
         HTTPException: 404 if document not found, 400 if not ready, 500 on error.
     """
     try:
+        if request.mode == "review":
+            # Smart Review: auto-pick the most-due document, scope the selector
+            # to its due concepts, and run a FREE session (no quota consumed).
+            picked = pick_review_document(str(user_id))
+            if not picked:
+                raise HTTPException(
+                    status_code=404,
+                    detail="No concepts are due for review right now.",
+                )
+            review_document_id, due_ids = picked
+            session_data = create_session(
+                user_id=str(user_id),
+                document_id=review_document_id,
+                num_questions=max(1, min(len(due_ids), 10)),
+                difficulty=request.difficulty,
+                question_types=request.question_types,
+                session_type="review",
+            )
+            # Review is FREE — intentionally skip consume_quiz_usage_or_429.
+            return session_data
+
+        if not request.document_id:
+            raise HTTPException(status_code=400, detail="document_id is required.")
+
         # Verify document exists and belongs to user
         doc_response = (
             supabase_admin.table("documents")
