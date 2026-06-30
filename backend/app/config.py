@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     environment: str = "development"
 
     # Abuse controls
+    admin_emails: str = ""
     max_document_mb: int = 20
     max_documents_per_user: int = 2
     max_quiz_sessions_per_day: int = 5
@@ -68,6 +69,13 @@ class Settings(BaseSettings):
     # Sentry
     sentry_dsn: str | None = None
 
+    def get_admin_emails(self) -> set[str]:
+        """Return normalized emails with unlimited access."""
+        return {
+            email.strip().lower()
+            for email in self.admin_emails.split(",")
+            if email.strip()
+        }
 
     def get_cors_origins(self) -> List[str]:
         """Build list of allowed CORS origins based on environment."""

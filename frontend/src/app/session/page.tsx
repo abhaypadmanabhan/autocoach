@@ -50,6 +50,7 @@ function SessionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id") ?? searchParams.get("id");
+  const isReview = searchParams.get("mode") === "review";
   const timerParam = searchParams.get("t");
   const initialTimer = timerParam ? parseInt(timerParam, 10) : null;
 
@@ -285,7 +286,7 @@ function SessionContent() {
       <TopNav
         showBack
         backHref="/dashboard"
-        eyebrow={document?.ai_title ?? document?.filename}
+        eyebrow={isReview ? "Smart Review" : (document?.ai_title ?? document?.filename)}
         title={
           session && question
             ? `Question ${question.question_number} of ${session.total_questions}`
@@ -322,7 +323,7 @@ function SessionContent() {
           )}
         >
           {sessionLoading || questionLoading ? (
-            <QuizLoadingTips />
+            <QuizLoadingTips kicker={isReview ? "01 / SMART REVIEW" : undefined} />
           ) : sessionError || questionError ? (
             <ErrorState
               message={sessionError ?? questionError ?? "Failed to load session"}
@@ -654,7 +655,7 @@ function questionTypeLabel(t: QuestionType) {
   }
 }
 
-function QuizLoadingTips() {
+function QuizLoadingTips({ kicker = "01 / QUIZ LAUNCH" }: { kicker?: string }) {
   const [tipIndex, setTipIndex] = useState(0);
   const tip = getRotatingTip(LEARNING_TIPS, tipIndex) ?? LEARNING_TIPS[0];
 
@@ -683,7 +684,7 @@ function QuizLoadingTips() {
         className="absolute inset-y-0 left-0 w-0.5 bg-[var(--accent)]"
       />
       <div className="flex items-center justify-between gap-3 border-b border-[var(--line-default)] px-5 py-3 sm:px-6">
-        <p className="kicker">01 / QUIZ LAUNCH</p>
+        <p className="kicker">{kicker}</p>
         <p className="font-mono text-[11px] uppercase tracking-[0.08em] tabular-nums text-[var(--fg-tertiary)]">
           Rotates 03.5s
         </p>

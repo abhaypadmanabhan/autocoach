@@ -1,14 +1,34 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, AlertTriangle, Sparkles, Loader2 } from "lucide-react";
 
 import { useReviewQueue } from "@/hooks/useReviewQueue";
+import { apiFetch, getErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 
 export function SmartReviewCard() {
   const { dueCount, conceptsPreview, dailyLimit, dailyLimitHit, isLoading, error } =
     useReviewQueue();
+  const router = useRouter();
+  const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+
+  async function handleStartReview() {
+    setStarting(true);
+    setStartError(null);
+    try {
+      const res = await apiFetch<{ session_id: string }>("/quiz/sessions/", {
+        method: "POST",
+        body: { mode: "review" },
+      });
+      router.push(`/session?session_id=${res.session_id}&mode=review`);
+    } catch (err) {
+      setStartError(getErrorMessage(err));
+      setStarting(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -86,10 +106,20 @@ export function SmartReviewCard() {
             </p>
           </div>
         </div>
-        <Button asChild>
-          <Link href="/session?mode=review">Start review</Link>
+        <Button onClick={handleStartReview} disabled={starting}>
+          {starting ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Starting…
+            </>
+          ) : (
+            "Start review"
+          )}
         </Button>
       </div>
+      {startError && (
+        <p className="mt-2 text-[12px] text-[var(--danger)]">{startError}</p>
+      )}
     </div>
   );
 }
