@@ -236,11 +236,8 @@ export default function SettingsPage() {
                     Unlimited uploads, adaptive sessions, smart review.
                   </p>
                 </div>
-                <Button variant="secondary" disabled>
-                  Upgrade
-                  <span className="ml-1 font-mono text-[10px] text-[var(--fg-disabled)]">
-                    Soon
-                  </span>
+                <Button variant="secondary" disabled aria-disabled="true">
+                  Coming soon
                 </Button>
               </div>
             </SettingsRow>
