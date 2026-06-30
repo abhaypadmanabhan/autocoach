@@ -11,7 +11,7 @@ from app.core.supabase import supabase_admin
 from app.observability.langfuse import observe
 from app.services.quiz_generator import generate_single_question
 from app.services.answer_evaluator import evaluate_answer
-from app.services.concepts import get_document_concepts
+from app.services.concepts import get_document_concepts, get_due_concepts
 
 logger = logging.getLogger(__name__)
 
@@ -172,8 +172,69 @@ def _get_session_question_history(session_id: str) -> list[dict]:
     return res.data or []
 
 
+def _due_concept_ids_for_document(user_id: str, document_id: str) -> set[str]:
+    """Concept ids currently due for review within one document.
+
+    Re-derived from get_due_concepts so the review pool narrows automatically
+    as mastery rises (reviewed concepts leave the due set)."""
+    try:
+        due = get_due_concepts(user_id, limit=20)
+    except Exception as e:
+        logger.warning(f"[review] get_due_concepts failed for user {user_id}: {e}")
+        return set()
+    return {
+        str(c["id"])
+        for c in due
+        if c.get("id") and str(c.get("document_id")) == str(document_id)
+    }
+
+
+def pick_review_document(user_id: str) -> tuple[str, list[str]] | None:
+    """Auto-pick the document with the most due concepts.
+
+    Tie-break: most recently studied (max last_tested_at among its due
+    concepts). Skips documents not in 'ready' status / deleted. Returns
+    (document_id, due_concept_ids) or None when nothing qualifies."""
+    due = get_due_concepts(user_id, limit=20)
+    if not due:
+        return None
+
+    by_doc: dict[str, dict] = {}
+    for c in due:
+        doc_id = c.get("document_id")
+        cid = c.get("id")
+        if not doc_id or not cid:
+            continue
+        entry = by_doc.setdefault(str(doc_id), {"ids": [], "latest": ""})
+        entry["ids"].append(str(cid))
+        last = c.get("last_tested_at") or ""
+        if last > entry["latest"]:
+            entry["latest"] = last
+    if not by_doc:
+        return None
+
+    candidate_ids = list(by_doc.keys())
+    docs_resp = (
+        supabase_admin.table("documents")
+        .select("id,status")
+        .eq("user_id", user_id)
+        .in_("id", candidate_ids)
+        .eq("status", "ready")
+        .execute()
+    )
+    ready_ids = {str(d["id"]) for d in (docs_resp.data or [])}
+    ranked = [d for d in candidate_ids if d in ready_ids]
+    if not ranked:
+        return None
+
+    # Most due first; tie-break by most recently studied.
+    ranked.sort(key=lambda d: (len(by_doc[d]["ids"]), by_doc[d]["latest"]), reverse=True)
+    chosen = ranked[0]
+    return chosen, by_doc[chosen]["ids"]
+
+
 def _select_next_concept(
-    session_id: str, user_id: str, document_id: str
+    session_id: str, user_id: str, document_id: str, session_type: str = "standard"
 ) -> dict | None:
     """Pick the next concept to test, using updated mastery scores.
 
@@ -193,10 +254,19 @@ def _select_next_concept(
         )
         return None
 
-    core_concepts = [c for c in all_concepts if c.get("is_core")]
+    if session_type == "review":
+        due_ids = _due_concept_ids_for_document(user_id, document_id)
+        core_concepts = [c for c in all_concepts if str(c["id"]) in due_ids]
+        # Due subset exhausted (mastery rose) → fall back to normal core pool.
+        if not core_concepts:
+            core_concepts = [c for c in all_concepts if c.get("is_core")]
+    else:
+        core_concepts = [c for c in all_concepts if c.get("is_core")]
+
     if not core_concepts:
         logger.warning(
-            f"[selector] No core concepts for document {document_id}; cannot select"
+            f"[selector] No selectable concepts for document {document_id} "
+            f"(session_type={session_type}); cannot select"
         )
         return None
 
@@ -289,6 +359,7 @@ def _generate_and_insert_question(
     difficulty: str,
     question_types: list[str],
     question_number: int,
+    session_type: str = "standard",
 ) -> dict | None:
     """Synchronous: pick a concept, generate one question, insert as ready.
 
@@ -296,7 +367,7 @@ def _generate_and_insert_question(
     question back in the create-session response. Subsequent questions go
     through `generate_next_question_bg` instead.
     """
-    concept = _select_next_concept(session_id, user_id, document_id)
+    concept = _select_next_concept(session_id, user_id, document_id, session_type)
     if not concept:
         return None
 
@@ -458,7 +529,9 @@ def generate_next_question_bg(session_id: str, user_id: str) -> None:
     while attempts < MAX_GENERATION_ATTEMPTS:
         attempts += 1
         try:
-            concept = _select_next_concept(session_id, user_id, document_id)
+            concept = _select_next_concept(
+                session_id, user_id, document_id, session.get("session_type") or "standard"
+            )
             if not concept:
                 last_err = RuntimeError("selector returned no concept")
                 break
@@ -606,6 +679,7 @@ def create_session(
     question_types: list[str],
     focus_concept_ids: list[str] | None = None,
     session_id: str | None = None,
+    session_type: str = "standard",
 ) -> dict:
     """Create a new adaptive quiz session and generate question 1.
 
@@ -635,6 +709,7 @@ def create_session(
             "user_id": user_id,
             "document_id": document_id,
             "status": "active",
+            "session_type": session_type,
             "difficulty": difficulty,
             "total_questions": num_questions,
             "answered_questions": 0,
@@ -651,6 +726,7 @@ def create_session(
             difficulty=difficulty,
             question_types=question_types,
             question_number=1,
+            session_type=session_type,
         )
 
         if not first_question:

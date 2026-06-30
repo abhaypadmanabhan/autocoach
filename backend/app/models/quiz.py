@@ -97,7 +97,8 @@ class QuizGenerateResponse(BaseModel):
 class QuizSessionCreate(BaseModel):
     """Request model for creating a quiz session."""
 
-    document_id: str
+    document_id: str | None = None
+    mode: str = Field(default="standard", pattern="^(standard|review)$")
     num_questions: int = Field(default=5, ge=1, le=20)
     difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
     question_types: list[QuestionType] = Field(default_factory=lambda: list(DEFAULT_QUESTION_TYPES))
