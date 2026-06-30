@@ -753,7 +753,7 @@ function Pricing() {
                 <span className="inline-block w-[110%] -rotate-[10deg] origin-left">
                   <span
                     className={cn(
-                      "block h-[2px] w-full bg-[var(--ink)]",
+                      "block h-[2px] w-full bg-[var(--ink)] origin-left scale-x-0",
                       isInView && "anim-hairline-draw",
                     )}
                   />
@@ -761,7 +761,7 @@ function Pricing() {
               </div>
             </div>
             <p className="mt-3 text-[13px] text-[var(--fg-secondary)]">
-              For exam season, certification grinds, and people with more than three PDFs.
+              For exam season, certification grinds, and people with more than two PDFs.
             </p>
             <ul className="mt-6 space-y-2.5 text-[14px] text-[var(--fg-secondary)] flex-1 list-none p-0">
               {PRO_FEATURES.map((f) => (
@@ -772,7 +772,7 @@ function Pricing() {
               ))}
             </ul>
             <div
-              role="status"
+              aria-disabled="true"
               className="mt-8 w-full border border-[var(--line-default)] px-1.5 py-2.5 text-center font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--fg-tertiary)] pointer-events-none select-none"
             >
               Coming soon
