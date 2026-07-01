@@ -391,3 +391,141 @@ def test_wait_for_answer_verdict_returns_pending_after_timeout(monkeypatch):
     result = session_manager.wait_for_answer_verdict(SESSION_ID, USER_ID, QUESTION_ID, wait_ms=200)
     assert result["eval_status"] == "pending"
     assert result.get("retry_after_ms") == 500
+
+
+# ---------------------------------------------------------------------------
+# _select_next_concept — wrong-answer bias boost (issue #24)
+# ---------------------------------------------------------------------------
+
+CORE_A = "11111111-1111-1111-1111-111111111111"
+CORE_B = "22222222-2222-2222-2222-222222222222"
+CORE_C = "33333333-3333-3333-3333-333333333333"
+CORE_F = "44444444-4444-4444-4444-444444444444"
+
+
+def _concept(cid: str, importance: float, mastery: float, is_core: bool = True) -> dict:
+    return {
+        "id": cid,
+        "concept_name": f"Concept-{cid[:4]}",
+        "importance_score": importance,
+        "is_core": is_core,
+        "mastery_score": mastery,
+    }
+
+
+def _hist(records: list[dict]) -> list[dict]:
+    """Build a session question history (oldest first) with sane defaults."""
+    out = []
+    for i, r in enumerate(records, start=1):
+        out.append(
+            {
+                "id": f"q-{i}",
+                "concept_ids": r["concept_ids"],
+                "is_correct": r["is_correct"],
+                "user_answer": "x",
+                "answered_at": f"2026-05-04T00:00:{i:02d}+00:00",
+                "question_number": i,
+            }
+        )
+    return out
+
+
+def _run_picks(concepts: list[dict], history: list[dict], seed: int, n: int = 600) -> list[str]:
+    with patch.object(session_manager, "get_document_concepts", return_value=concepts), \
+         patch.object(session_manager, "_get_session_question_history", return_value=history):
+        random.seed(seed)
+        return [
+            session_manager._select_next_concept(SESSION_ID, USER_ID, DOC_ID)["id"]
+            for _ in range(n)
+        ]
+
+
+def test_recently_missed_concept_selected_more_often():
+    """A concept missed in the last 10 answered Qs outdraws an equally-mastered
+    non-missed peer. Same-seed control isolates the ×1.3 boost as the cause."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=50.0),
+        _concept(CORE_B, importance=1.0, mastery=50.0),
+        _concept(CORE_C, importance=1.0, mastery=95.0),  # filler → skip/dedup-excluded
+    ]
+    # Last 3 = C,C,C → dedup excludes C (and 3-correct lockout). Candidates = A,B.
+    # A's miss sits inside the last-10 window but outside the last-3 dedup window.
+    missed = _hist([
+        {"concept_ids": [CORE_A], "is_correct": False},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+    ])
+    control = _hist([
+        {"concept_ids": [CORE_A], "is_correct": True},  # A answered correctly → no boost
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+    ])
+
+    missed_picks = _run_picks(concepts, missed, seed=0)
+    control_picks = _run_picks(concepts, control, seed=0)
+
+    a_missed = missed_picks.count(CORE_A)
+    b_missed = missed_picks.count(CORE_B)
+    a_control = control_picks.count(CORE_A)
+
+    # The boosted concept beats its equally-mastered peer...
+    assert a_missed > b_missed
+    # ...and beats its own non-missed baseline under an identical RNG stream.
+    assert a_missed > a_control
+
+
+def test_wrong_answer_boost_never_overrides_recent_dedup():
+    """Even a tempting, recently-missed concept stays excluded while it sits in
+    the RECENT_ASK_WINDOW — dedup wins over the boost."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=10.0),  # very tempting + missed
+        _concept(CORE_B, importance=1.0, mastery=50.0),
+        _concept(CORE_C, importance=1.0, mastery=50.0),
+    ]
+    # A fills the last 3 answered Qs (and was missed) → dedup-excluded despite boost.
+    history = _hist([
+        {"concept_ids": [CORE_A], "is_correct": False},
+        {"concept_ids": [CORE_A], "is_correct": False},
+        {"concept_ids": [CORE_A], "is_correct": False},
+    ])
+    picks = _run_picks(concepts, history, seed=0, n=200)
+    assert CORE_A not in picks, "recently-asked concept must stay excluded even when missed"
+    assert all(p in {CORE_B, CORE_C} for p in picks)
+
+
+def test_miss_outside_window_is_not_boosted():
+    """A miss older than WRONG_ANSWER_WINDOW answered Qs no longer boosts."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=50.0),
+        _concept(CORE_B, importance=1.0, mastery=50.0),
+        _concept(CORE_C, importance=1.0, mastery=95.0),
+        _concept(CORE_F, importance=1.0, mastery=95.0),
+    ]
+    # A missed at position -10 (inside the 10-Q window).
+    inside = _hist([
+        {"concept_ids": [CORE_F], "is_correct": True},
+        {"concept_ids": [CORE_A], "is_correct": False},
+        *[{"concept_ids": [CORE_F], "is_correct": True} for _ in range(6)],
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+    ])
+    # Same history but A's miss shifted to position -11 (outside the window).
+    outside = _hist([
+        {"concept_ids": [CORE_A], "is_correct": False},
+        *[{"concept_ids": [CORE_F], "is_correct": True} for _ in range(7)],
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+    ])
+
+    a_inside = _run_picks(concepts, inside, seed=0).count(CORE_A)
+    a_outside = _run_picks(concepts, outside, seed=0).count(CORE_A)
+
+    # Under an identical RNG stream, the in-window miss is boosted and the
+    # out-of-window miss is not, so the in-window run picks A strictly more.
+    assert a_inside > a_outside

@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 CORE_MASTERY_THRESHOLD = 80.0
 DEPRIORITIZE_AFTER_CORRECT = 3  # consecutive corrects on a concept → skip it
 RECENT_ASK_WINDOW = 3  # never re-pick a concept that appeared in the last N answered Qs
+WRONG_ANSWER_WINDOW = 10  # look back this many answered Qs for recently-missed concepts
+WRONG_ANSWER_BOOST = 1.3  # weight multiplier for concepts missed in that window
 EXPLORATION_PROBABILITY = 0.30
 MAX_GENERATION_ATTEMPTS = 2  # initial try + 1 retry inside the bg task
 
@@ -244,7 +246,10 @@ def _select_next_concept(
       2. Skip concepts answered correctly 3 times in a row this session.
       3. Skip concepts asked in the last RECENT_ASK_WINDOW answered questions
          (prevents back-to-back-to-back picks).
-      4. weight = max(1, (100 - mastery) * importance_score)
+      4. weight = max(1, (100 - mastery) * importance_score), then ×1.3 for any
+         concept missed in the last WRONG_ANSWER_WINDOW answered Qs so recent
+         mistakes resurface faster. Dedup (step 3) still wins: a concept in the
+         recent-ask window is already excluded and never reaches this boost.
       5. With probability EXPLORATION_PROBABILITY: uniform-random over candidates.
          Otherwise: weighted sample by step 4 weights.
     """
@@ -315,6 +320,17 @@ def _select_next_concept(
     if not candidates:
         candidates = core_concepts
 
+    # Recently-missed concepts: any concept answered incorrectly in the last
+    # WRONG_ANSWER_WINDOW answered questions gets a selection-weight boost so
+    # mistakes resurface sooner. `is_correct is False` deliberately excludes
+    # None — a text_free answer still awaiting async grading (#22) is not yet a
+    # miss and won't be boosted until its verdict lands.
+    recently_missed: set[str] = set()
+    for q in history[-WRONG_ANSWER_WINDOW:]:
+        if q.get("is_correct") is False:
+            for cid in q.get("concept_ids") or []:
+                recently_missed.add(str(cid))
+
     # Exploration roll: 30% uniform random, 70% weighted.
     if random.random() < EXPLORATION_PROBABILITY:
         choice = random.choice(candidates)
@@ -331,6 +347,10 @@ def _select_next_concept(
         # is still selectable; floor weight at 1.0 so a fully-mastered concept
         # can still be selected via exploration in degenerate cases.
         weight = max(1.0, (100.0 - mastery) * max(importance, 0.1))
+        # Bias toward recently-missed concepts (dedup already removed any that
+        # were asked in the last RECENT_ASK_WINDOW, so this cannot fight dedup).
+        if str(c["id"]) in recently_missed:
+            weight *= WRONG_ANSWER_BOOST
         weights.append(weight)
 
     chosen = random.choices(candidates, weights=weights, k=1)[0]
