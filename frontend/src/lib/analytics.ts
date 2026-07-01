@@ -71,7 +71,6 @@ export const analytics = {
             });
             isInitialized = true;
             (window as Window & { posthog?: typeof posthog }).posthog = posthog;
-            console.log("[posthog] init ok with host:", host);
         } else {
             console.warn("[posthog] init failed", {
                 keyPresent: !!key,
