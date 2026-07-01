@@ -4,4 +4,7 @@
 - **Sentry SDK 2.x FastAPI Integration**: In sentry-sdk 2.x, the FastAPI integration is enabled automatically when initializing `sentry_sdk.init` in an environment where the fastapi package is installed. Do not manually import or instantiate `FastAPIIntegration` from `sentry_sdk.integrations.fastapi`, as it can lead to import errors.
 - **Git Worktree Environment Setup**: When creating a git worktree, untracked/ignored files (like `.env` and virtual environments `venv`) are not copied to the new worktree. Symlinking the main `venv` and `.env` files to the worktree allows running tests and servers instantly without duplicate configuration.
 - **GDPR User Data Cleanup Idempotency**: Admin deletion scripts should be idempotent and handle potential exceptions (e.g. database 404/missing table errors for tables like `user_xp` or `user_documents_progress` that might not be mapped in SQLAlchemy but are in the schema) to guarantee the script runs successfully to completion without breaking midway.
+- **Langfuse Cloud Configuration Mapping**: When configuring settings in Pydantic-settings based FastAPI apps, ensure the environment variables match the expected `BaseSettings` attributes (e.g., `LANGFUSE_HOST` mapping to `langfuse_host`), rather than assuming default SDK names (like `LANGFUSE_BASE_URL`).
+- **Secrets Auditing**: When handling environment variable swaps, perform a manual `git diff --staged` audit before committing to verify that no credentials or gitignored files (like local `.env`) are accidentally committed to the branch.
+
 
