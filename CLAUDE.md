@@ -12,7 +12,7 @@ AutoCoach is an AI-powered tutoring app that turns documents (PDF, PPTX) into in
 - DBs: Supabase (Postgres + Auth + Storage), Qdrant Cloud (vectors)
 - LLMs: Kimi K2.6 (primary, Moonshot first-party), OpenAI GPT-4o-mini (fallback)
 - Embeddings: OpenAI `text-embedding-3-small` (1536 dim)
-- Observability: Langfuse v4. **Self-hosted Railway stack DECOMMISSIONED 2026-05-19** (cost: ~$13/cycle, 94% of the Railway bill, for a zero-user app). Backend now runs the Langfuse SDK in **NOOP mode** (no `LANGFUSE_*` keys set → instrumentation silent, zero cost). 6 `@observe()` decorators still in code, inert until keys return. **Migration to Langfuse Cloud free tier is pending** — see `tasks/todo.md`.
+- Observability: Langfuse v4. Migrated to Langfuse Cloud free tier on 2026-07-01 (Issue #16). Tracing is fully enabled and instrumented via 6 `@observe()` decorators. Configured on Railway with production environment settings and locally for development.
 
 **Hosting:**
 - Frontend: Vercel (`https://autocoach-rho.vercel.app`)
@@ -66,8 +66,8 @@ On ingestion, also: AI-generated title + concept extraction (top 20 chunks via K
 - `apiFetch<T>(path, options)` in `frontend/src/lib/api.ts` adds Bearer token.
 
 ### Observability (Langfuse)
-- **Currently NOOP.** Self-hosted Railway stack decommissioned 2026-05-19; `LANGFUSE_*` env vars removed from the autocoach Railway service. Lifespan banner reads `Langfuse: disabled (NOOP)`. No traces collected until the Cloud migration (`tasks/todo.md`) lands.
-- Singleton client at `backend/app/observability/langfuse.py` — NOOP-when-keys-missing, exception-safe constructor. **Host-agnostic**: re-enable by setting `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` / `LANGFUSE_HOST`. No code change needed to point at Cloud.
+- **Enabled.** Connected to Langfuse Cloud. Lifespan banner reads `Langfuse: enabled`. Traces are collected and sent to cloud.langfuse.com.
+- Singleton client at `backend/app/observability/langfuse.py` — exception-safe constructor, host-agnostic. Configured via environment variables: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, and `LANGFUSE_HOST`.
 - Lifespan flush hook in `app/main.py`.
 - `@observe()` decorators on: `quiz_generator.generate_quiz_questions`, `concepts.extract_concepts`, `answer_evaluator.evaluate_free_text`, `embeddings.get_embeddings`, `retrieval.retrieve_relevant_chunks`, `session_manager._update_concept_mastery`. Still in code, inert in NOOP mode.
 - Lifespan banner: `Langfuse: enabled` (or `disabled (NOOP)`) — visible thanks to `logging.basicConfig(force=True)` in `main.py:28`.
@@ -161,7 +161,7 @@ KIMI_API_KEY, OPENAI_API_KEY
 
 Optional:
 ```
-LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST, LANGFUSE_ENVIRONMENT   # currently UNSET in prod — Langfuse NOOP. Set all three keys to re-enable (Cloud migration pending).
+LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST, LANGFUSE_ENVIRONMENT   # fully configured on Railway (production) and locally (development).
 QDRANT_KEEPALIVE_INTERVAL_S=300         # 0 disables
 GENERATION_STALE_TTL_SECONDS=30         # FSM self-heal threshold
 NEXT_QUESTION_MAX_WAIT_MS=10000         # long-poll cap
@@ -194,12 +194,11 @@ Frontend needs `NEXT_PUBLIC_BACKEND_URL` and Supabase publishable keys.
 ## Phase 1.7 Status (current sprint — Eval & Observability)
 
 Done:
-1. ~~Self-hosted Langfuse on Railway~~ — **decommissioned 2026-05-19** (cost: 94% of Railway bill, zero users). Replacement: migrate to Langfuse Cloud free tier — tracked in `tasks/todo.md`.
-2. `@observe()` instrumentation on 6 LLM + retrieval call sites ✅ (in code, inert in NOOP mode until Cloud keys land)
-3. Smoke-test traces visible in UI (parent + generation child, env+release tags) ✅ — verified once on the now-removed self-hosted stack.
+1. ~~Self-hosted Langfuse on Railway~~ — decommissioned 2026-05-19. Migrated to Langfuse Cloud free tier on 2026-07-01. ✅
+2. `@observe()` instrumentation on 6 LLM + retrieval call sites ✅
+3. Smoke-test traces visible in UI (parent + generation child, env+release tags) ✅ — verified on Langfuse Cloud.
 
 Next:
-0. **Migrate Langfuse to Cloud free tier** — env-only swap, no code change. See `tasks/todo.md`. Blocks eval work below (steps 5–7 need a trace backend).
 4. Golden eval set: 3 PDFs (DDIA, Product Analytics, Attention Is All You Need) × 50 (question, source_chunk, ideal_answer) tuples
 5. Ragas integration (faithfulness, context_recall, context_precision)
 6. Hand-grade 50 answers for human-vs-LLM-judge agreement
