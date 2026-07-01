@@ -11,6 +11,7 @@ from app.core.supabase import supabase_admin
 from app.observability.langfuse import observe
 from app.services.quiz_generator import generate_single_question
 from app.services.answer_evaluator import evaluate_answer
+from app.models.quiz import QuestionType
 from app.services.concepts import get_document_concepts, get_due_concepts
 
 logger = logging.getLogger(__name__)
@@ -874,16 +875,100 @@ def get_current_question(session_id: str, user_id: str) -> dict | None:
         return None
 
 
+def _finalize_answer(
+    session: dict, user_id: str, question: dict, is_correct: bool, feedback: str
+) -> dict:
+    """Post-verdict bookkeeping shared by the inline (MCQ/T-F) and the async
+    (text_free) eval paths: update mastery, recompute document progress and
+    session counts, and decide whether the session ends.
+
+    The caller is expected to have already written `is_correct` onto the
+    question row. Returns the answer-result payload (without `eval_status`,
+    which the caller stamps)."""
+    session_id = session["id"]
+
+    # 1. Update mastery BEFORE next-question selection so the bg generator
+    #    sees fresh data.
+    mastery_delta = 0.0
+    try:
+        q_concept_ids = question.get("concept_ids")
+        if q_concept_ids:
+            before_scores = _get_mastery_scores(user_id, q_concept_ids)
+            _update_concept_mastery(user_id, q_concept_ids, is_correct)
+            _recompute_document_progress(user_id, session["document_id"])
+            after_scores = _get_mastery_scores(user_id, q_concept_ids)
+            mastery_delta = round(
+                sum(
+                    after_scores.get(str(cid), 0.0)
+                    - before_scores.get(str(cid), 0.0)
+                    for cid in q_concept_ids
+                ),
+                2,
+            )
+    except Exception as e:
+        logger.error(f"Failed to update mastery/progress: {e}")
+
+    # 2. Refresh counts and decide whether to end the session.
+    new_answered, new_correct = _recompute_session_counts(session_id)
+    cap_hit = new_answered >= session["total_questions"]
+
+    post_concepts = get_document_concepts(session["document_id"], user_id)
+    all_mastered = _all_core_mastered(post_concepts)
+
+    is_complete = cap_hit or all_mastered
+    ended_reason = None
+    if is_complete:
+        ended_reason = "cap_reached" if cap_hit else "mastery_threshold"
+
+    session_update = {
+        "answered_questions": new_answered,
+        "correct_answers": new_correct,
+    }
+    if is_complete:
+        session_update["status"] = "completed"
+        session_update["completed_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        supabase_admin.table("quiz_sessions").update(session_update).eq(
+            "id", session_id
+        ).execute()
+    except Exception as e:
+        logger.error(f"Failed to update quiz session counts: {e}")
+
+    xp_awarded = 10 if is_correct else 0
+
+    return {
+        "result": {
+            "is_correct": is_correct,
+            "correct_answer": question["correct_answer"],
+            "explanation": question["explanation"],
+            "score_so_far": new_correct,
+            "total_answered": new_answered,
+            "feedback": feedback,
+            "xp_awarded": xp_awarded,
+            "mastery_delta": mastery_delta,
+        },
+        "session_complete": is_complete,
+        "session_ended_reason": ended_reason,
+    }
+
+
 def submit_answer(
     session_id: str, user_id: str, question_id: str, answer: str, input_method: str
 ) -> dict:
-    """Fast path: evaluate, update mastery, recompute counts, return.
+    """Record an answer fast.
 
-    Does NOT generate the next question synchronously. The route handler is
-    responsible for triggering `generate_next_question_bg` afterwards
-    (typically via FastAPI BackgroundTasks). Frontend then calls
-    `GET /quiz/sessions/{id}/next` to fetch the prepared question.
-    """
+    MCQ / T-F are graded inline (pure string compare, ~sub-ms) and fully
+    finalized here. `text_free` requires an LLM call (~2s p50), so it is
+    recorded immediately with `is_correct = NULL` and `status = 'answered'`,
+    and the verdict is produced off the request path by
+    `evaluate_answer_bg` (scheduled by the route). The pending-eval marker is
+    `status = 'answered' AND is_correct IS NULL` — no schema change needed.
+
+    Does NOT generate the next question synchronously. For MCQ/T-F the route
+    triggers `generate_next_question_bg`; for text_free `evaluate_answer_bg`
+    triggers it once grading + mastery are settled. Returns a dict carrying
+    `eval_status` ("complete" | "pending")."""
     try:
         session_response = (
             supabase_admin.table("quiz_sessions")
@@ -913,7 +998,46 @@ def submit_answer(
         if question["user_answer"] is not None:
             raise ValueError("Question already answered")
 
-        # 1. Evaluate (LLM call only for text_free)
+        now = datetime.now(timezone.utc).isoformat()
+        is_async_eval = (
+            str(question["question_type"]).lower() == QuestionType.TEXT_FREE.value
+        )
+
+        if is_async_eval:
+            # Fast path: persist the answer, defer the LLM verdict. `answered_at`
+            # doubles as the eval-start timestamp for the stale-TTL self-heal.
+            supabase_admin.table("questions").update(
+                {
+                    "user_answer": answer,
+                    "is_correct": None,
+                    "input_method": input_method,
+                    "answered_at": now,
+                    "status": "answered",
+                }
+            ).eq("id", question_id).execute()
+
+            # Counts for the immediate (pending) response. Do NOT finalize the
+            # session here — `evaluate_answer_bg` owns mastery + completion once
+            # the verdict lands.
+            new_answered, new_correct = _recompute_session_counts(session_id)
+
+            return {
+                "result": {
+                    "is_correct": None,
+                    "correct_answer": question["correct_answer"],
+                    "explanation": question["explanation"],
+                    "score_so_far": new_correct,
+                    "total_answered": new_answered,
+                    "feedback": None,
+                    "xp_awarded": 0,
+                    "mastery_delta": 0.0,
+                },
+                "session_complete": False,
+                "session_ended_reason": None,
+                "eval_status": "pending",
+            }
+
+        # Inline path (MCQ / T-F): grade + finalize synchronously.
         eval_result = evaluate_answer(
             question_type=question["question_type"],
             user_answer=answer,
@@ -923,7 +1047,6 @@ def submit_answer(
         is_correct = eval_result["is_correct"]
         feedback = eval_result.get("feedback", "")
 
-        now = datetime.now(timezone.utc).isoformat()
         supabase_admin.table("questions").update(
             {
                 "user_answer": answer,
@@ -934,73 +1057,203 @@ def submit_answer(
             }
         ).eq("id", question_id).execute()
 
-        # 2. Update mastery BEFORE selection so the bg task sees fresh data.
-        mastery_delta = 0.0
-        try:
-            q_concept_ids = question.get("concept_ids")
-            if q_concept_ids:
-                before_scores = _get_mastery_scores(user_id, q_concept_ids)
-                _update_concept_mastery(user_id, q_concept_ids, is_correct)
-                _recompute_document_progress(user_id, session["document_id"])
-                after_scores = _get_mastery_scores(user_id, q_concept_ids)
-                mastery_delta = round(
-                    sum(
-                        after_scores.get(str(cid), 0.0)
-                        - before_scores.get(str(cid), 0.0)
-                        for cid in q_concept_ids
-                    ),
-                    2,
-                )
-        except Exception as e:
-            logger.error(f"Failed to update mastery/progress: {e}")
-
-        # 3. Refresh counts and decide whether to end the session.
-        new_answered, new_correct = _recompute_session_counts(session_id)
-        cap_hit = new_answered >= session["total_questions"]
-
-        post_concepts = get_document_concepts(session["document_id"], user_id)
-        all_mastered = _all_core_mastered(post_concepts)
-
-        is_complete = cap_hit or all_mastered
-        ended_reason = None
-        if is_complete:
-            ended_reason = "cap_reached" if cap_hit else "mastery_threshold"
-
-        session_update = {
-            "answered_questions": new_answered,
-            "correct_answers": new_correct,
-        }
-        if is_complete:
-            session_update["status"] = "completed"
-            session_update["completed_at"] = now
-
-        try:
-            supabase_admin.table("quiz_sessions").update(session_update).eq(
-                "id", session_id
-            ).execute()
-        except Exception as e:
-            logger.error(f"Failed to update quiz session counts: {e}")
-
-        xp_awarded = 10 if is_correct else 0
-
-        return {
-            "result": {
-                "is_correct": is_correct,
-                "correct_answer": question["correct_answer"],
-                "explanation": question["explanation"],
-                "score_so_far": new_correct,
-                "total_answered": new_answered,
-                "feedback": feedback,
-                "xp_awarded": xp_awarded,
-                "mastery_delta": mastery_delta,
-            },
-            "session_complete": is_complete,
-            "session_ended_reason": ended_reason,
-        }
+        finalized = _finalize_answer(session, user_id, question, is_correct, feedback)
+        return {**finalized, "eval_status": "complete"}
 
     except Exception as e:
         logger.error(f"Failed to submit answer: {e}")
         raise
+
+
+# ---------------------------------------------------------------------------
+# Async free-text answer evaluation (mirrors the async generation FSM)
+# ---------------------------------------------------------------------------
+
+
+def evaluate_answer_bg(session_id: str, user_id: str, question_id: str) -> None:
+    """Background-task entrypoint: grade a pending `text_free` answer, write
+    the verdict onto the question row, finalize mastery + session state, then
+    kick off next-question generation. Idempotent — exits quietly if the
+    answer is missing or already graded (`is_correct` populated)."""
+    try:
+        session_resp = (
+            supabase_admin.table("quiz_sessions")
+            .select("*")
+            .eq("id", session_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        if not session_resp.data:
+            logger.warning(f"[bg-eval {session_id}] session not found for user {user_id}")
+            return
+        session = session_resp.data[0]
+
+        question_resp = (
+            supabase_admin.table("questions")
+            .select("*")
+            .eq("id", question_id)
+            .eq("session_id", session_id)
+            .execute()
+        )
+        if not question_resp.data:
+            logger.warning(f"[bg-eval {session_id}] question {question_id} not found")
+            return
+        question = question_resp.data[0]
+
+        if question.get("user_answer") is None:
+            logger.warning(
+                f"[bg-eval {session_id}] question {question_id} has no answer; skipping"
+            )
+            return
+        if question.get("is_correct") is not None:
+            # Already graded (another worker won the race, or a self-heal retry
+            # arrived late) — nothing to do.
+            return
+
+        eval_result = evaluate_answer(
+            question_type=question["question_type"],
+            user_answer=question["user_answer"],
+            correct_answer=question["correct_answer"],
+            question_text=question["question_text"],
+        )
+        is_correct = bool(eval_result["is_correct"])
+        feedback = eval_result.get("feedback", "")
+
+        supabase_admin.table("questions").update({"is_correct": is_correct}).eq(
+            "id", question_id
+        ).execute()
+
+        # Only the owner of the session-active state should finalize; if the
+        # session already ended (edge: a concurrent path finished it) the
+        # finalize is still safe/idempotent because it recomputes from rows.
+        finalized = _finalize_answer(session, user_id, question, is_correct, feedback)
+
+        logger.info(
+            f"[bg-eval {session_id}] q {question_id} graded is_correct={is_correct}"
+        )
+
+        # Pre-warm the next question now that mastery is fresh.
+        if not finalized["session_complete"]:
+            generate_next_question_bg(session_id, user_id)
+
+    except Exception as e:
+        logger.error(f"[bg-eval {session_id}] failed to evaluate answer: {e}")
+
+
+def _build_verdict_response(session: dict, question: dict) -> dict:
+    """Assemble a completed answer verdict from a graded question row + the
+    (now-finalized) session row. Used by the verdict long-poll."""
+    is_correct = bool(question["is_correct"])
+    session_complete = session["status"] != "active"
+    ended_reason = None
+    if session_complete:
+        ended_reason = (
+            "cap_reached"
+            if session["answered_questions"] >= session["total_questions"]
+            else "mastery_threshold"
+        )
+    return {
+        "result": {
+            "is_correct": is_correct,
+            "correct_answer": question["correct_answer"],
+            "explanation": question["explanation"],
+            "score_so_far": session["correct_answers"],
+            "total_answered": session["answered_questions"],
+            "feedback": None,
+            "xp_awarded": 10 if is_correct else 0,
+            "mastery_delta": 0.0,
+        },
+        "session_complete": session_complete,
+        "session_ended_reason": ended_reason,
+        "eval_status": "complete",
+    }
+
+
+def check_answer_verdict(session_id: str, user_id: str, question_id: str) -> dict:
+    """Single state probe for a `text_free` answer verdict.
+
+    Returns `{"eval_status": "complete", ...}` once graded, or
+    `{"eval_status": "pending", ...}` while the LLM eval is in flight. If the
+    pending row is stale (older than the generation stale-TTL), re-drives
+    `evaluate_answer_bg` to self-heal a dropped background task."""
+    session_resp = (
+        supabase_admin.table("quiz_sessions")
+        .select("*")
+        .eq("id", session_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not session_resp.data:
+        raise ValueError("Session not found")
+    session = session_resp.data[0]
+
+    question_resp = (
+        supabase_admin.table("questions")
+        .select("*")
+        .eq("id", question_id)
+        .eq("session_id", session_id)
+        .execute()
+    )
+    if not question_resp.data:
+        raise ValueError("Question not found")
+    question = question_resp.data[0]
+
+    if question.get("is_correct") is not None:
+        return _build_verdict_response(session, question)
+
+    pending = {
+        "result": {
+            "is_correct": None,
+            "correct_answer": question["correct_answer"],
+            "explanation": question["explanation"],
+            "score_so_far": session["correct_answers"],
+            "total_answered": session["answered_questions"],
+            "feedback": None,
+            "xp_awarded": 0,
+            "mastery_delta": 0.0,
+        },
+        "session_complete": False,
+        "session_ended_reason": None,
+        "eval_status": "pending",
+    }
+
+    # Self-heal: if the answer has been sitting ungraded past the stale TTL,
+    # the background task was likely lost — re-drive it inline (idempotent).
+    settings = get_settings()
+    ttl = max(5, int(settings.generation_stale_ttl_seconds))
+    answered_at = question.get("answered_at")
+    if answered_at:
+        try:
+            answered_dt = datetime.fromisoformat(answered_at.replace("Z", "+00:00"))
+            if (datetime.now(timezone.utc) - answered_dt) > timedelta(seconds=ttl):
+                logger.warning(
+                    f"[verdict {session_id}] q {question_id} eval stale (>{ttl}s); "
+                    f"re-driving evaluate_answer_bg"
+                )
+                evaluate_answer_bg(session_id, user_id, question_id)
+        except Exception as e:
+            logger.warning(f"[verdict {session_id}] stale-check failed: {e}")
+
+    return pending
+
+
+def wait_for_answer_verdict(
+    session_id: str, user_id: str, question_id: str, wait_ms: int = 5000
+) -> dict:
+    """Long-poll wrapper around `check_answer_verdict`. Used by GET
+    /quiz/sessions/{id}/answer to return the finished verdict for a
+    `text_free` answer once background grading completes."""
+    settings = get_settings()
+    cap_ms = max(0, min(int(wait_ms), settings.next_question_max_wait_ms))
+    deadline = time.monotonic() + (cap_ms / 1000.0)
+
+    while True:
+        result = check_answer_verdict(session_id, user_id, question_id)
+        if result["eval_status"] == "complete":
+            return result
+        if time.monotonic() >= deadline:
+            return {**result, "retry_after_ms": 500}
+        time.sleep(0.2)
 
 
 def wait_for_next_question(

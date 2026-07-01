@@ -101,6 +101,33 @@ export function useCreateSession() {
   return { createSession, creating, error };
 }
 
+/**
+ * Poll the async-eval verdict endpoint for a `text_free` answer.
+ *
+ * POST /answer returns immediately with `eval_status: "pending"` for free
+ * text (the LLM grades off the request path). This resolves once the verdict
+ * lands, so callers can treat every answer as if it were graded synchronously.
+ * Each call long-polls up to `waitMs` server-side; grading is ~2s p50, so this
+ * typically resolves in one or two round-trips. On the pathological timeout it
+ * returns the last (still-pending) response rather than hanging.
+ */
+async function pollAnswerVerdict(
+  sessionId: string,
+  questionId: string,
+  { waitMs = 5000, maxAttempts = 6 }: { waitMs?: number; maxAttempts?: number } = {},
+): Promise<AnswerResponse> {
+  let last: AnswerResponse | null = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const verdict = await apiFetch<AnswerResponse>(
+      `/quiz/sessions/${sessionId}/answer?question_id=${questionId}&wait_ms=${waitMs}`,
+    );
+    last = verdict;
+    if (verdict.eval_status !== "pending") return verdict;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return last as AnswerResponse;
+}
+
 export function useAnswerQuestion(sessionId: string | null) {
   const { mutate: globalMutate } = useSWRConfig();
   const [submitting, setSubmitting] = useState(false);
@@ -121,19 +148,17 @@ export function useAnswerQuestion(sessionId: string | null) {
           throw new Error("Answer cannot be empty");
         }
 
-        if (process.env.NODE_ENV === "development") {
-          console.log("submitAnswer payload", {
-            answer: normalizedAnswer,
-            input_method: inputMethod,
-            sessionId,
-            questionId,
-          });
-        }
-
-        const response = await apiFetch<AnswerResponse>(
+        let response = await apiFetch<AnswerResponse>(
           `/quiz/sessions/${sessionId}/answer?question_id=${questionId}`,
           { method: "POST", body: { answer: normalizedAnswer, input_method: inputMethod } }
         );
+
+        // text_free answers grade asynchronously — wait for the verdict so
+        // the caller always receives a settled `is_correct`.
+        if (response.eval_status === "pending") {
+          response = await pollAnswerVerdict(sessionId, questionId);
+        }
+
         // Only mutate session data, NOT current question
         // Question will be refetched when user clicks "Next Question"
         await globalMutate(`/quiz/sessions/${sessionId}`);

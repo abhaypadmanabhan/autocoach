@@ -97,6 +97,10 @@ export interface DocumentConceptsResponse {
 }
 
 export interface AnswerResult {
+  // The backend transiently sends `null` while a text_free answer is still
+  // being graded (eval_status === "pending"), but `submitAnswer` polls the
+  // verdict internally and only ever resolves a settled boolean — so callers
+  // always observe a concrete verdict here.
   is_correct: boolean;
   correct_answer: string;
   explanation?: string | null;
@@ -107,10 +111,15 @@ export interface AnswerResult {
   mastery_delta?: number;
 }
 
+export type AnswerEvalStatus = "complete" | "pending";
+
 export interface AnswerResponse {
   result: AnswerResult;
   session_complete: boolean;
   session_ended_reason?: "cap_reached" | "mastery_threshold" | null;
+  // "pending" → text_free verdict is still being computed; poll
+  // GET /quiz/sessions/{id}/answer for the final result.
+  eval_status?: AnswerEvalStatus;
 }
 
 export type NextQuestionStatus = "ready" | "preparing" | "ended" | "failed";

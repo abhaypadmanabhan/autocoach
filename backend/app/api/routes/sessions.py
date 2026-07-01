@@ -30,6 +30,8 @@ from app.services.session_manager import (
     submit_answer,
     get_current_question,
     generate_next_question_bg,
+    evaluate_answer_bg,
+    wait_for_answer_verdict,
     wait_for_next_question,
     pick_review_document,
 )
@@ -288,8 +290,13 @@ def submit_quiz_answer(
     background_tasks: BackgroundTasks,
     user_id=Depends(enforce_quiz_rate_limit),
 ):
-    """Evaluate an answer fast, then queue next-question generation in the
-    background. Frontend should call GET /next afterwards if not complete."""
+    """Record an answer fast, then queue background work.
+
+    MCQ / T-F are graded inline and we queue next-question generation. A
+    `text_free` answer returns immediately with `eval_status="pending"`; we
+    queue `evaluate_answer_bg`, which grades it off the request path and then
+    triggers next-question generation itself. On pending, the frontend polls
+    GET /answer for the verdict; otherwise it calls GET /next."""
     try:
         result = submit_answer(
             session_id=str(session_id),
@@ -299,9 +306,16 @@ def submit_quiz_answer(
             input_method=answer_data.input_method,
         )
 
-        # Schedule async generation of the next question — fire-and-forget.
-        # The bg task is idempotent and short-circuits if the session ended.
-        if not result["session_complete"]:
+        eval_status = result.get("eval_status", "complete")
+        if eval_status == "pending":
+            # Grade off the request path; the eval task pre-warms the next
+            # question once mastery is settled.
+            background_tasks.add_task(
+                evaluate_answer_bg, str(session_id), str(user_id), str(question_id)
+            )
+        elif not result["session_complete"]:
+            # Schedule async generation of the next question — fire-and-forget.
+            # The bg task is idempotent and short-circuits if the session ended.
             background_tasks.add_task(
                 generate_next_question_bg, str(session_id), str(user_id)
             )
@@ -319,6 +333,7 @@ def submit_quiz_answer(
             ),
             session_complete=result["session_complete"],
             session_ended_reason=result.get("session_ended_reason"),
+            eval_status=eval_status,
         )
 
     except ValueError as e:
@@ -328,6 +343,50 @@ def submit_quiz_answer(
         raise HTTPException(
             status_code=500, detail="Failed to submit answer"
         )
+
+
+@router.get("/{session_id}/answer", response_model=AnswerResponse)
+def get_answer_verdict(
+    session_id: UUID,
+    question_id: UUID,
+    wait_ms: int = Query(default=5000, ge=0, le=10000),
+    user_id=Depends(enforce_quiz_rate_limit),
+):
+    """Long-poll for the verdict of an async-graded `text_free` answer.
+
+    Returns 200 with `eval_status="complete"` and the full result once
+    background grading finishes, or `eval_status="pending"` (plus
+    `retry_after_ms`) if grading has not finished within `wait_ms`. MCQ / T-F
+    answers are graded inline by POST /answer and never need this endpoint."""
+    try:
+        result = wait_for_answer_verdict(
+            session_id=str(session_id),
+            user_id=str(user_id),
+            question_id=str(question_id),
+            wait_ms=wait_ms,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to fetch answer verdict: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch answer verdict")
+
+    r = result["result"]
+    return AnswerResponse(
+        result=AnswerResult(
+            is_correct=r["is_correct"],
+            correct_answer=r["correct_answer"],
+            explanation=r["explanation"],
+            score_so_far=r["score_so_far"],
+            total_answered=r["total_answered"],
+            feedback=r.get("feedback"),
+            xp_awarded=r.get("xp_awarded", 0),
+            mastery_delta=r.get("mastery_delta", 0.0),
+        ),
+        session_complete=result["session_complete"],
+        session_ended_reason=result.get("session_ended_reason"),
+        eval_status=result["eval_status"],
+    )
 
 
 @router.get("/{session_id}/next", response_model=NextQuestionResponse)
