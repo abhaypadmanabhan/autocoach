@@ -97,15 +97,15 @@ no paid rerankers. Phased: P0 Langfuse Cloud → P1 Ragas → P2 latency profili
 
 **Why first:** all later eval scores attach to traces. NOOP path stays on until keys present.
 
-- [ ] Sign up at `cloud.langfuse.com`, create org + `autocoach` project
-- [ ] Generate project API keys (`pk-lf-...`, `sk-lf-...`)
-- [ ] Set on Railway service + local `backend/.env`:
+- [x] Sign up at `cloud.langfuse.com`, create org + `autocoach` project
+- [x] Generate project API keys (`pk-lf-...`, `sk-lf-...`)
+- [x] Set on Railway service + local `backend/.env`:
   - `LANGFUSE_HOST=https://cloud.langfuse.com` (or EU)
   - `LANGFUSE_PUBLIC_KEY=pk-lf-...`
   - `LANGFUSE_SECRET_KEY=sk-lf-...`
   - `LANGFUSE_ENVIRONMENT=production`
-- [ ] Redeploy; confirm lifespan banner flips to `Langfuse: enabled`
-- [ ] Smoke: `POST /quiz/sessions/` → trace in Cloud UI within 30s
+- [x] Redeploy; confirm lifespan banner flips to `Langfuse: enabled`
+- [x] Smoke: `POST /quiz/sessions/` → trace in Cloud UI within 30s
 
 ## Phase 1 — Local Ragas harness
 
