@@ -244,6 +244,9 @@ class Question(Base):
     explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     user_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_correct: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # Async free-text eval (#22): {"feedback", "mastery_delta", "xp_awarded"}
+    # once graded; carries the self-heal "attempts" counter while pending.
+    eval_result: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     answered_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
