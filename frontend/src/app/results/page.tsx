@@ -76,7 +76,12 @@ function ResultsContent() {
     questions.length > 0
       ? questions.filter((q) => q.is_correct === true).length
       : (session?.correct_answers ?? 0);
-  const wrong = total - correct;
+  // Only explicitly-graded misses count as wrong; is_correct === null means
+  // the async verdict hasn't landed — ungraded, not missed.
+  const wrong =
+    questions.length > 0
+      ? questions.filter((q) => q.is_correct === false).length
+      : total - correct;
   const scorePercent = total > 0 ? Math.round((correct / total) * 100) : 0;
   const grade = gradeFor(scorePercent);
 
@@ -209,10 +214,12 @@ function ResultsContent() {
                 <ReviewList items={questions} />
               </TabsContent>
               <TabsContent value="correct">
-                <ReviewList items={questions.filter((q) => q.is_correct)} />
+                <ReviewList items={questions.filter((q) => q.is_correct === true)} />
               </TabsContent>
               <TabsContent value="wrong">
-                <ReviewList items={questions.filter((q) => !q.is_correct)} />
+                {/* Ungraded (is_correct === null) answers are excluded — they
+                    were not missed, their verdict just hasn't landed. */}
+                <ReviewList items={questions.filter((q) => q.is_correct === false)} />
               </TabsContent>
             </Tabs>
           </Section>
@@ -287,15 +294,18 @@ function ReviewRow({ q }: { q: ReviewItem }) {
         <span
           className={cn(
             "shrink-0 grid place-items-center h-6 w-6",
-            q.is_correct
-              ? "text-[var(--accent-text)]"
-              : "text-[var(--danger)]",
+            q.is_correct === true && "text-[var(--accent-text)]",
+            q.is_correct === false && "text-[var(--danger)]",
+            q.is_correct === null && "text-[var(--fg-tertiary)]",
           )}
         >
-          {q.is_correct ? (
+          {q.is_correct === true ? (
             <CheckCircle2 className="h-3.5 w-3.5" />
-          ) : (
+          ) : q.is_correct === false ? (
             <XCircle className="h-3.5 w-3.5" />
+          ) : (
+            // Verdict still pending (async grading) — ungraded, not missed.
+            <Loader2 className="h-3.5 w-3.5" />
           )}
         </span>
         <div className="flex-1 min-w-0">
@@ -324,10 +334,10 @@ function ReviewRow({ q }: { q: ReviewItem }) {
               </span>
               <p
                 className={cn(
-                  "text-[13px]",
-                  q.is_correct
-                    ? "text-[var(--fg-secondary)]"
-                    : "text-[var(--fg-secondary)] line-through decoration-[var(--line-default)]",
+                  "text-[13px] text-[var(--fg-secondary)]",
+                  // Strike through only confirmed misses — never ungraded.
+                  q.is_correct === false &&
+                    "line-through decoration-[var(--line-default)]",
                 )}
               >
                 {q.user_answer}

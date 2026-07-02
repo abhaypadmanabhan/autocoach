@@ -125,10 +125,20 @@ class AnswerSubmit(BaseModel):
 
 
 class AnswerResult(BaseModel):
-    """Result of evaluating an answer."""
+    """Result of evaluating an answer.
 
-    is_correct: bool
-    correct_answer: str
+    `is_correct` is nullable: for `text_free` the verdict is produced by a
+    background LLM eval, so the initial answer response carries `is_correct
+    = None` (see `AnswerResponse.eval_status == "pending"`). MCQ / T-F are
+    graded inline and always carry a concrete bool.
+
+    `correct_answer` / `explanation` are nullable because pending payloads
+    deliberately omit them — the model answer must never be visible before
+    the user's answer is graded (answer-leak fix).
+    """
+
+    is_correct: bool | None = None
+    correct_answer: str | None = None
     explanation: str | None = None
     score_so_far: int
     total_answered: int
@@ -143,11 +153,21 @@ class AnswerResponse(BaseModel):
     Note: `next_question` is no longer included. After receiving this
     response, the frontend calls `GET /quiz/sessions/{id}/next` to fetch
     the prepared question (which is generated in the background).
+
+    `eval_status` is `"complete"` when the verdict is final (MCQ / T-F, or a
+    `text_free` answer that has finished background grading) and `"pending"`
+    when a `text_free` answer is still being evaluated off the request path.
+    On `"pending"`, the client polls `GET /quiz/sessions/{id}/answer` for the
+    final verdict.
     """
 
     result: AnswerResult
     session_complete: bool
     session_ended_reason: str | None = None  # "cap_reached" | "mastery_threshold"
+    eval_status: str = "complete"  # "complete" | "pending"
+    # Set on a pending GET /answer long-poll timeout: suggested client delay
+    # before re-polling (mirrors NextQuestionResponse.retry_after_ms).
+    retry_after_ms: int | None = None
 
 
 class NextQuestionResponse(BaseModel):

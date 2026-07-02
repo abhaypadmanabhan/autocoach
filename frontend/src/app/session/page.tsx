@@ -390,60 +390,84 @@ function SessionContent() {
 
               {showFeedback && lastResult && (
                 <aside className="anim-marg-in space-y-4 lg:pl-2">
-                  <div
-                    className={cn(
-                      "p-4 border",
-                      lastResult.is_correct
-                        ? "border-[var(--accent)]"
-                        : "border-[var(--danger)]",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      {lastResult.is_correct ? (
-                        <CheckCircle2 className="h-4 w-4 text-[var(--accent-text)]" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-[var(--danger)]" />
-                      )}
-                      <span
-                        className={cn(
-                          "font-mono text-[11px] uppercase tracking-[0.08em]",
-                          lastResult.is_correct
-                            ? "text-[var(--accent-text)]"
-                            : "text-[var(--danger)]",
-                        )}
-                      >
-                        {lastResult.is_correct ? "Correct" : "Incorrect"}
-                      </span>
-                      {lastResult.xp_awarded != null && lastResult.xp_awarded !== 0 && (
-                        <span className="ml-auto font-mono text-[11px] tabular-nums text-[var(--fg-secondary)]">
-                          +{lastResult.xp_awarded} XP
+                  {lastResult.is_correct === null ? (
+                    // Async grading (text_free) still in flight — this is NOT
+                    // an incorrect answer: neutral state, no verdict, no XP,
+                    // no model answer (the backend withholds it while
+                    // pending). The user can move on; grading continues in
+                    // the background and counts settle on the results page.
+                    <div className="p-4 border border-[var(--line-default)]">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-[var(--fg-tertiary)]" />
+                        <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--fg-secondary)]">
+                          Still grading…
                         </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {!lastResult.is_correct && (
-                    <div className="space-y-1.5">
-                      <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
-                        You said
-                      </span>
-                      <p className="text-[14px] text-[var(--fg-secondary)] line-through decoration-[var(--line-default)]">
-                        {answer || "—"}
+                      </div>
+                      <p className="mt-2 text-[13px] text-[var(--fg-secondary)]">
+                        Your answer is saved. You can keep going — the verdict
+                        will show up in your results.
                       </p>
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      <div
+                        className={cn(
+                          "p-4 border",
+                          lastResult.is_correct
+                            ? "border-[var(--accent)]"
+                            : "border-[var(--danger)]",
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          {lastResult.is_correct ? (
+                            <CheckCircle2 className="h-4 w-4 text-[var(--accent-text)]" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-[var(--danger)]" />
+                          )}
+                          <span
+                            className={cn(
+                              "font-mono text-[11px] uppercase tracking-[0.08em]",
+                              lastResult.is_correct
+                                ? "text-[var(--accent-text)]"
+                                : "text-[var(--danger)]",
+                            )}
+                          >
+                            {lastResult.is_correct ? "Correct" : "Incorrect"}
+                          </span>
+                          {lastResult.xp_awarded != null && lastResult.xp_awarded !== 0 && (
+                            <span className="ml-auto font-mono text-[11px] tabular-nums text-[var(--fg-secondary)]">
+                              +{lastResult.xp_awarded} XP
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                  <div className="space-y-1.5 border-l-2 border-[var(--accent)] bg-[var(--bg-inset)] pl-3 py-2">
-                    <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
-                      Correct answer
-                    </span>
-                    <p className="text-[14px] font-medium text-[var(--fg-primary)]">
-                      {lastResult.correct_answer}
-                    </p>
-                  </div>
+                      {lastResult.is_correct === false && (
+                        <div className="space-y-1.5">
+                          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
+                            You said
+                          </span>
+                          <p className="text-[14px] text-[var(--fg-secondary)] line-through decoration-[var(--line-default)]">
+                            {answer || "—"}
+                          </p>
+                        </div>
+                      )}
 
-                  {lastResult.explanation && (
-                    <WhyInset>{lastResult.explanation}</WhyInset>
+                      {lastResult.correct_answer != null && (
+                        <div className="space-y-1.5 border-l-2 border-[var(--accent)] bg-[var(--bg-inset)] pl-3 py-2">
+                          <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
+                            Correct answer
+                          </span>
+                          <p className="text-[14px] font-medium text-[var(--fg-primary)]">
+                            {lastResult.correct_answer}
+                          </p>
+                        </div>
+                      )}
+
+                      {lastResult.explanation && (
+                        <WhyInset>{lastResult.explanation}</WhyInset>
+                      )}
+                    </>
                   )}
 
                   {nextError && (
@@ -506,8 +530,9 @@ function QuestionView({
   answer: string;
   setAnswer: (v: string, method?: "click" | "typed" | "voice") => void;
   showFeedback: boolean;
-  correctAnswer?: string;
-  isCorrect?: boolean;
+  correctAnswer?: string | null;
+  // null → verdict still pending (async text_free grading)
+  isCorrect?: boolean | null;
   disabled: boolean;
 }) {
   const isMcq = (question.options?.length ?? 0) > 0;
@@ -534,7 +559,8 @@ function QuestionView({
             const letter = LETTERS[i] ?? String(i + 1);
             const selected = answer === opt;
             const correct = showFeedback && correctAnswer === opt;
-            const wrong = showFeedback && selected && !isCorrect;
+            // Pending verdict (null) must not paint the selection as wrong.
+            const wrong = showFeedback && selected && isCorrect === false;
             return (
               <button
                 key={i}
@@ -606,7 +632,8 @@ function QuestionView({
           {["True", "False"].map((opt, i) => {
             const selected = answer.toLowerCase() === opt.toLowerCase();
             const correct = showFeedback && correctAnswer?.toLowerCase() === opt.toLowerCase();
-            const wrong = showFeedback && selected && !isCorrect;
+            // Pending verdict (null) must not paint the selection as wrong.
+            const wrong = showFeedback && selected && isCorrect === false;
             return (
               <button
                 key={opt}

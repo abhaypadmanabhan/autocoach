@@ -57,13 +57,6 @@ class User(Base):
     full_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Daily Sprint fields
-    streak_count: Mapped[int] = mapped_column(
-        Integer, server_default="0", nullable=False
-    )
-    last_sprint_date: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
     total_xp: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -251,6 +244,9 @@ class Question(Base):
     explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     user_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_correct: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # Async free-text eval (#22): {"feedback", "mastery_delta", "xp_awarded"}
+    # once graded; carries the self-heal "attempts" counter while pending.
+    eval_result: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     answered_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -335,7 +331,6 @@ class QuizSession(Base):
         nullable=True,
         server_default=text("0"),
     )
-    score: Mapped[Optional[float]] = mapped_column(Numeric(5, 2), nullable=True)
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -373,7 +368,6 @@ class Chunk(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     embedding_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    page_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     chunk_metadata: Mapped[Optional[dict]] = mapped_column(
         "metadata",
         JSONB,
