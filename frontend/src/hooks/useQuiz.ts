@@ -106,26 +106,43 @@ export function useCreateSession() {
  *
  * POST /answer returns immediately with `eval_status: "pending"` for free
  * text (the LLM grades off the request path). This resolves once the verdict
- * lands, so callers can treat every answer as if it were graded synchronously.
- * Each call long-polls up to `waitMs` server-side; grading is ~2s p50, so this
- * typically resolves in one or two round-trips. On the pathological timeout it
- * returns the last (still-pending) response rather than hanging.
+ * lands. Each call long-polls up to `waitMs` server-side; grading is ~2s p50,
+ * so this typically resolves in one or two round-trips.
+ *
+ * The answer is already persisted server-side when this runs, so transient
+ * poll failures (network blip, 429 from the shared quiz rate limiter, 5xx)
+ * are swallowed: they count as a failed attempt and polling continues after a
+ * delay. This NEVER throws and never resubmits — a caller-level retry of the
+ * POST would dead-end on 400 "Question already answered".
+ *
+ * Returns the settled verdict, the last still-pending response if the window
+ * is exhausted, or `null` if every attempt errored — callers keep their
+ * original pending response in the null case and must render the pending
+ * state, not a verdict.
  */
 async function pollAnswerVerdict(
   sessionId: string,
   questionId: string,
   { waitMs = 5000, maxAttempts = 6 }: { waitMs?: number; maxAttempts?: number } = {},
-): Promise<AnswerResponse> {
+): Promise<AnswerResponse | null> {
   let last: AnswerResponse | null = null;
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const verdict = await apiFetch<AnswerResponse>(
-      `/quiz/sessions/${sessionId}/answer?question_id=${questionId}&wait_ms=${waitMs}`,
-    );
-    last = verdict;
-    if (verdict.eval_status !== "pending") return verdict;
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    let delayMs = 300;
+    try {
+      const verdict = await apiFetch<AnswerResponse>(
+        `/quiz/sessions/${sessionId}/answer?question_id=${questionId}&wait_ms=${waitMs}`,
+      );
+      last = verdict;
+      if (verdict.eval_status !== "pending") return verdict;
+      delayMs = verdict.retry_after_ms ?? 300;
+    } catch {
+      // Transient poll error — keep polling; back off a bit harder since the
+      // request failed fast (no server-side long-poll happened).
+      delayMs = 1000;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
-  return last as AnswerResponse;
+  return last;
 }
 
 export function useAnswerQuestion(sessionId: string | null) {
@@ -153,10 +170,14 @@ export function useAnswerQuestion(sessionId: string | null) {
           { method: "POST", body: { answer: normalizedAnswer, input_method: inputMethod } }
         );
 
-        // text_free answers grade asynchronously — wait for the verdict so
-        // the caller always receives a settled `is_correct`.
+        // text_free answers grade asynchronously — wait for the verdict.
+        // If polling exhausts its window (or every poll errored) the response
+        // stays pending (`is_correct: null`): the UI shows a "still grading"
+        // state instead of a wrong verdict. Never rethrow or resubmit here —
+        // the answer is already persisted.
         if (response.eval_status === "pending") {
-          response = await pollAnswerVerdict(sessionId, questionId);
+          const settled = await pollAnswerVerdict(sessionId, questionId);
+          if (settled) response = settled;
         }
 
         // Only mutate session data, NOT current question

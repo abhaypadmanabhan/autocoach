@@ -97,12 +97,15 @@ export interface DocumentConceptsResponse {
 }
 
 export interface AnswerResult {
-  // The backend transiently sends `null` while a text_free answer is still
-  // being graded (eval_status === "pending"), but `submitAnswer` polls the
-  // verdict internally and only ever resolves a settled boolean — so callers
-  // always observe a concrete verdict here.
-  is_correct: boolean;
-  correct_answer: string;
+  // `null` while a text_free answer is still being graded in the background
+  // (eval_status === "pending"). `submitAnswer` polls for the verdict, but
+  // the poll window can be exhausted (slow LLM, transient errors) and the
+  // response then stays pending — callers MUST handle the null state and
+  // never render it as "incorrect".
+  is_correct: boolean | null;
+  // `null` on pending payloads: the backend never exposes the model answer
+  // before the user's answer has been graded.
+  correct_answer: string | null;
   explanation?: string | null;
   score_so_far: number;
   total_answered: number;
@@ -120,6 +123,9 @@ export interface AnswerResponse {
   // "pending" → text_free verdict is still being computed; poll
   // GET /quiz/sessions/{id}/answer for the final result.
   eval_status?: AnswerEvalStatus;
+  // Suggested delay before re-polling when a GET /answer long-poll timed out
+  // while still pending.
+  retry_after_ms?: number | null;
 }
 
 export type NextQuestionStatus = "ready" | "preparing" | "ended" | "failed";
