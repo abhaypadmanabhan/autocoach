@@ -92,6 +92,14 @@ class _FakeTable:
         self._filters.append(("in", k, list(vs)))
         return self
 
+    def is_(self, k, v):
+        self._filters.append(("is", k, v))
+        return self
+
+    def lt(self, k, v):
+        self._filters.append(("lt", k, v))
+        return self
+
     def order(self, *args, **kwargs):
         self._order = (args, kwargs)
         return self

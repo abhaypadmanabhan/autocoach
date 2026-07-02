@@ -1,11 +1,17 @@
 """Tests for async free-text answer evaluation (issue #22) and the
 wrong-answer bias boost in the concept selector (issue #24).
 
-Async-eval design (no schema change): a `text_free` answer is recorded fast
-with `status='answered'` and `is_correct=NULL` (the pending-eval marker) and
-graded off the request path by `evaluate_answer_bg`. `check_answer_verdict` /
-`wait_for_answer_verdict` long-poll for the verdict and self-heal a dropped
-eval via the stale-TTL, mirroring the async generation FSM.
+Async-eval design: a `text_free` answer is recorded fast with
+`status='answered'` and `is_correct=NULL` (the pending-eval marker) and graded
+off the request path by `evaluate_answer_bg`, which finalizes exactly once via
+a conditional verdict write (`is_correct IS NULL`) and persists feedback /
+mastery_delta / xp into `questions.eval_result` (jsonb). `check_answer_verdict`
+/ `wait_for_answer_verdict` long-poll for the verdict; pending payloads are
+neutral (no correct_answer/explanation). A stale pending eval is healed via an
+atomic answered_at-bump claim + daemon-thread re-drive, attempts-capped with a
+fail-closed terminal state; `check_next_question` / `get_current_question` are
+additional heal entry points (restart-lost BackgroundTasks) and never trigger
+generation while an eval is pending.
 """
 
 import random
@@ -42,11 +48,14 @@ def _make_question(
     user_answer=None,
     is_correct=None,
     answered_at: datetime | None = None,
+    eval_result: dict | None = None,
+    question_number: int = 2,
+    qid: str = QUESTION_ID,
 ) -> dict:
     return {
-        "id": QUESTION_ID,
+        "id": qid,
         "session_id": SESSION_ID,
-        "question_number": 2,
+        "question_number": question_number,
         "question_type": qtype,
         "question_text": "What is X?",
         "options": None,
@@ -55,25 +64,57 @@ def _make_question(
         "concept_ids": [CONCEPT_ID],
         "user_answer": user_answer,
         "is_correct": is_correct,
+        "eval_result": eval_result,
         "status": "ready" if user_answer is None else "answered",
         "answered_at": answered_at.isoformat() if answered_at else None,
     }
 
 
-class _FakeSupabase:
-    """Minimal Supabase stub. Reads return the list for the table; writes are
-    recorded on `.updates` / `.inserts`. Rows are shared references, so a test
-    can mutate `fake.questions[0]` between calls to simulate the verdict
-    landing."""
+def _row_matches(row: dict, filters: list[tuple]) -> bool:
+    for op, key, val in filters:
+        actual = row.get(key)
+        if op == "eq":
+            if str(actual) != str(val):
+                return False
+        elif op == "in":
+            if str(actual) not in {str(v) for v in val}:
+                return False
+        elif op == "is":
+            if val in (None, "null") and actual is not None:
+                return False
+        elif op == "not.is":
+            if val in (None, "null") and actual is None:
+                return False
+        elif op == "lt":
+            if actual is None or not (str(actual) < str(val)):
+                return False
+    return True
 
-    def __init__(self, sessions=None, questions=None):
+
+class _FakeSupabase:
+    """Supabase stub with filter-aware reads and conditional updates.
+
+    Reads apply eq/in/is/lt filters against the table rows (shared dict
+    references, so a test can mutate `fake.questions[0]` between calls to
+    simulate the verdict landing). Updates are recorded on `.updates`, applied
+    to the matching rows, and return exactly those rows — so a conditional
+    update (e.g. `.is_("is_correct", "null")`) returns empty data when no row
+    matches, mirroring the atomic-claim semantics under test. `update_hook`
+    (table, filters, payload) -> list | None can force an update result (e.g.
+    [] to simulate losing a claim race) without touching rows."""
+
+    def __init__(self, sessions=None, questions=None, update_hook=None):
         self.sessions = sessions or []
         self.questions = questions or []
         self.updates: list[dict] = []
         self.inserts: list[dict] = []
+        self.update_hook = update_hook
 
     def table(self, name):
         return _FakeTable(self, name)
+
+    def rows_for(self, name):
+        return self.sessions if name == "quiz_sessions" else self.questions
 
 
 class _FakeTable:
@@ -86,24 +127,38 @@ class _FakeTable:
         self._limit = None
         self._update_payload = None
         self._insert_payload = None
+        self._negate_next = False
 
     def select(self, *args):
         self._select = args
         return self
 
-    def eq(self, k, v):
-        self._filters.append(("eq", k, v))
+    def _add_filter(self, op, k, v):
+        if self._negate_next:
+            op = f"not.{op}"
+            self._negate_next = False
+        self._filters.append((op, k, v))
         return self
 
+    def eq(self, k, v):
+        return self._add_filter("eq", k, v)
+
     def in_(self, k, vs):
-        self._filters.append(("in", k, list(vs)))
-        return self
+        return self._add_filter("in", k, list(vs))
+
+    def is_(self, k, v):
+        return self._add_filter("is", k, v)
+
+    def lt(self, k, v):
+        return self._add_filter("lt", k, v)
 
     def order(self, *args, **kwargs):
         self._order = (args, kwargs)
         return self
 
-    def not_(self):  # pragma: no cover - unused surface guard
+    @property
+    def not_(self):
+        self._negate_next = True
         return self
 
     def limit(self, n):
@@ -123,11 +178,37 @@ class _FakeTable:
             self.parent.updates.append(
                 {"table": self.name, "filters": self._filters, "payload": self._update_payload}
             )
-            return MagicMock(data=[{"id": "x", **self._update_payload}])
+            if self.parent.update_hook is not None:
+                hooked = self.parent.update_hook(
+                    self.name, self._filters, self._update_payload
+                )
+                if hooked is not None:
+                    return MagicMock(data=hooked)
+            matched = [
+                r for r in self.parent.rows_for(self.name)
+                if _row_matches(r, self._filters)
+            ]
+            for r in matched:
+                r.update(self._update_payload)
+            return MagicMock(data=[dict(r) for r in matched])
         if self._insert_payload is not None:
             self.parent.inserts.append({"table": self.name, "payload": self._insert_payload})
             return MagicMock(data=[self._insert_payload])
-        rows = self.parent.sessions if self.name == "quiz_sessions" else self.parent.questions
+        rows = [
+            r for r in self.parent.rows_for(self.name)
+            if _row_matches(r, self._filters)
+        ]
+        if self._order:
+            order_args, order_kwargs = self._order
+            if order_args:
+                key = order_args[0]
+                rows = sorted(
+                    rows,
+                    key=lambda r: (r.get(key) is None, r.get(key)),
+                    reverse=bool(order_kwargs.get("desc")),
+                )
+        if self._limit is not None:
+            rows = rows[: self._limit]
         return MagicMock(data=list(rows))
 
 
@@ -298,6 +379,136 @@ def test_evaluate_answer_bg_skips_when_no_answer():
     eval_mock.assert_not_called()
 
 
+def test_evaluate_answer_bg_lost_verdict_race_does_not_finalize():
+    """Exactly-once finalize: when the conditional verdict write matches zero
+    rows (a racing worker — duplicate task or stale-TTL re-drive — graded the
+    answer first), the loser must NOT finalize (mastery would double-count)
+    and must NOT trigger generation."""
+
+    def lose_verdict_write(table, filters, payload):
+        if table == "questions" and "is_correct" in payload:
+            return []  # racing worker already wrote the verdict
+        return None
+
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[_make_question(qtype="text_free", user_answer="student answer")],
+        update_hook=lose_verdict_write,
+    )
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(
+             session_manager, "evaluate_answer",
+             return_value={"is_correct": True, "feedback": "good"},
+         ) as eval_mock, \
+         patch.object(session_manager, "_finalize_answer") as fin_mock, \
+         patch.object(session_manager, "generate_next_question_bg") as gen_mock:
+        session_manager.evaluate_answer_bg(SESSION_ID, USER_ID, QUESTION_ID)
+
+    eval_mock.assert_called_once()  # this worker paid one LLM call, no more
+    fin_mock.assert_not_called()
+    gen_mock.assert_not_called()
+    # The verdict write must be conditional on the answer being ungraded.
+    verdict_writes = [
+        u for u in fake.updates
+        if u["table"] == "questions" and "is_correct" in u["payload"]
+    ]
+    assert len(verdict_writes) == 1
+    assert ("is", "is_correct", "null") in verdict_writes[0]["filters"]
+
+
+def test_evaluate_answer_bg_persists_eval_result():
+    """After winning the verdict write + finalizing, the real feedback /
+    mastery_delta / xp are persisted onto the question row for the poller."""
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[_make_question(qtype="text_free", user_answer="student answer")],
+    )
+    finalized = {
+        "result": {"is_correct": True, "mastery_delta": 2.75, "xp_awarded": 10},
+        "session_complete": True,
+        "session_ended_reason": "cap_reached",
+    }
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(
+             session_manager, "evaluate_answer",
+             return_value={"is_correct": True, "feedback": "well reasoned"},
+         ), \
+         patch.object(session_manager, "_finalize_answer", return_value=finalized):
+        session_manager.evaluate_answer_bg(SESSION_ID, USER_ID, QUESTION_ID)
+
+    stored = [
+        u["payload"]["eval_result"]
+        for u in fake.updates
+        if u["table"] == "questions" and "eval_result" in u["payload"]
+    ]
+    assert stored == [
+        {"feedback": "well reasoned", "mastery_delta": 2.75, "xp_awarded": 10}
+    ]
+
+
+# ---------------------------------------------------------------------------
+# pending-eval gate + restart self-heal from /next and /current
+# ---------------------------------------------------------------------------
+
+
+def test_generate_next_question_bg_defers_while_eval_pending():
+    """The generator must not claim a slot (and select on pre-verdict mastery)
+    while an answer eval is pending — the eval task re-triggers it once the
+    verdict lands."""
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[_make_question(user_answer="a", is_correct=None)],
+    )
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "_select_next_concept") as sel_mock, \
+         patch.object(session_manager, "generate_single_question") as gen_mock:
+        session_manager.generate_next_question_bg(SESSION_ID, USER_ID)
+
+    sel_mock.assert_not_called()
+    gen_mock.assert_not_called()
+    assert fake.inserts == [], "no generation placeholder may be claimed"
+
+
+def test_check_next_question_heals_stale_pending_eval_and_waits():
+    """GET /next is a re-drive path for a restart-lost eval: a stale pending
+    answer gets healed (claim + daemon-thread re-drive) and the poller sees
+    'preparing' — generation is NOT triggered on unsettled mastery."""
+    stale = datetime.now(timezone.utc) - timedelta(seconds=120)
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[_make_question(user_answer="a", is_correct=None, answered_at=stale)],
+    )
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "_spawn_bg") as spawn_mock, \
+         patch.object(session_manager, "_trigger_generation_if_needed") as trig_mock:
+        result = session_manager.check_next_question(SESSION_ID, USER_ID)
+
+    assert result["status"] == "preparing"
+    spawn_mock.assert_called_once()
+    assert spawn_mock.call_args.args == (
+        session_manager.evaluate_answer_bg, SESSION_ID, USER_ID, QUESTION_ID,
+    )
+    trig_mock.assert_not_called()
+
+
+def test_get_current_question_heals_stale_pending_eval_and_waits():
+    """GET /current likewise heals a stale pending eval instead of triggering
+    generation on unsettled mastery."""
+    stale = datetime.now(timezone.utc) - timedelta(seconds=120)
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[_make_question(user_answer="a", is_correct=None, answered_at=stale)],
+    )
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "_spawn_bg") as spawn_mock, \
+         patch.object(session_manager, "_trigger_generation_if_needed") as trig_mock:
+        result = session_manager.get_current_question(SESSION_ID, USER_ID)
+
+    assert result is None
+    spawn_mock.assert_called_once()
+    trig_mock.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # check_answer_verdict / wait_for_answer_verdict
 # ---------------------------------------------------------------------------
@@ -347,19 +558,209 @@ def test_check_answer_verdict_reports_session_complete():
     assert result["session_ended_reason"] == "cap_reached"
 
 
-def test_check_answer_verdict_self_heals_stale_eval():
-    """An ungraded answer older than the stale-TTL re-drives the eval task."""
+def test_check_answer_verdict_self_heals_stale_eval_in_background():
+    """An ungraded answer older than the stale-TTL is claimed atomically
+    (conditional answered_at bump) and re-driven in a daemon thread — the LLM
+    must never run inline on the poll request thread."""
     stale = datetime.now(timezone.utc) - timedelta(seconds=120)
     fake = _FakeSupabase(
         sessions=[_make_active_session()],
         questions=[_make_question(user_answer="a", is_correct=None, answered_at=stale)],
     )
     with patch.object(session_manager, "supabase_admin", fake), \
-         patch.object(session_manager, "evaluate_answer_bg") as heal_mock:
+         patch.object(session_manager, "_spawn_bg") as spawn_mock, \
+         patch.object(session_manager, "evaluate_answer") as llm_mock:
         result = session_manager.check_answer_verdict(SESSION_ID, USER_ID, QUESTION_ID)
 
     assert result["eval_status"] == "pending"
-    heal_mock.assert_called_once_with(SESSION_ID, USER_ID, QUESTION_ID)
+
+    # Exactly one atomic claim: answered_at bump conditional on the answer
+    # still being ungraded AND still stale (is + lt filters).
+    claims = [
+        u for u in fake.updates
+        if u["table"] == "questions" and "answered_at" in u["payload"]
+    ]
+    assert len(claims) == 1
+    claim_ops = {f[0] for f in claims[0]["filters"]}
+    assert "is" in claim_ops and "lt" in claim_ops
+
+    # Attempt counter persisted inside eval_result jsonb.
+    attempt_writes = [
+        u for u in fake.updates
+        if (u["payload"].get("eval_result") or {}).get("attempts") == 1
+    ]
+    assert attempt_writes, "heal must record the attempt in eval_result"
+
+    # Re-drive spawned off-thread; nothing ran the LLM inline.
+    spawn_mock.assert_called_once()
+    assert spawn_mock.call_args.args == (
+        session_manager.evaluate_answer_bg, SESSION_ID, USER_ID, QUESTION_ID,
+    )
+    llm_mock.assert_not_called()
+
+
+def test_stale_heal_claim_lost_does_not_redrive():
+    """If the conditional claim matches zero rows (another worker claimed this
+    TTL window, or the verdict just landed) the heal must do nothing more."""
+    stale = datetime.now(timezone.utc) - timedelta(seconds=120)
+
+    def lose_claims(table, filters, payload):
+        if table == "questions" and "answered_at" in payload:
+            return []  # claim lost
+        return None
+
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[_make_question(user_answer="a", is_correct=None, answered_at=stale)],
+        update_hook=lose_claims,
+    )
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "_spawn_bg") as spawn_mock:
+        result = session_manager.check_answer_verdict(SESSION_ID, USER_ID, QUESTION_ID)
+
+    assert result["eval_status"] == "pending"
+    spawn_mock.assert_not_called()
+    # No attempts bookkeeping after a lost claim.
+    assert not [
+        u for u in fake.updates if "eval_result" in u["payload"]
+    ], "lost claim must not write attempts"
+
+
+def test_stale_heal_fails_closed_after_attempt_cap():
+    """Third stale claim (attempts cap) fails closed: conditional
+    is_correct=false write with apology feedback, then finalize; next-question
+    generation is handed to a daemon thread, never run inline."""
+    stale = datetime.now(timezone.utc) - timedelta(seconds=120)
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[
+            _make_question(
+                user_answer="a",
+                is_correct=None,
+                answered_at=stale,
+                eval_result={"attempts": 2},
+            )
+        ],
+    )
+    finalized = {
+        "result": {"is_correct": False},
+        "session_complete": False,
+        "session_ended_reason": None,
+    }
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "_finalize_answer", return_value=finalized) as fin_mock, \
+         patch.object(session_manager, "_spawn_bg") as spawn_mock, \
+         patch.object(session_manager, "evaluate_answer") as llm_mock:
+        session_manager.check_answer_verdict(SESSION_ID, USER_ID, QUESTION_ID)
+
+    fail_writes = [
+        u for u in fake.updates
+        if u["table"] == "questions" and u["payload"].get("is_correct") is False
+    ]
+    assert len(fail_writes) == 1
+    assert ("is", "is_correct", "null") in fail_writes[0]["filters"]
+    assert (
+        fail_writes[0]["payload"]["eval_result"]["feedback"]
+        == session_manager.EVAL_FAILED_FEEDBACK
+    )
+    fin_mock.assert_called_once()
+    llm_mock.assert_not_called()
+    spawn_mock.assert_called_once()
+    assert spawn_mock.call_args.args == (
+        session_manager.generate_next_question_bg, SESSION_ID, USER_ID,
+    )
+
+
+def test_check_answer_verdict_rejects_unanswered_question():
+    """Polling the verdict of a question with no submitted answer must raise —
+    never return a payload (the pending dict was an answer-leak vector)."""
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[_make_question(user_answer=None)],
+    )
+    with patch.object(session_manager, "supabase_admin", fake):
+        with pytest.raises(ValueError, match="not answered"):
+            session_manager.check_answer_verdict(SESSION_ID, USER_ID, QUESTION_ID)
+
+
+def test_pending_payloads_never_leak_correct_answer():
+    """Both pending payloads — the verdict poll and the submit fast path —
+    must carry neutral fields only: no correct_answer, no explanation."""
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[
+            _make_question(user_answer="a", is_correct=None, answered_at=datetime.now(timezone.utc))
+        ],
+    )
+    with patch.object(session_manager, "supabase_admin", fake):
+        polled = session_manager.check_answer_verdict(SESSION_ID, USER_ID, QUESTION_ID)
+    assert polled["eval_status"] == "pending"
+    assert polled["result"]["correct_answer"] is None
+    assert polled["result"]["explanation"] is None
+
+    fake2 = _FakeSupabase(
+        sessions=[_make_active_session()],
+        questions=[_make_question(qtype="text_free")],
+    )
+    with patch.object(session_manager, "supabase_admin", fake2), \
+         patch.object(session_manager, "evaluate_answer"):
+        submitted = session_manager.submit_answer(
+            SESSION_ID, USER_ID, QUESTION_ID, "ans", "typed"
+        )
+    assert submitted["eval_status"] == "pending"
+    assert submitted["result"]["correct_answer"] is None
+    assert submitted["result"]["explanation"] is None
+
+
+def test_verdict_returns_stored_feedback_and_mastery_delta():
+    """A graded verdict surfaces the persisted eval_result (feedback, real
+    mastery_delta, xp) instead of hardcoded None/0.0."""
+    session = _make_active_session(total=5, answered=2, correct=2)
+    fake = _FakeSupabase(
+        sessions=[session],
+        questions=[
+            _make_question(
+                user_answer="a",
+                is_correct=True,
+                answered_at=datetime.now(timezone.utc),
+                eval_result={"feedback": "nice work", "mastery_delta": 3.5, "xp_awarded": 10},
+            )
+        ],
+    )
+    with patch.object(session_manager, "supabase_admin", fake):
+        result = session_manager.check_answer_verdict(SESSION_ID, USER_ID, QUESTION_ID)
+
+    assert result["eval_status"] == "complete"
+    assert result["result"]["feedback"] == "nice work"
+    assert result["result"]["mastery_delta"] == 3.5
+    assert result["result"]["xp_awarded"] == 10
+    # Session row already reflects the finalize → its counters are used.
+    assert result["result"]["score_so_far"] == 2
+    assert result["result"]["total_answered"] == 2
+
+
+def test_verdict_midflight_derives_counts_from_question_rows():
+    """Verdict written but finalize not yet reflected in the session row
+    (answered_questions < question_number): the poller must derive counts from
+    the question rows and completion from the graded count — never report a
+    graded final answer with session_complete=False."""
+    session = _make_active_session(total=2, answered=1, correct=1)  # stale counters
+    q1 = _make_question(
+        qid="bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+        question_number=1,
+        user_answer="x",
+        is_correct=True,
+    )
+    q2 = _make_question(user_answer="a", is_correct=True, question_number=2)
+    fake = _FakeSupabase(sessions=[session], questions=[q1, q2])
+    with patch.object(session_manager, "supabase_admin", fake):
+        result = session_manager.check_answer_verdict(SESSION_ID, USER_ID, QUESTION_ID)
+
+    assert result["eval_status"] == "complete"
+    assert result["result"]["total_answered"] == 2
+    assert result["result"]["score_so_far"] == 2
+    assert result["session_complete"] is True
+    assert result["session_ended_reason"] == "cap_reached"
 
 
 def test_wait_for_answer_verdict_returns_complete(monkeypatch):
@@ -529,3 +930,55 @@ def test_miss_outside_window_is_not_boosted():
     # Under an identical RNG stream, the in-window miss is boosted and the
     # out-of-window miss is not, so the in-window run picks A strictly more.
     assert a_inside > a_outside
+
+
+def test_pending_eval_rows_do_not_break_trailing_correct_lockout():
+    """An is_correct=None row (async eval in flight, #22) is neutral: it must
+    not clear an earned 3-correct lockout. Pre-fix, the backward walk treated
+    None as wrong, froze the concept, and made it selectable again."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=50.0),
+        _concept(CORE_B, importance=1.0, mastery=50.0),
+        _concept(CORE_C, importance=1.0, mastery=50.0),
+        _concept(CORE_F, importance=1.0, mastery=50.0),
+    ]
+    # C earns the 3-correct lockout, then gets asked again with the verdict
+    # still pending; A/B/F fill the recent-ask window so a broken lockout
+    # would leave C as the ONLY candidate.
+    history = _hist([
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": None},  # pending async eval
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_F], "is_correct": True},
+    ])
+    picks = _run_picks(concepts, history, seed=0, n=200)
+    assert CORE_C not in picks, "pending row must not clear the 3-correct lockout"
+
+
+def test_pending_eval_rows_are_not_boosted_as_misses():
+    """An is_correct=None row is not a miss: under an identical RNG stream the
+    selection sequence must be exactly the same whether A's trailing answer is
+    still pending or was correct — no ×1.3 boost, no lockout side effects."""
+    concepts = [
+        _concept(CORE_A, importance=1.0, mastery=50.0),
+        _concept(CORE_B, importance=1.0, mastery=50.0),
+        _concept(CORE_C, importance=1.0, mastery=95.0),
+    ]
+    pending = _hist([
+        {"concept_ids": [CORE_A], "is_correct": None},  # awaiting verdict
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+    ])
+    control = _hist([
+        {"concept_ids": [CORE_A], "is_correct": True},
+        {"concept_ids": [CORE_B], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+        {"concept_ids": [CORE_C], "is_correct": True},
+    ])
+    assert _run_picks(concepts, pending, seed=0) == _run_picks(concepts, control, seed=0)

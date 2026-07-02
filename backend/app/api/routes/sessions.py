@@ -323,8 +323,10 @@ def submit_quiz_answer(
         return AnswerResponse(
             result=AnswerResult(
                 is_correct=result["result"]["is_correct"],
-                correct_answer=result["result"]["correct_answer"],
-                explanation=result["result"]["explanation"],
+                # None on the pending fast path — the model answer is never
+                # exposed before the async verdict lands.
+                correct_answer=result["result"].get("correct_answer"),
+                explanation=result["result"].get("explanation"),
                 score_so_far=result["result"]["score_so_far"],
                 total_answered=result["result"]["total_answered"],
                 feedback=result["result"].get("feedback"),
@@ -356,8 +358,11 @@ def get_answer_verdict(
 
     Returns 200 with `eval_status="complete"` and the full result once
     background grading finishes, or `eval_status="pending"` (plus
-    `retry_after_ms`) if grading has not finished within `wait_ms`. MCQ / T-F
-    answers are graded inline by POST /answer and never need this endpoint."""
+    `retry_after_ms`) if grading has not finished within `wait_ms`. Pending
+    responses carry only neutral fields — never `correct_answer` or
+    `explanation`. 404 for an unknown session/question; 409 when the question
+    has not been answered yet. MCQ / T-F answers are graded inline by
+    POST /answer and never need this endpoint."""
     try:
         result = wait_for_answer_verdict(
             session_id=str(session_id),
@@ -366,7 +371,12 @@ def get_answer_verdict(
             wait_ms=wait_ms,
         )
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        detail = str(e)
+        # "Session/Question not found" → 404; "Question not answered" → 409
+        # (polling a verdict before submitting is a client-state conflict —
+        # and must never return the model answer).
+        status_code = 404 if "not found" in detail.lower() else 409
+        raise HTTPException(status_code=status_code, detail=detail)
     except Exception as e:
         logger.error("Failed to fetch answer verdict: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to fetch answer verdict")
@@ -375,8 +385,8 @@ def get_answer_verdict(
     return AnswerResponse(
         result=AnswerResult(
             is_correct=r["is_correct"],
-            correct_answer=r["correct_answer"],
-            explanation=r["explanation"],
+            correct_answer=r.get("correct_answer"),
+            explanation=r.get("explanation"),
             score_so_far=r["score_so_far"],
             total_answered=r["total_answered"],
             feedback=r.get("feedback"),
@@ -386,6 +396,7 @@ def get_answer_verdict(
         session_complete=result["session_complete"],
         session_ended_reason=result.get("session_ended_reason"),
         eval_status=result["eval_status"],
+        retry_after_ms=result.get("retry_after_ms"),
     )
 
 

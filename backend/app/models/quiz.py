@@ -131,10 +131,14 @@ class AnswerResult(BaseModel):
     background LLM eval, so the initial answer response carries `is_correct
     = None` (see `AnswerResponse.eval_status == "pending"`). MCQ / T-F are
     graded inline and always carry a concrete bool.
+
+    `correct_answer` / `explanation` are nullable because pending payloads
+    deliberately omit them — the model answer must never be visible before
+    the user's answer is graded (answer-leak fix).
     """
 
     is_correct: bool | None = None
-    correct_answer: str
+    correct_answer: str | None = None
     explanation: str | None = None
     score_so_far: int
     total_answered: int
@@ -161,6 +165,9 @@ class AnswerResponse(BaseModel):
     session_complete: bool
     session_ended_reason: str | None = None  # "cap_reached" | "mastery_threshold"
     eval_status: str = "complete"  # "complete" | "pending"
+    # Set on a pending GET /answer long-poll timeout: suggested client delay
+    # before re-polling (mirrors NextQuestionResponse.retry_after_ms).
+    retry_after_ms: int | None = None
 
 
 class NextQuestionResponse(BaseModel):
