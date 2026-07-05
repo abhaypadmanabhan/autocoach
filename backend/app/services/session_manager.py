@@ -1,6 +1,7 @@
 """Quiz session management service — adaptive on-demand loop with async generation."""
 
 import logging
+import math
 import random
 import threading
 import time
@@ -13,6 +14,7 @@ from app.core.supabase import supabase_admin
 from app.observability.langfuse import observe
 from app.services.quiz_generator import generate_single_question
 from app.services.answer_evaluator import evaluate_answer
+from app.services.embeddings import get_embeddings
 from app.models.quiz import QuestionType
 from app.services.concepts import get_document_concepts, get_due_concepts
 
@@ -28,6 +30,13 @@ EXPLORATION_PROBABILITY = 0.30
 MAX_GENERATION_ATTEMPTS = 2  # initial try + 1 retry inside the bg task
 MAX_EVAL_ATTEMPTS = 3  # stale-eval heal re-drives before failing closed
 EVAL_FAILED_FEEDBACK = "We couldn't grade this answer automatically."
+
+# Semantic dedup (#23): a freshly generated question is a near-duplicate when
+# its embedding cosine-similarity exceeds this threshold against any of the last
+# SEMANTIC_DEDUP_WINDOW questions in the session. The generator retries once on
+# a hit (see quiz_generator.generate_single_question).
+SEMANTIC_DUP_THRESHOLD = 0.85
+SEMANTIC_DEDUP_WINDOW = 3
 
 
 def _is_stale(timestamp_iso: str | None, ttl_s: int) -> bool:
@@ -458,6 +467,79 @@ def _build_question_response(question: dict, total_questions: int, difficulty: s
     }
 
 
+# ---------------------------------------------------------------------------
+# Semantic question dedup (#23)
+# ---------------------------------------------------------------------------
+
+
+def _cosine_similarity(a: list[float], b: list[float]) -> float:
+    """Cosine similarity of two equal-length vectors. Returns 0.0 for empty,
+    mismatched-length, or zero-norm inputs (never raises)."""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    norm_a = math.sqrt(sum(x * x for x in a))
+    norm_b = math.sqrt(sum(y * y for y in b))
+    if norm_a == 0.0 or norm_b == 0.0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _embed_question(text: str) -> list[float] | None:
+    """Embed one question's text (1536-dim, via OpenAI text-embedding-3-small).
+
+    Returns None on empty text or any embedding failure so that embedding
+    problems can never block question generation/delivery — dedup and storage
+    both fail open (skip) on None."""
+    if not text or not text.strip():
+        return None
+    try:
+        vectors = get_embeddings([text])
+    except Exception as e:  # defensive: get_embeddings already swallows most errors
+        logger.warning(f"[dedup] embedding failed: {e}")
+        return None
+    return vectors[0] if vectors else None
+
+
+def _recent_question_embeddings(session_id: str, limit: int) -> list[list[float]]:
+    """Stored embeddings of the last `limit` questions in a session (newest
+    first), skipping any row without a stored embedding.
+
+    Fetches one extra row so an in-flight `generating` placeholder (whose
+    embedding is still NULL) does not shrink the effective comparison window."""
+    res = (
+        supabase_admin.table("questions")
+        .select("question_embedding,question_number")
+        .eq("session_id", session_id)
+        .order("question_number", desc=True)
+        .limit(limit + 1)
+        .execute()
+    )
+    out: list[list[float]] = []
+    for row in res.data or []:
+        emb = row.get("question_embedding")
+        if isinstance(emb, list) and emb:
+            out.append([float(x) for x in emb])
+            if len(out) >= limit:
+                break
+    return out
+
+
+def _is_semantically_duplicate(question_text: str, session_id: str) -> bool:
+    """True when `question_text` is a near-duplicate (cosine > threshold) of any
+    of the last SEMANTIC_DEDUP_WINDOW questions in the session.
+
+    Fails open (returns False) when the candidate can't be embedded — dedup is
+    a quality nudge and must never block question delivery."""
+    candidate = _embed_question(question_text)
+    if candidate is None:
+        return False
+    for prior in _recent_question_embeddings(session_id, SEMANTIC_DEDUP_WINDOW):
+        if _cosine_similarity(candidate, prior) > SEMANTIC_DUP_THRESHOLD:
+            return True
+    return False
+
+
 def _generate_and_insert_question(
     session_id: str,
     document_id: str,
@@ -482,6 +564,7 @@ def _generate_and_insert_question(
         concept=concept,
         difficulty=difficulty,
         question_types=question_types,
+        session_id=session_id,
     )
     if not q:
         logger.error(
@@ -501,6 +584,7 @@ def _generate_and_insert_question(
         "correct_answer": q.get("correct_answer", ""),
         "explanation": q.get("explanation"),
         "concept_ids": [str(concept["id"])],
+        "question_embedding": _embed_question(q.get("question_text", "")),
         "user_answer": None,
         "is_correct": None,
         "input_method": None,
@@ -580,6 +664,7 @@ def _fill_ready_question(question_id: str, q: dict, concept_id: str, attempts: i
         "correct_answer": q.get("correct_answer", ""),
         "explanation": q.get("explanation"),
         "concept_ids": [concept_id],
+        "question_embedding": _embed_question(q.get("question_text", "")),
         "ready_at": now,
         "generation_attempts": attempts,
     }
@@ -657,6 +742,7 @@ def generate_next_question_bg(session_id: str, user_id: str) -> None:
                 concept=concept,
                 difficulty=difficulty,
                 question_types=question_types,
+                session_id=session_id,
             )
             if not q:
                 logger.warning(
