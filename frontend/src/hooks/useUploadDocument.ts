@@ -87,10 +87,10 @@ export function useUploadDocument() {
 
         if (uploadError) {
           // Handle specific storage errors
-          if (uploadError.message.includes("duplicate")) {
+          if (uploadError.message?.includes("duplicate")) {
             throw new Error("A file with this name already exists.");
           }
-          if (uploadError.message.includes("payload")) {
+          if (uploadError.message?.includes("payload")) {
             throw new Error(`File is too large. Maximum size is ${MAX_FILE_SIZE_MB}MB.`);
           }
           throw new Error(`Upload failed: ${uploadError.message}`);
