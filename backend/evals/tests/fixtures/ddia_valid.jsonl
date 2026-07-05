@@ -1,0 +1,3 @@
+{"question": "TEST FIXTURE: what does the toy doc say the sky is?", "source_chunk_text": "TEST FIXTURE: the toy doc states the sky is blue during the day.", "ideal_answer": "TEST FIXTURE: the sky is blue.", "concept_label": "test-sky"}
+{"question": "TEST FIXTURE: what is two plus two in the toy doc?", "source_chunk_text": "TEST FIXTURE: the toy doc says two plus two equals four.", "ideal_answer": "TEST FIXTURE: four.", "concept_label": "test-math"}
+{"question": "TEST FIXTURE: which animal meows in the toy doc?", "source_chunk_text": "TEST FIXTURE: the toy doc mentions a cat that meows.", "ideal_answer": "TEST FIXTURE: a cat.", "concept_label": "test-animals"}
