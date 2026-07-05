@@ -185,29 +185,6 @@ def _consume_usage_or_raise(
     )
 
 
-def check_quiz_limit(user_id: UUID) -> None:
-    """Raise 429 if quiz limit reached."""
-    usage = get_or_create_daily_usage(user_id)
-    allowed = QUIZ_LIMIT + usage.get("extra_quizzes", 0)
-    if usage["quizzes_used"] >= allowed:
-        raise _build_limit_error(
-            "quiz",
-            allowed,
-            f"You've reached your daily quiz limit of {allowed}.",
-        )
-
-
-def increment_quiz_usage(user_id: UUID) -> None:
-    """Increment quiz usage count (atomic)."""
-    _consume_usage_or_raise(
-        user_id,
-        field="quizzes_used",
-        limit=10**9,
-        limit_type="quiz",
-        message="You've reached your daily quiz limit.",
-    )
-
-
 def consume_quiz_usage_or_429(user_id: UUID) -> int:
     """Atomically consume one quiz from daily quota or raise 429."""
     if has_unlimited(user_id):

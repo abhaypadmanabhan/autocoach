@@ -22,7 +22,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from app.api.routes import documents, quiz, sessions
+from app.api.routes import documents, sessions
 from app.main import app
 
 
@@ -46,7 +46,6 @@ def test_session_route_handlers_are_sync():
         sessions.get_current_quiz_question,
         sessions.submit_quiz_answer,
         sessions.get_next_question,
-        quiz.generate_quiz,
     ):
         assert not inspect.iscoroutinefunction(fn), (
             f"{fn.__name__} must be a plain `def` handler so Starlette runs it "

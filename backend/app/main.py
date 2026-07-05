@@ -24,7 +24,6 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from app.api.routes import (  # noqa: E402
     health,
     documents,
-    quiz,
     sessions,
     review,
     xp,
@@ -124,7 +123,6 @@ async def options_preflight_passthrough(_full_path: str):
 
 app.include_router(health.router, tags=["health"])
 app.include_router(documents.router, prefix="/documents", tags=["documents"])
-app.include_router(quiz.router, prefix="/quiz", tags=["quiz"])
 app.include_router(sessions.router, prefix="/quiz/sessions", tags=["quiz-sessions"])
 app.include_router(review.router, prefix="/review", tags=["review"])
 app.include_router(xp.router, prefix="/xp", tags=["xp"])
