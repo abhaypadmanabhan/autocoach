@@ -20,7 +20,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services import session_manager
+from app.services import quiz_generator, session_manager
 
 
 SESSION_ID = "ffffffff-ffff-ffff-ffff-ffffffffffff"
@@ -982,3 +982,150 @@ def test_pending_eval_rows_are_not_boosted_as_misses():
         {"concept_ids": [CORE_C], "is_correct": True},
     ])
     assert _run_picks(concepts, pending, seed=0) == _run_picks(concepts, control, seed=0)
+
+
+# ---------------------------------------------------------------------------
+# Semantic question dedup (#23)
+# ---------------------------------------------------------------------------
+
+DIM = 1536
+_IDENT = [1.0] * DIM
+_DISTINCT = [0.0] * (DIM - 1) + [1.0]  # cosine ~0.026 vs _IDENT → well under threshold
+_CONCEPT = {"id": CONCEPT_ID, "concept_name": "Storage engines"}
+
+
+def _q_with_embedding(qid: str, question_number: int, embedding) -> dict:
+    q = _make_question(qid=qid, question_number=question_number)
+    q["question_embedding"] = embedding
+    return q
+
+
+def test_cosine_similarity_edge_cases():
+    assert session_manager._cosine_similarity(_IDENT, _IDENT) == pytest.approx(1.0)
+    assert session_manager._cosine_similarity([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)  # orthogonal
+    assert session_manager._cosine_similarity([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]) == pytest.approx(1.0)  # parallel
+    # empty / mismatched-length / zero-norm never raise → 0.0
+    assert session_manager._cosine_similarity([], _IDENT) == 0.0
+    assert session_manager._cosine_similarity([1.0, 2.0], [1.0]) == 0.0
+    assert session_manager._cosine_similarity([0.0, 0.0], [1.0, 1.0]) == 0.0
+
+
+def test_is_semantically_duplicate_flags_near_identical():
+    """A candidate whose embedding matches a recent question's stored embedding
+    (cosine > 0.85) is flagged as a duplicate."""
+    prior = _q_with_embedding("prev", question_number=1, embedding=_IDENT)
+    fake = _FakeSupabase(sessions=[_make_active_session()], questions=[prior])
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "get_embeddings", return_value=[_IDENT]):
+        assert session_manager._is_semantically_duplicate("near dup", SESSION_ID) is True
+
+
+def test_is_semantically_duplicate_passes_distinct_question():
+    """A candidate far from the prior (cosine well under threshold) is NOT a
+    duplicate."""
+    prior = _q_with_embedding("prev", question_number=1, embedding=_IDENT)
+    fake = _FakeSupabase(sessions=[_make_active_session()], questions=[prior])
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "get_embeddings", return_value=[_DISTINCT]):
+        assert session_manager._is_semantically_duplicate("distinct", SESSION_ID) is False
+
+
+def test_is_semantically_duplicate_fails_open_when_embedding_unavailable():
+    """If the candidate can't be embedded, dedup must fail OPEN (False) so it
+    never blocks question delivery — even when a matching prior exists."""
+    prior = _q_with_embedding("prev", question_number=1, embedding=_IDENT)
+    fake = _FakeSupabase(sessions=[_make_active_session()], questions=[prior])
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "get_embeddings", return_value=[]):
+        assert session_manager._is_semantically_duplicate("q", SESSION_ID) is False
+
+
+def test_is_semantically_duplicate_ignores_rows_without_embedding():
+    """Rows with a NULL embedding (e.g. an in-flight 'generating' placeholder or
+    pre-#23 questions) are skipped, not treated as a zero-vector match."""
+    no_emb = _make_question(qid="placeholder", question_number=2)  # no question_embedding
+    fake = _FakeSupabase(sessions=[_make_active_session()], questions=[no_emb])
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "get_embeddings", return_value=[_IDENT]):
+        assert session_manager._is_semantically_duplicate("q", SESSION_ID) is False
+
+
+def test_is_semantically_duplicate_only_checks_recent_window():
+    """Only the last SEMANTIC_DEDUP_WINDOW questions are compared: a duplicate
+    that has scrolled out of the window no longer trips dedup."""
+    # Oldest (out-of-window) question is identical to the candidate; the 3 most
+    # recent are all distinct from it.
+    old_dup = _q_with_embedding("old", question_number=1, embedding=_IDENT)
+    recent = [
+        _q_with_embedding(f"q{n}", question_number=n, embedding=_DISTINCT)
+        for n in (2, 3, 4)
+    ]
+    fake = _FakeSupabase(
+        sessions=[_make_active_session()], questions=[old_dup, *recent]
+    )
+    assert session_manager.SEMANTIC_DEDUP_WINDOW == 3
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "get_embeddings", return_value=[_IDENT]):
+        assert session_manager._is_semantically_duplicate("q", SESSION_ID) is False
+
+
+# --- generator retry (integration: consecutive Qs are not near-duplicates) ---
+
+
+def test_generate_single_question_retries_on_semantic_duplicate():
+    """The generator regenerates ONCE when the first question is a near-dup, and
+    serves the fresh (non-duplicate) question — so consecutive session questions
+    are not near-duplicates."""
+    dup = {"question_text": "What is a B-tree?", "question_type": "text_free", "correct_answer": "a"}
+    fresh = {"question_text": "Explain LSM trees.", "question_type": "text_free", "correct_answer": "b"}
+    with patch.object(quiz_generator, "generate_quiz_questions", side_effect=[[dup], [fresh]]) as gen_mock, \
+         patch.object(session_manager, "_is_semantically_duplicate", side_effect=[True, False]) as dup_mock:
+        result = quiz_generator.generate_single_question(
+            DOC_ID, _CONCEPT, session_id=SESSION_ID
+        )
+
+    assert result["question_text"] == "Explain LSM trees."
+    assert gen_mock.call_count == 2  # initial + exactly one retry
+    assert dup_mock.call_count == 2  # checked the first, then the retry
+
+
+def test_generate_single_question_no_retry_when_unique():
+    """A first-shot non-duplicate is served immediately — no wasted regeneration."""
+    fresh = {"question_text": "Explain LSM trees.", "question_type": "text_free", "correct_answer": "b"}
+    with patch.object(quiz_generator, "generate_quiz_questions", side_effect=[[fresh]]) as gen_mock, \
+         patch.object(session_manager, "_is_semantically_duplicate", return_value=False) as dup_mock:
+        result = quiz_generator.generate_single_question(
+            DOC_ID, _CONCEPT, session_id=SESSION_ID
+        )
+
+    assert result["question_text"] == "Explain LSM trees."
+    assert gen_mock.call_count == 1
+    dup_mock.assert_called_once()
+
+
+def test_generate_single_question_falls_through_when_retry_still_duplicate():
+    """At most ONE retry: if the retry is also a duplicate, fall through
+    gracefully with the first question — dedup must never return None."""
+    dup1 = {"question_text": "What is a B-tree?", "question_type": "text_free", "correct_answer": "a"}
+    dup2 = {"question_text": "Define a B-tree.", "question_type": "text_free", "correct_answer": "a"}
+    with patch.object(quiz_generator, "generate_quiz_questions", side_effect=[[dup1], [dup2]]) as gen_mock, \
+         patch.object(session_manager, "_is_semantically_duplicate", return_value=True):
+        result = quiz_generator.generate_single_question(
+            DOC_ID, _CONCEPT, session_id=SESSION_ID
+        )
+
+    assert result is not None
+    assert result["question_text"] == "What is a B-tree?"  # kept the first
+    assert gen_mock.call_count == 2  # never more than one retry
+
+
+def test_generate_single_question_skips_dedup_without_session_id():
+    """No session_id → dedup is skipped entirely (legacy one-shot callers)."""
+    fresh = {"question_text": "Explain LSM trees.", "question_type": "text_free", "correct_answer": "b"}
+    with patch.object(quiz_generator, "generate_quiz_questions", side_effect=[[fresh]]) as gen_mock, \
+         patch.object(session_manager, "_is_semantically_duplicate") as dup_mock:
+        result = quiz_generator.generate_single_question(DOC_ID, _CONCEPT)
+
+    dup_mock.assert_not_called()
+    assert gen_mock.call_count == 1
+    assert result["question_text"] == "Explain LSM trees."

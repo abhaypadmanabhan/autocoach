@@ -430,11 +430,18 @@ def generate_single_question(
     concept: dict,
     difficulty: str = "medium",
     question_types: list[str] | None = None,
+    session_id: str | None = None,
 ) -> dict | None:
     """Generate a single quiz question for one concept.
 
     `concept` must have at least `id` and `concept_name`; `concept_description`
     optional. Returns the question dict (with concept_id annotated) or None.
+
+    When `session_id` is given, applies semantic dedup (#23): if the generated
+    question is a near-duplicate (cosine > threshold) of the last N questions in
+    the session, regenerate ONCE. If the retry is also a duplicate (or fails),
+    fall through gracefully with the first question — dedup is a best-effort
+    quality nudge and must never block question delivery.
     """
     if question_types is None:
         question_types = ["text_mcq", "text_tf", "text_free"]
@@ -445,19 +452,47 @@ def generate_single_question(
     }
     cid = concept.get("id")
 
-    questions = generate_quiz_questions(
-        document_id=document_id,
-        num_questions=1,
-        difficulty=difficulty,
-        question_types=question_types,
-        target_concepts=[target],
-        focus_concept_ids=[cid] if cid else None,
-    )
+    def _generate_one() -> dict | None:
+        questions = generate_quiz_questions(
+            document_id=document_id,
+            num_questions=1,
+            difficulty=difficulty,
+            question_types=question_types,
+            target_concepts=[target],
+            focus_concept_ids=[cid] if cid else None,
+        )
+        if not questions:
+            return None
+        candidate = questions[0]
+        if cid and not candidate.get("concept_id"):
+            candidate["concept_id"] = cid
+        return candidate
 
-    if not questions:
+    q = _generate_one()
+    if q is None:
         return None
 
-    q = questions[0]
-    if cid and not q.get("concept_id"):
-        q["concept_id"] = cid
+    if session_id:
+        # Lazy import avoids a circular import: session_manager imports this
+        # module at load time.
+        from app.services.session_manager import _is_semantically_duplicate
+
+        try:
+            if _is_semantically_duplicate(q.get("question_text", ""), session_id):
+                logger.info(
+                    "[dedup] generated question is a near-duplicate; regenerating once"
+                )
+                retry = _generate_one()
+                if retry and not _is_semantically_duplicate(
+                    retry.get("question_text", ""), session_id
+                ):
+                    q = retry
+                else:
+                    logger.info(
+                        "[dedup] retry still a near-duplicate (or empty); keeping first question"
+                    )
+        except Exception as e:
+            # Dedup is best-effort — a failure here must not drop the question.
+            logger.warning(f"[dedup] semantic dedup check failed, using question as-is: {e}")
+
     return q
