@@ -7,8 +7,12 @@ from __future__ import annotations
 
 import logging
 
-import pandas as pd
 import pytest
+
+# Skip this whole module when pandas is absent. The base CI `backend·pytest`
+# job installs only backend/requirements.txt + requirements-dev.txt (no
+# evals/requirements.txt), so pandas/datasets/ragas are not present there.
+pd = pytest.importorskip("pandas")
 
 import evals.run_ragas as rr
 from evals.config import PlaceholderDocIdError

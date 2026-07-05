@@ -32,8 +32,6 @@ import sys
 from pathlib import Path
 from typing import Any, Optional, Protocol
 
-import pandas as pd
-
 from evals.config import ConfigError, PlaceholderDocIdError, load_config
 from evals.tuples_io import TupleError, load_tuples
 
@@ -206,6 +204,11 @@ def maybe_upload_to_langfuse(doc: str, df: pd.DataFrame) -> None:
     logger.info("Uploaded Ragas means to Langfuse trace %s", trace_id)
 
 
+# Backward-compat alias for the pre-existing regression test
+# tests/test_evals_review_fixes.py (calls module._maybe_upload_to_langfuse).
+_maybe_upload_to_langfuse = maybe_upload_to_langfuse
+
+
 def run_one(
     doc: str,
     *,
@@ -224,6 +227,7 @@ def run_one(
     tuples = load_tuples(doc, limit=limit, golden_dir=golden_dir)
     if not tuples:
         logger.warning("No tuples loaded for %s — skipping", doc)
+        import pandas as pd  # lazy: eval-only dep, not in base requirements
         return pd.DataFrame(columns=list(METRIC_COLUMNS))
 
     logger.info(
