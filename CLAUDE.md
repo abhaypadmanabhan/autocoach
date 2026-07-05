@@ -8,7 +8,7 @@ AutoCoach is an AI-powered tutoring app that turns documents (PDF, PPTX) into in
 
 **Tech Stack:**
 - Frontend: Next.js 16 (App Router), React 19, TypeScript, TailwindCSS 4, SWR
-- Backend: FastAPI, Python 3.12+
+- Backend: FastAPI, Python 3.11.9
 - DBs: Supabase (Postgres + Auth + Storage), Qdrant Cloud (vectors)
 - LLMs: Kimi K2.6 (primary, Moonshot first-party), OpenAI GPT-4o-mini (fallback)
 - Embeddings: OpenAI `text-embedding-3-small` (1536 dim)
