@@ -525,19 +525,32 @@ def _recent_question_embeddings(session_id: str, limit: int) -> list[list[float]
     return out
 
 
-def _is_semantically_duplicate(question_text: str, session_id: str) -> bool:
-    """True when `question_text` is a near-duplicate (cosine > threshold) of any
-    of the last SEMANTIC_DEDUP_WINDOW questions in the session.
+def _semantic_duplicate_check(question_text: str, session_id: str) -> tuple[bool, list[float] | None]:
+    """Return the semantic duplicate decision and the candidate embedding.
 
     Fails open (returns False) when the candidate can't be embedded — dedup is
     a quality nudge and must never block question delivery."""
     candidate = _embed_question(question_text)
     if candidate is None:
-        return False
+        return False, None
     for prior in _recent_question_embeddings(session_id, SEMANTIC_DEDUP_WINDOW):
         if _cosine_similarity(candidate, prior) > SEMANTIC_DUP_THRESHOLD:
-            return True
-    return False
+            return True, candidate
+    return False, candidate
+
+
+def _is_semantically_duplicate(question_text: str, session_id: str) -> bool:
+    """True when `question_text` is a near-duplicate (cosine > threshold) of any
+    of the last SEMANTIC_DEDUP_WINDOW questions in the session."""
+    is_duplicate, _ = _semantic_duplicate_check(question_text, session_id)
+    return is_duplicate
+
+
+def _question_embedding_for_storage(q: dict) -> list[float] | None:
+    embedded = q.get("question_embedding")
+    if isinstance(embedded, list) and embedded:
+        return embedded
+    return _embed_question(q.get("question_text", ""))
 
 
 def _generate_and_insert_question(
@@ -584,7 +597,7 @@ def _generate_and_insert_question(
         "correct_answer": q.get("correct_answer", ""),
         "explanation": q.get("explanation"),
         "concept_ids": [str(concept["id"])],
-        "question_embedding": _embed_question(q.get("question_text", "")),
+        "question_embedding": _question_embedding_for_storage(q),
         "user_answer": None,
         "is_correct": None,
         "input_method": None,
@@ -664,7 +677,7 @@ def _fill_ready_question(question_id: str, q: dict, concept_id: str, attempts: i
         "correct_answer": q.get("correct_answer", ""),
         "explanation": q.get("explanation"),
         "concept_ids": [concept_id],
-        "question_embedding": _embed_question(q.get("question_text", "")),
+        "question_embedding": _question_embedding_for_storage(q),
         "ready_at": now,
         "generation_attempts": attempts,
     }

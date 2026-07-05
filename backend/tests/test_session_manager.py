@@ -1079,12 +1079,17 @@ def test_generate_single_question_retries_on_semantic_duplicate():
     dup = {"question_text": "What is a B-tree?", "question_type": "text_free", "correct_answer": "a"}
     fresh = {"question_text": "Explain LSM trees.", "question_type": "text_free", "correct_answer": "b"}
     with patch.object(quiz_generator, "generate_quiz_questions", side_effect=[[dup], [fresh]]) as gen_mock, \
-         patch.object(session_manager, "_is_semantically_duplicate", side_effect=[True, False]) as dup_mock:
+         patch.object(
+             session_manager,
+             "_semantic_duplicate_check",
+             side_effect=[(True, _IDENT), (False, _DISTINCT)],
+         ) as dup_mock:
         result = quiz_generator.generate_single_question(
             DOC_ID, _CONCEPT, session_id=SESSION_ID
         )
 
     assert result["question_text"] == "Explain LSM trees."
+    assert result["question_embedding"] == _DISTINCT
     assert gen_mock.call_count == 2  # initial + exactly one retry
     assert dup_mock.call_count == 2  # checked the first, then the retry
 
@@ -1093,14 +1098,54 @@ def test_generate_single_question_no_retry_when_unique():
     """A first-shot non-duplicate is served immediately — no wasted regeneration."""
     fresh = {"question_text": "Explain LSM trees.", "question_type": "text_free", "correct_answer": "b"}
     with patch.object(quiz_generator, "generate_quiz_questions", side_effect=[[fresh]]) as gen_mock, \
-         patch.object(session_manager, "_is_semantically_duplicate", return_value=False) as dup_mock:
+         patch.object(
+             session_manager,
+             "_semantic_duplicate_check",
+             return_value=(False, _DISTINCT),
+         ) as dup_mock:
         result = quiz_generator.generate_single_question(
             DOC_ID, _CONCEPT, session_id=SESSION_ID
         )
 
     assert result["question_text"] == "Explain LSM trees."
+    assert result["question_embedding"] == _DISTINCT
     assert gen_mock.call_count == 1
     dup_mock.assert_called_once()
+
+
+def test_generate_and_insert_question_reuses_dedup_embedding_for_storage():
+    """A delivered non-retried question should pay one embedding call: the vector
+    computed for semantic dedup is the vector stored on the question row."""
+    dedup_embedding = [0.125] * DIM
+    storage_embedding = [0.875] * DIM
+    fresh = {
+        "question_text": "Explain LSM trees.",
+        "question_type": "text_free",
+        "correct_answer": "b",
+    }
+    fake = _FakeSupabase(sessions=[_make_active_session()], questions=[])
+
+    with patch.object(session_manager, "supabase_admin", fake), \
+         patch.object(session_manager, "_select_next_concept", return_value=_CONCEPT), \
+         patch.object(quiz_generator, "generate_quiz_questions", return_value=[fresh]), \
+         patch.object(
+             session_manager,
+             "get_embeddings",
+             side_effect=[[dedup_embedding], [storage_embedding]],
+         ) as emb_mock:
+        record = session_manager._generate_and_insert_question(
+            SESSION_ID,
+            DOC_ID,
+            USER_ID,
+            "medium",
+            ["text_free"],
+            question_number=2,
+        )
+
+    emb_mock.assert_called_once_with(["Explain LSM trees."])
+    assert record is not None
+    assert record["question_embedding"] == dedup_embedding
+    assert fake.inserts[0]["payload"]["question_embedding"] == dedup_embedding
 
 
 def test_generate_single_question_falls_through_when_retry_still_duplicate():
@@ -1109,13 +1154,18 @@ def test_generate_single_question_falls_through_when_retry_still_duplicate():
     dup1 = {"question_text": "What is a B-tree?", "question_type": "text_free", "correct_answer": "a"}
     dup2 = {"question_text": "Define a B-tree.", "question_type": "text_free", "correct_answer": "a"}
     with patch.object(quiz_generator, "generate_quiz_questions", side_effect=[[dup1], [dup2]]) as gen_mock, \
-         patch.object(session_manager, "_is_semantically_duplicate", return_value=True):
+         patch.object(
+             session_manager,
+             "_semantic_duplicate_check",
+             side_effect=[(True, _IDENT), (True, _DISTINCT)],
+         ):
         result = quiz_generator.generate_single_question(
             DOC_ID, _CONCEPT, session_id=SESSION_ID
         )
 
     assert result is not None
     assert result["question_text"] == "What is a B-tree?"  # kept the first
+    assert result["question_embedding"] == _IDENT
     assert gen_mock.call_count == 2  # never more than one retry
 
 
@@ -1123,7 +1173,7 @@ def test_generate_single_question_skips_dedup_without_session_id():
     """No session_id → dedup is skipped entirely (legacy one-shot callers)."""
     fresh = {"question_text": "Explain LSM trees.", "question_type": "text_free", "correct_answer": "b"}
     with patch.object(quiz_generator, "generate_quiz_questions", side_effect=[[fresh]]) as gen_mock, \
-         patch.object(session_manager, "_is_semantically_duplicate") as dup_mock:
+         patch.object(session_manager, "_semantic_duplicate_check") as dup_mock:
         result = quiz_generator.generate_single_question(DOC_ID, _CONCEPT)
 
     dup_mock.assert_not_called()

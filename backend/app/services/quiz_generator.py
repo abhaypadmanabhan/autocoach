@@ -475,18 +475,31 @@ def generate_single_question(
     if session_id:
         # Lazy import avoids a circular import: session_manager imports this
         # module at load time.
-        from app.services.session_manager import _is_semantically_duplicate
+        from app.services.session_manager import _semantic_duplicate_check
 
         try:
-            if _is_semantically_duplicate(q.get("question_text", ""), session_id):
+            is_duplicate, embedding = _semantic_duplicate_check(
+                q.get("question_text", ""), session_id
+            )
+            if embedding is not None:
+                q["question_embedding"] = embedding
+            if is_duplicate:
                 logger.info(
                     "[dedup] generated question is a near-duplicate; regenerating once"
                 )
                 retry = _generate_one()
-                if retry and not _is_semantically_duplicate(
-                    retry.get("question_text", ""), session_id
-                ):
-                    q = retry
+                if retry:
+                    retry_is_duplicate, retry_embedding = _semantic_duplicate_check(
+                        retry.get("question_text", ""), session_id
+                    )
+                    if retry_embedding is not None:
+                        retry["question_embedding"] = retry_embedding
+                    if not retry_is_duplicate:
+                        q = retry
+                    else:
+                        logger.info(
+                            "[dedup] retry still a near-duplicate (or empty); keeping first question"
+                        )
                 else:
                     logger.info(
                         "[dedup] retry still a near-duplicate (or empty); keeping first question"
