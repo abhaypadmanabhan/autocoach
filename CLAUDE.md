@@ -8,7 +8,7 @@ AutoCoach is an AI-powered tutoring app that turns documents (PDF, PPTX) into in
 
 **Tech Stack:**
 - Frontend: Next.js 16 (App Router), React 19, TypeScript, TailwindCSS 4, SWR
-- Backend: FastAPI, Python 3.12+
+- Backend: FastAPI, Python 3.11.9
 - DBs: Supabase (Postgres + Auth + Storage), Qdrant Cloud (vectors)
 - LLMs: Kimi K2.6 (primary, Moonshot first-party), OpenAI GPT-4o-mini (fallback)
 - Embeddings: OpenAI `text-embedding-3-small` (1536 dim)
@@ -185,7 +185,6 @@ Frontend needs `NEXT_PUBLIC_BACKEND_URL` and Supabase publishable keys.
 
 ## Specs
 
-- `docs/specs/langfuse-selfhost.md` — Phase 1.7 self-hosted Langfuse on Railway. **SUPERSEDED 2026-05-19** — stack decommissioned on cost grounds; kept for history only.
 - `docs/specs/kimi-k2.6-migration.md` — K2.5 → K2.6 model bump
 - `docs/HANDOFF.md` — engineering handoff, "Phase 1.7 — Where We Are Right Now" is the canonical session-start read
 - `tasks/bugs.md` — test-failure tickets, all resolved 2026-05-14 (65 passed). NOTE: gitignored, absent in fresh clones
