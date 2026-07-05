@@ -1,0 +1,6 @@
+{
+  "document_id": "12345678-1234-1234-1234-123456789abc",
+  "label": "TEST FIXTURE doc",
+  "top_k": 3,
+  "notes": "SYNTHETIC TEST FIXTURE — not a real documents.id; test-only."
+}

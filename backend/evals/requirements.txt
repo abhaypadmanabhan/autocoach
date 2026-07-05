@@ -1,7 +1,15 @@
 # Eval-only deps. Kept out of backend/requirements.txt so they do not ship
-# to Railway. Install into the same venv with:
+# to Railway. Install into the eval venv with:
 #   pip install -r backend/evals/requirements.txt
-ragas>=0.2.10
+#
+# ragas is pinned to the 0.2.x line on purpose: kimi_judge.py uses the 0.2.x
+# adapter API (`ragas.llms.LangchainLLMWrapper`, `ragas.embeddings.
+# LangchainEmbeddingsWrapper`) and `from ragas import evaluate`. ragas 0.3+ /
+# 0.4+ reorganized these import paths and the `evaluate()` signature, so do
+# NOT bump past 0.2.x without updating kimi_judge.py and run_ragas.py.
+# langchain-openai is likewise held to 0.2.x so the langchain-core it pulls
+# (0.3.x) stays compatible with ragas 0.2.x.
+ragas>=0.2.10,<0.3
+langchain-openai>=0.2.0,<0.3
 datasets>=3.0.0
-langchain-openai>=0.2.0
 pandas>=2.2.0
