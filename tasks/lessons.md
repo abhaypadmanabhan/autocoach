@@ -6,5 +6,7 @@
 - **GDPR User Data Cleanup Idempotency**: Admin deletion scripts should be idempotent and handle potential exceptions (e.g. database 404/missing table errors for tables like `user_xp` or `user_documents_progress` that might not be mapped in SQLAlchemy but are in the schema) to guarantee the script runs successfully to completion without breaking midway.
 - **Langfuse Cloud Configuration Mapping**: When configuring settings in Pydantic-settings based FastAPI apps, ensure the environment variables match the expected `BaseSettings` attributes (e.g., `LANGFUSE_HOST` mapping to `langfuse_host`), rather than assuming default SDK names (like `LANGFUSE_BASE_URL`).
 - **Secrets Auditing**: When handling environment variable swaps, perform a manual `git diff --staged` audit before committing to verify that no credentials or gitignored files (like local `.env`) are accidentally committed to the branch.
+- **Nixpacks Build Runtime Verification**: To verify what runtime version is actually compiled and executed by Railway/Nixpacks in production, use the `railway logs --build` command rather than guessing from local config files or local developer machine configurations.
+
 
 

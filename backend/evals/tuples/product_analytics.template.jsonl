@@ -1,0 +1,8 @@
+# TEMPLATE — fill every <paste ...> field with REAL content, then save as
+# ../golden/product_analytics.jsonl. Do NOT run the eval on unfilled placeholders.
+# See backend/evals/tuples/README.md. Target: 30 tuples (10 easy / 10 medium / 10 hard).
+{"question": "<paste a real question a learner would ask about product analytics>", "source_chunk_text": "<paste ~200-500 chars of the verbatim chunk that SHOULD be retrieved>", "ideal_answer": "<paste a 1-3 sentence reference answer>", "concept_label": "<short concept label>"}
+{"question": "<paste question 2>", "source_chunk_text": "<paste verbatim source chunk 2>", "ideal_answer": "<paste ideal answer 2>", "concept_label": "<label 2>"}
+{"question": "<paste question 3>", "source_chunk_text": "<paste verbatim source chunk 3>", "ideal_answer": "<paste ideal answer 3>", "concept_label": "<label 3>"}
+{"question": "<paste question 4>", "source_chunk_text": "<paste verbatim source chunk 4>", "ideal_answer": "<paste ideal answer 4>", "concept_label": "<label 4>"}
+{"question": "<paste question 5>", "source_chunk_text": "<paste verbatim source chunk 5>", "ideal_answer": "<paste ideal answer 5>", "concept_label": "<label 5>"}

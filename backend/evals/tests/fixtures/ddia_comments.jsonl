@@ -1,0 +1,3 @@
+# a comment line — must be skipped
+
+{"question": "TEST FIXTURE: comment test q", "source_chunk_text": "TEST FIXTURE: comment test source.", "ideal_answer": "TEST FIXTURE: comment test answer.", "concept_label": "c"}

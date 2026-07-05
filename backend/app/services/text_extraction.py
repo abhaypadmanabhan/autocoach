@@ -6,6 +6,8 @@ from io import BytesIO
 from pypdf import PdfReader
 from pptx import Presentation
 
+from app.observability.langfuse import observe
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,6 +41,12 @@ def sanitize_text(text: str) -> str:
     return ''.join(cleaned_chars)
 
 
+@observe(
+    name="text_extraction.pdf",
+    as_type="span",
+    capture_input=False,
+    capture_output=False,
+)
 def extract_text_from_pdf(file_bytes: bytes) -> tuple[str, int]:
     """
     Extract text from a PDF file.
@@ -70,6 +78,12 @@ def extract_text_from_pdf(file_bytes: bytes) -> tuple[str, int]:
         return "", 0
 
 
+@observe(
+    name="text_extraction.pptx",
+    as_type="span",
+    capture_input=False,
+    capture_output=False,
+)
 def extract_text_from_pptx(file_bytes: bytes) -> tuple[str, int]:
     """
     Extract text from a PowerPoint file.

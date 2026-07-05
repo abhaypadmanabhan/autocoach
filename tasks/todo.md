@@ -1,3 +1,11 @@
+# Issue #34 — Stale-docs cleanup + config drift (2026-07-04)
+
+- [x] Stale-docs cleanup and config drift tasks
+  - [x] Delete stale files (`frontend/DESIGN_SYSTEM.md`, `design/`, `docs/ui/*`, `docs/specs/langfuse-selfhost.md`)
+  - [x] Update `.env.example` keys to match `backend/app/config.py` Settings
+  - [x] Pin Python version to 3.11.9 consistently in `backend/runtime.txt` and `CLAUDE.md`
+  - [x] Verify there are no inbound links from kept docs/README
+
 # CTO Reconcile + Hygiene Sprint (2026-06-27)
 
 **Mode:** plan-first. Nothing below executes until user approves. Scope locked by user:
