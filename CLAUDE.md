@@ -185,7 +185,6 @@ Frontend needs `NEXT_PUBLIC_BACKEND_URL` and Supabase publishable keys.
 
 ## Specs
 
-- `docs/specs/langfuse-selfhost.md` — Phase 1.7 self-hosted Langfuse on Railway. **SUPERSEDED 2026-05-19** — stack decommissioned on cost grounds; kept for history only.
 - `docs/specs/kimi-k2.6-migration.md` — K2.5 → K2.6 model bump
 - `docs/HANDOFF.md` — engineering handoff, "Phase 1.7 — Where We Are Right Now" is the canonical session-start read
 - `tasks/bugs.md` — test-failure tickets, all resolved 2026-05-14 (65 passed). NOTE: gitignored, absent in fresh clones
