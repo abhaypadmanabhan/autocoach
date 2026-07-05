@@ -6,6 +6,7 @@ from uuid import UUID
 from app.config import get_settings
 from app.core.supabase import supabase_admin
 from app.core.qdrant import store_vectors
+from app.observability.langfuse import observe
 from app.services.text_extraction import extract_text_from_pdf, extract_text_from_pptx
 from app.services.chunking import chunk_text
 from app.services.embeddings import get_embeddings
@@ -21,6 +22,56 @@ MAX_EXTRACTED_CHARS = 2_000_000
 MAX_CHUNKS = 500
 
 
+@observe(
+    name="ingestion.extract",
+    as_type="span",
+    capture_input=False,
+    capture_output=False,
+)
+def _extract_document_text(file_type: str, file_bytes: bytes) -> tuple[str, int]:
+    if file_type == "pdf":
+        return extract_text_from_pdf(file_bytes)
+    if file_type == "pptx":
+        return extract_text_from_pptx(file_bytes)
+    raise ValueError(f"Unsupported file type: {file_type}")
+
+
+@observe(
+    name="ingestion.chunk",
+    as_type="span",
+    capture_input=False,
+    capture_output=False,
+)
+def _chunk_document_text(full_text: str) -> list[dict]:
+    return chunk_text(full_text)
+
+
+@observe(
+    name="ingestion.embed",
+    as_type="span",
+    capture_input=False,
+    capture_output=False,
+)
+def _embed_chunks(chunks: list[dict]) -> list[list[float]]:
+    texts = [chunk["content"] for chunk in chunks]
+    return get_embeddings(texts)
+
+
+@observe(
+    name="ingestion.upsert",
+    as_type="span",
+    capture_input=False,
+    capture_output=False,
+)
+def _upsert_vectors(
+    document_id: str,
+    chunks: list[dict],
+    embeddings: list[list[float]],
+) -> list[str]:
+    return store_vectors(document_id, chunks, embeddings)
+
+
+@observe(name="ingestion.process_document", as_type="span", capture_output=False)
 def process_document(document_id: str) -> None:
     """
     Process a document through the full ingestion pipeline.
@@ -81,14 +132,11 @@ def process_document(document_id: str) -> None:
 
         # Extract text based on file type
         try:
-            if file_type == "pdf":
-                full_text, page_count = extract_text_from_pdf(file_bytes)
-            elif file_type == "pptx":
-                full_text, page_count = extract_text_from_pptx(file_bytes)
-            else:
+            if file_type not in ("pdf", "pptx"):
                 logger.error(f"Unsupported file type: {file_type}")
                 _mark_document_failed(document_id, f"Unsupported file type: {file_type}")
                 return
+            full_text, page_count = _extract_document_text(file_type, file_bytes)
         except Exception as e:
             logger.error(f"Failed to extract text from document {document_id}: {e}")
             _mark_document_failed(document_id, f"Text extraction failed: {str(e)}")
@@ -113,7 +161,7 @@ def process_document(document_id: str) -> None:
 
         # Chunk the text
         try:
-            chunks = chunk_text(full_text)
+            chunks = _chunk_document_text(full_text)
             if not chunks:
                 logger.error(f"No chunks created from document {document_id}")
                 _mark_document_failed(document_id, "Failed to create text chunks")
@@ -132,8 +180,7 @@ def process_document(document_id: str) -> None:
 
         # Generate embeddings
         try:
-            texts = [chunk["content"] for chunk in chunks]
-            embeddings = get_embeddings(texts)
+            embeddings = _embed_chunks(chunks)
             if not embeddings:
                 logger.error(f"No embeddings generated for document {document_id}")
                 _mark_document_failed(document_id, "Failed to generate embeddings")
@@ -146,7 +193,7 @@ def process_document(document_id: str) -> None:
 
         # Store vectors in Qdrant
         try:
-            point_ids = store_vectors(document_id, chunks, embeddings)
+            point_ids = _upsert_vectors(document_id, chunks, embeddings)
             logger.info(f"Stored {len(point_ids)} vectors in Qdrant")
         except Exception as e:
             logger.error(f"Failed to store vectors for document {document_id}: {e}")
