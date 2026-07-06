@@ -1,0 +1,14 @@
+// AutoCoach iOS build configuration — TEMPLATE (committed).
+//
+// 1. Copy this file to `Config.xcconfig` (gitignored) next to this template.
+// 2. Fill in SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY from the repo `.env`
+//    (NEXT_PUBLIC_SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY).
+// 3. The values are injected into Info.plist at build time via `$(...)`.
+//
+// The publishable (anon) key is not a secret, but xcconfig keeps the env
+// swappable (dev/prod) and keeps real values out of git. NEVER commit a
+// filled-in Config.xcconfig — it is gitignored.
+
+SUPABASE_URL = https://YOUR-PROJECT.supabase.co
+SUPABASE_PUBLISHABLE_KEY = YOUR_PUBLISHABLE_KEY
+BACKEND_BASE_URL = https://autocoach-production.up.railway.app
