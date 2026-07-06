@@ -39,15 +39,19 @@ final class SpeechRecognizer {
     /// Request mic + speech permissions (call before first use).
     func requestAuthorization() async {
         state = .requesting
+        // The completion handlers fire on a background queue. They must NOT inherit
+        // this @MainActor function's isolation — mark @Sendable so Swift 6 doesn't
+        // insert a main-actor executor assertion that traps off-thread. Resuming a
+        // CheckedContinuation is thread-safe; the awaiting code resumes back on main.
         let mic = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
+            AVAudioSession.sharedInstance().requestRecordPermission { @Sendable granted in
                 cont.resume(returning: granted)
             }
         }
         guard mic else { state = .unavailable("Microphone access denied."); return }
 
         let auth = await withCheckedContinuation { (cont: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
-            SFSpeechRecognizer.requestAuthorization { status in cont.resume(returning: status) }
+            SFSpeechRecognizer.requestAuthorization { @Sendable status in cont.resume(returning: status) }
         }
         switch auth {
         case .authorized:
@@ -91,8 +95,12 @@ final class SpeechRecognizer {
 
         let inputNode = engine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            request.append(buffer)
+        // The tap block runs on a realtime audio thread — @Sendable so it doesn't
+        // inherit start()'s main-actor isolation (which would trap off-thread).
+        // `request.append` is safe to call from the tap; vouch for the capture.
+        nonisolated(unsafe) let req = request
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { @Sendable buffer, _ in
+            req.append(buffer)
         }
 
         engine.prepare()
@@ -103,16 +111,18 @@ final class SpeechRecognizer {
             return
         }
 
-        let task = recognizer!.recognitionTask(with: request) { [weak self] result, error in
-            // Hop to the main actor — SFSpeechRecognizer calls back on a queue.
+        let task = recognizer!.recognitionTask(with: request) { @Sendable [weak self] result, error in
+            // Fires on SFSpeech's own queue (@Sendable — no main-actor inheritance).
+            // Extract Sendable values here, then hop to main to touch @Observable state.
+            let text = result?.bestTranscription.formattedString
+            let failed = error != nil
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if let result {
-                    let text = result.bestTranscription.formattedString
+                if let text {
                     self.transcript = text
                     self.didCaptureVoice = true
                 }
-                if error != nil {
+                if failed {
                     // Transient recognition error — stop cleanly (don't crash UI).
                     self.stop()
                 }
