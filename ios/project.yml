@@ -9,21 +9,43 @@ settings:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
+packages:
+  supabase-swift:
+    url: https://github.com/supabase/supabase-swift.git
+    from: "2.0.0"
 targets:
   AutoCoach:
     type: application
     platform: iOS
     sources:
       - AutoCoach
+    dependencies:
+      - package: supabase-swift
+        product: Supabase
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
+    info:
+      path: AutoCoach/Info.plist
+      properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        # Padzy OS / Quiet Brutalism is light-only — lock the trait globally.
+        UIUserInterfaceStyle: Light
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Voice dictation for free-text answers (M2).
+        NSMicrophoneUsageDescription: "AutoCoach uses the microphone to dictate your free-text quiz answers."
+        NSSpeechRecognitionUsageDescription: "AutoCoach uses speech recognition to transcribe your dictated quiz answers."
+        # Resolved at build time from Config.xcconfig (gitignored, never committed).
+        # Unresolved in a fresh clone → empty string → app shows a config-missing screen.
+        SUPABASE_URL: "$(SUPABASE_URL)"
+        SUPABASE_PUBLISHABLE_KEY: "$(SUPABASE_PUBLISHABLE_KEY)"
+        BACKEND_BASE_URL: "$(BACKEND_BASE_URL)"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.padzy.autocoach
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        # Padzy OS / Quiet Brutalism is light-only — lock the trait globally.
-        INFOPLIST_KEY_UIUserInterfaceStyle: Light
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         TARGETED_DEVICE_FAMILY: "1"
         CURRENT_PROJECT_VERSION: "1"
-        MARKETING_VERSION: "0.1.0"
+        MARKETING_VERSION: "0.2.0"
         SWIFT_STRICT_CONCURRENCY: complete

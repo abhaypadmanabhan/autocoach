@@ -1,10 +1,17 @@
 import SwiftUI
 
+/// AutoCoach — native iOS (Milestone 2: auth → quiz → verdict → results vertical slice).
+///
+/// Dependency wiring happens in ``AppRoot`` (built on first appearance via a
+/// `.task`, so the `@MainActor`-isolated ``AuthStore`` is constructed on the
+/// main actor — required under Swift 6 strict concurrency). The `@main` App
+/// stays a thin shell.
 @main
 struct AutoCoachApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRoot()
         }
     }
 }
+
