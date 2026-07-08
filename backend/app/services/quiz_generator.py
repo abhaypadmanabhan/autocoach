@@ -4,12 +4,13 @@ import json
 import logging
 
 from pydantic import ValidationError
+from langfuse import propagate_attributes
 
 from app.core.supabase import supabase_admin
 from app.models.quiz import LLMQuestion
 from app.observability.langfuse import observe
 from app.services.retrieval import retrieve_relevant_chunks
-from app.services.llm import call_kimi, call_openai
+from app.services.llm import call_kimi, call_openai, tag_current_generation
 
 logger = logging.getLogger(__name__)
 
@@ -229,10 +230,13 @@ def _call_quiz_llm(system_prompt: str, user_prompt: str) -> str:
         response = ""
 
     if response:
+        tag_current_generation(response)
         return response
 
     logger.warning("Kimi quiz generation returned empty response, trying OpenAI fallback")
-    return call_openai(system_prompt, user_prompt, temperature=0.7)
+    response = call_openai(system_prompt, user_prompt, temperature=0.7)
+    tag_current_generation(response)
+    return response
 
 
 def _retry_generation_once(
@@ -245,32 +249,18 @@ def _retry_generation_once(
     return _parse_llm_questions(retry_response, focus_concept_ids=focus_concept_ids)
 
 
-@observe(name="quiz.generate_questions", as_type="generation")
-def generate_quiz_questions(
+def _run_quiz_generation(
     document_id: str,
-    num_questions: int = 5,
-    difficulty: str = "medium",
-    question_types: list[str] = None,
-    target_concepts: list[dict] = None,
-    focus_concept_ids: list[str] | None = None,
+    num_questions: int,
+    difficulty: str,
+    question_types: list[str],
+    target_concepts: list[dict] | None,
+    focus_concept_ids: list[str] | None,
 ) -> list[dict]:
-    """
-    Generate quiz questions from document content using LLM.
-
-    Args:
-        document_id: The ID of the document to generate questions from.
-        num_questions: Number of questions to generate (default 5).
-        difficulty: Difficulty level - "easy", "medium", or "hard".
-        question_types: List of question types to include (mcq, true_false, free_text).
-        target_concepts: List of dicts [{"name":Str, "description":Str}] to focus on.
-        focus_concept_ids: List of concept UUIDs for targeted chunk retrieval.
-
-    Returns:
-        List of question dictionaries, or empty list on failure.
-    """
-    if question_types is None:
-        question_types = ["text_mcq", "text_tf", "text_free"]
-
+    """Core generation logic for `generate_quiz_questions`, split out so the
+    public function can wrap it in `propagate_attributes(...)` (#71) without
+    reindenting (and risking corrupting) the multi-line prompt string
+    literals below."""
     try:
         # Determine chunk retrieval strategy
         if focus_concept_ids and target_concepts:
@@ -425,12 +415,54 @@ Return ONLY a valid JSON array with no markdown formatting."""
         return []
 
 
+@observe(name="quiz.generate_questions", as_type="generation")
+def generate_quiz_questions(
+    document_id: str,
+    num_questions: int = 5,
+    difficulty: str = "medium",
+    question_types: list[str] = None,
+    target_concepts: list[dict] = None,
+    focus_concept_ids: list[str] | None = None,
+    session_id: str | None = None,
+    user_id: str | None = None,
+) -> list[dict]:
+    """
+    Generate quiz questions from document content using LLM.
+
+    Args:
+        document_id: The ID of the document to generate questions from.
+        num_questions: Number of questions to generate (default 5).
+        difficulty: Difficulty level - "easy", "medium", or "hard".
+        question_types: List of question types to include (mcq, true_false, free_text).
+        target_concepts: List of dicts [{"name":Str, "description":Str}] to focus on.
+        focus_concept_ids: List of concept UUIDs for targeted chunk retrieval.
+        session_id: Quiz session id, tagged onto the Langfuse trace (#71).
+        user_id: User id, tagged onto the Langfuse trace (#71).
+
+    Returns:
+        List of question dictionaries, or empty list on failure.
+    """
+    if question_types is None:
+        question_types = ["text_mcq", "text_tf", "text_free"]
+
+    with propagate_attributes(user_id=user_id, session_id=session_id):
+        return _run_quiz_generation(
+            document_id,
+            num_questions,
+            difficulty,
+            question_types,
+            target_concepts,
+            focus_concept_ids,
+        )
+
+
 def generate_single_question(
     document_id: str,
     concept: dict,
     difficulty: str = "medium",
     question_types: list[str] | None = None,
     session_id: str | None = None,
+    user_id: str | None = None,
 ) -> dict | None:
     """Generate a single quiz question for one concept.
 
@@ -442,6 +474,9 @@ def generate_single_question(
     the session, regenerate ONCE. If the retry is also a duplicate (or fails),
     fall through gracefully with the first question — dedup is a best-effort
     quality nudge and must never block question delivery.
+
+    `session_id`/`user_id` are also threaded onto the Langfuse trace (#71) via
+    `generate_quiz_questions`.
     """
     if question_types is None:
         question_types = ["text_mcq", "text_tf", "text_free"]
@@ -460,6 +495,8 @@ def generate_single_question(
             question_types=question_types,
             target_concepts=[target],
             focus_concept_ids=[cid] if cid else None,
+            session_id=session_id,
+            user_id=user_id,
         )
         if not questions:
             return None
