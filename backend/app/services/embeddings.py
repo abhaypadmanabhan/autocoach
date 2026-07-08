@@ -21,7 +21,12 @@ EMBEDDING_DIMENSIONS = 1536
 MAX_BATCH_SIZE = 100
 
 
-@observe(name="embeddings.openai_3_small", as_type="generation")
+@observe(
+    name="embeddings.openai_3_small",
+    as_type="generation",
+    capture_input=False,
+    capture_output=False,
+)
 def get_embeddings(texts: list[str]) -> list[list[float]]:
     """
     Generate embeddings for a list of texts using OpenAI API.
