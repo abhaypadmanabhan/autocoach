@@ -9,6 +9,8 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from langfuse import propagate_attributes
+
 from app.config import get_settings
 from app.core.supabase import supabase_admin
 from app.observability.langfuse import observe
@@ -137,64 +139,69 @@ def _get_mastery_scores(user_id: str, concept_ids: list[str]) -> dict[str, float
 
 @observe(name="session.update_mastery", as_type="span")
 def _update_concept_mastery(user_id: str, concept_ids: list[str], is_correct: bool):
-    """Update mastery for a list of concepts (Bayesian-smoothed EMA blend)."""
+    """Update mastery for a list of concepts (Bayesian-smoothed EMA blend).
+
+    `user_id` is tagged onto the Langfuse trace (#71) via `propagate_attributes`
+    rather than only landing in the generic captured-input JSON blob.
+    """
     if not concept_ids:
         return
 
-    now = datetime.now(timezone.utc).isoformat()
+    with propagate_attributes(user_id=user_id):
+        now = datetime.now(timezone.utc).isoformat()
 
-    for concept_id in concept_ids:
-        try:
-            res = (
-                supabase_admin.table("user_concept_mastery")
-                .select("*")
-                .eq("user_id", user_id)
-                .eq("concept_id", concept_id)
-                .execute()
-            )
-            current = res.data[0] if res.data else None
+        for concept_id in concept_ids:
+            try:
+                res = (
+                    supabase_admin.table("user_concept_mastery")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("concept_id", concept_id)
+                    .execute()
+                )
+                current = res.data[0] if res.data else None
 
-            times_tested = (current["times_tested"] if current else 0) + 1
-            times_correct = (current["times_correct"] if current else 0) + (
-                1 if is_correct else 0
-            )
+                times_tested = (current["times_tested"] if current else 0) + 1
+                times_correct = (current["times_correct"] if current else 0) + (
+                    1 if is_correct else 0
+                )
 
-            smoothed = (times_correct + 1) / (times_tested + 2)
-            prev = (current["mastery_score"] / 100.0) if current else 0.0
-            raw = 0.85 * prev + 0.15 * smoothed
-            raw = max(0.0, min(1.0, raw))
+                smoothed = (times_correct + 1) / (times_tested + 2)
+                prev = (current["mastery_score"] / 100.0) if current else 0.0
+                raw = 0.85 * prev + 0.15 * smoothed
+                raw = max(0.0, min(1.0, raw))
 
-            if times_tested < 5:
-                display = min(raw, 0.95)
-            elif times_tested >= 5 and smoothed >= 0.9:
-                display = raw
-            else:
-                display = min(raw, 0.95)
+                if times_tested < 5:
+                    display = min(raw, 0.95)
+                elif times_tested >= 5 and smoothed >= 0.9:
+                    display = raw
+                else:
+                    display = min(raw, 0.95)
 
-            mastery_score = round(display * 100.0, 2)
+                mastery_score = round(display * 100.0, 2)
 
-            data = {
-                "user_id": user_id,
-                "concept_id": concept_id,
-                "times_tested": times_tested,
-                "times_correct": times_correct,
-                "mastery_score": mastery_score,
-                "last_tested_at": now,
-            }
+                data = {
+                    "user_id": user_id,
+                    "concept_id": concept_id,
+                    "times_tested": times_tested,
+                    "times_correct": times_correct,
+                    "mastery_score": mastery_score,
+                    "last_tested_at": now,
+                }
 
-            if mastery_score >= CORE_MASTERY_THRESHOLD:
-                if not current or not current.get("mastered_at"):
-                    data["mastered_at"] = now
-            else:
-                data["mastered_at"] = None
+                if mastery_score >= CORE_MASTERY_THRESHOLD:
+                    if not current or not current.get("mastered_at"):
+                        data["mastered_at"] = now
+                else:
+                    data["mastered_at"] = None
 
-            supabase_admin.table("user_concept_mastery").upsert(data).execute()
-            logger.info(
-                f"Updated mastery for concept {concept_id}: score={mastery_score}"
-            )
+                supabase_admin.table("user_concept_mastery").upsert(data).execute()
+                logger.info(
+                    f"Updated mastery for concept {concept_id}: score={mastery_score}"
+                )
 
-        except Exception as e:
-            logger.error(f"Failed to update mastery for concept {concept_id}: {e}")
+            except Exception as e:
+                logger.error(f"Failed to update mastery for concept {concept_id}: {e}")
 
 
 def _recompute_document_progress(user_id: str, document_id: str):
@@ -578,6 +585,7 @@ def _generate_and_insert_question(
         difficulty=difficulty,
         question_types=question_types,
         session_id=session_id,
+        user_id=user_id,
     )
     if not q:
         logger.error(
@@ -756,6 +764,7 @@ def generate_next_question_bg(session_id: str, user_id: str) -> None:
                 difficulty=difficulty,
                 question_types=question_types,
                 session_id=session_id,
+                user_id=user_id,
             )
             if not q:
                 logger.warning(
@@ -1256,6 +1265,8 @@ def submit_answer(
             user_answer=answer,
             correct_answer=question["correct_answer"],
             question_text=question["question_text"],
+            session_id=session_id,
+            user_id=user_id,
         )
         is_correct = eval_result["is_correct"]
         feedback = eval_result.get("feedback", "")
@@ -1328,6 +1339,8 @@ def evaluate_answer_bg(session_id: str, user_id: str, question_id: str) -> None:
             user_answer=question["user_answer"],
             correct_answer=question["correct_answer"],
             question_text=question["question_text"],
+            session_id=session_id,
+            user_id=user_id,
         )
         is_correct = bool(verdict["is_correct"])
         feedback = verdict.get("feedback", "")

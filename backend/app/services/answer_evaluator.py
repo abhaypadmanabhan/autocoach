@@ -3,8 +3,10 @@
 import json
 import logging
 
+from langfuse import propagate_attributes
+
 from app.observability.langfuse import observe
-from app.services.llm import call_kimi, call_openai
+from app.services.llm import call_kimi, call_openai, tag_current_generation
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +134,11 @@ def _sanitize_user_answer(answer: str) -> str:
 
 @observe(name="quiz.evaluate_free_text", as_type="generation")
 def evaluate_free_text(
-    user_answer: str, correct_answer: str, question_text: str
+    user_answer: str,
+    correct_answer: str,
+    question_text: str,
+    session_id: str | None = None,
+    user_id: str | None = None,
 ) -> tuple[bool, str, str]:
     """
     Evaluate a free text question answer using LLM.
@@ -140,63 +146,75 @@ def evaluate_free_text(
     Returns tuple of (is_correct, feedback, explanation). Defaults to
     is_correct=False on every failure path to prevent prompt-injection or
     LLM-downtime-driven free wins.
+
+    `session_id`/`user_id` are tagged onto the Langfuse trace (#71); model +
+    token usage are tagged onto this generation span per cascade branch (#72).
     """
-    try:
-        sanitized_answer = _sanitize_user_answer(user_answer)
-        prompt = FREE_TEXT_EVAL_PROMPT.format(
-            question_text=question_text,
-            correct_answer=correct_answer,
-            user_answer=sanitized_answer,
-        )
-
-        response = call_kimi(
-            system_prompt=FREE_TEXT_EVAL_SYSTEM,
-            user_prompt=prompt,
-        )
-
-        if not response:
-            logger.warning("Kimi evaluation failed, trying OpenAI fallback")
-            response = call_openai(
-                system_prompt=FREE_TEXT_EVAL_SYSTEM,
-                user_prompt=prompt,
-                temperature=0.3,
+    with propagate_attributes(user_id=user_id, session_id=session_id):
+        try:
+            sanitized_answer = _sanitize_user_answer(user_answer)
+            prompt = FREE_TEXT_EVAL_PROMPT.format(
+                question_text=question_text,
+                correct_answer=correct_answer,
+                user_answer=sanitized_answer,
             )
 
-        if not response:
-            logger.error("Both LLM evaluations failed — failing closed (is_correct=False)")
-            return False, "Could not evaluate. Please retry.", correct_answer
+            response = call_kimi(
+                system_prompt=FREE_TEXT_EVAL_SYSTEM,
+                user_prompt=prompt,
+            )
 
-        try:
-            cleaned = response.strip()
-            if cleaned.startswith("```json"):
-                cleaned = cleaned[7:]
-            if cleaned.startswith("```"):
-                cleaned = cleaned[3:]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-            cleaned = cleaned.strip()
+            if not response:
+                logger.warning("Kimi evaluation failed, trying OpenAI fallback")
+                response = call_openai(
+                    system_prompt=FREE_TEXT_EVAL_SYSTEM,
+                    user_prompt=prompt,
+                    temperature=0.3,
+                )
 
-            result = json.loads(cleaned)
-            is_correct = bool(result.get("is_correct", False))
-            feedback = str(result.get("feedback", "Answer evaluated."))[:1000]
-            return is_correct, feedback, correct_answer
+            if not response:
+                logger.error("Both LLM evaluations failed — failing closed (is_correct=False)")
+                return False, "Could not evaluate. Please retry.", correct_answer
 
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
-            logger.error(f"Failed to parse evaluation JSON: {e}")
-            return False, "Could not evaluate. Please retry.", correct_answer
+            tag_current_generation(response)
 
-    except Exception as e:
-        logger.error(f"Error evaluating free text answer: {e}")
-        return False, "Could not evaluate. Please try again.", correct_answer
+            try:
+                cleaned = response.strip()
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned[7:]
+                if cleaned.startswith("```"):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                cleaned = cleaned.strip()
+
+                result = json.loads(cleaned)
+                is_correct = bool(result.get("is_correct", False))
+                feedback = str(result.get("feedback", "Answer evaluated."))[:1000]
+                return is_correct, feedback, correct_answer
+
+            except (json.JSONDecodeError, TypeError, ValueError) as e:
+                logger.error(f"Failed to parse evaluation JSON: {e}")
+                return False, "Could not evaluate. Please retry.", correct_answer
+
+        except Exception as e:
+            logger.error(f"Error evaluating free text answer: {e}")
+            return False, "Could not evaluate. Please try again.", correct_answer
 
 
 def evaluate_answer(
     question_type: str,
     user_answer: str,
     correct_answer: str,
-    question_text: str = ""
+    question_text: str = "",
+    session_id: str | None = None,
+    user_id: str | None = None,
 ) -> dict:
-    """Route answer evaluation by canonical question_type enum value."""
+    """Route answer evaluation by canonical question_type enum value.
+
+    `session_id`/`user_id` are only used by the `text_free` branch (the only
+    one that calls an LLM / has a Langfuse trace) — ignored otherwise.
+    """
     question_type = question_type.lower()
 
     if question_type == "text_mcq":
@@ -209,7 +227,8 @@ def evaluate_answer(
 
     if question_type == "text_free":
         is_correct, feedback, explanation = evaluate_free_text(
-            user_answer, correct_answer, question_text
+            user_answer, correct_answer, question_text,
+            session_id=session_id, user_id=user_id,
         )
         return {
             "is_correct": is_correct,

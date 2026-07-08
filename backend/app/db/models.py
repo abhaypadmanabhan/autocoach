@@ -56,6 +56,11 @@ class User(Base):
     email: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     avatar_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    plan_type: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        server_default=text("'free'::text"),
+    )
 
     total_xp: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
 

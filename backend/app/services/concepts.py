@@ -116,7 +116,12 @@ def _postprocess_concepts(concepts: List[ExtractedConcept]) -> List[dict]:
     return items
 
 
-@observe(name="ingestion.extract_concepts", as_type="generation")
+@observe(
+    name="ingestion.extract_concepts",
+    as_type="generation",
+    capture_input=False,
+    capture_output=False,
+)
 def extract_concepts(document_id: str, chunks: List[dict]) -> None:
     """Extract learning concepts from a document's chunks and store them."""
     try:
