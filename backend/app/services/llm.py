@@ -59,9 +59,13 @@ def tag_current_generation(response: str) -> None:
     model = getattr(response, "model", None)
     if model is None:
         return
-    get_client().update_current_generation(
-        model=model, usage_details=getattr(response, "usage_details", None)
-    )
+    try:
+        get_client().update_current_generation(
+            model=model, usage_details=getattr(response, "usage_details", None)
+        )
+    except Exception as e:
+        # Observability must never break a successful LLM call — fail open.
+        logger.warning(f"Langfuse generation tagging failed: {e}")
 
 
 def call_kimi(system_prompt: str, user_prompt: str) -> str:
