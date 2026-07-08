@@ -8,9 +8,11 @@ Langfuse SDK to avoid opening any real network connections.
 
 from __future__ import annotations
 
+import ast
 import os
 import sys
 import types
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -26,6 +28,9 @@ if "langfuse" not in sys.modules:
 
 from app.config import Settings
 from app.observability import langfuse as obs
+
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture(autouse=True)
@@ -73,6 +78,52 @@ def _settings(**overrides) -> Settings:
     }
     base.update(overrides)
     return Settings(**base)
+
+
+def _observe_kwargs(module_path: str, function_name: str) -> dict[str, object]:
+    source = (BACKEND_DIR / module_path).read_text()
+    tree = ast.parse(source)
+
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if node.name != function_name:
+                continue
+
+            for decorator in node.decorator_list:
+                if not isinstance(decorator, ast.Call):
+                    continue
+                if not isinstance(decorator.func, ast.Name):
+                    continue
+                if decorator.func.id != "observe":
+                    continue
+                return {
+                    keyword.arg: ast.literal_eval(keyword.value)
+                    for keyword in decorator.keywords
+                    if keyword.arg is not None
+                }
+
+    raise AssertionError(f"Missing @observe decorator on {module_path}:{function_name}")
+
+
+@pytest.mark.parametrize(
+    ("module_path", "function_name"),
+    [
+        ("app/services/concepts.py", "extract_concepts"),
+        ("app/services/embeddings.py", "get_embeddings"),
+        ("app/services/retrieval.py", "retrieve_relevant_chunks"),
+        ("app/services/text_extraction.py", "extract_text_from_pdf"),
+        ("app/services/text_extraction.py", "extract_text_from_pptx"),
+        ("app/services/ingestion.py", "_extract_document_text"),
+        ("app/services/ingestion.py", "_chunk_document_text"),
+        ("app/services/ingestion.py", "_embed_chunks"),
+        ("app/services/ingestion.py", "_upsert_vectors"),
+    ],
+)
+def test_payload_risky_observe_spans_disable_capture(module_path, function_name):
+    kwargs = _observe_kwargs(module_path, function_name)
+
+    assert kwargs.get("capture_input") is False
+    assert kwargs.get("capture_output") is False
 
 
 # ---------------------------------------------------------------------------
