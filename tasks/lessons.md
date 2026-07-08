@@ -7,4 +7,6 @@
 - **Langfuse Cloud Configuration Mapping**: When configuring settings in Pydantic-settings based FastAPI apps, ensure the environment variables match the expected `BaseSettings` attributes (e.g., `LANGFUSE_HOST` mapping to `langfuse_host`), rather than assuming default SDK names (like `LANGFUSE_BASE_URL`).
 - **Secrets Auditing**: When handling environment variable swaps, perform a manual `git diff --staged` audit before committing to verify that no credentials or gitignored files (like local `.env`) are accidentally committed to the branch.
 - **Nixpacks Build Runtime Verification**: To verify what runtime version is actually compiled and executed by Railway/Nixpacks in production, use the `railway logs --build` command rather than guessing from local config files or local developer machine configurations.
-- **Documentation & Route Sync**: When deleting, renaming, or refactoring backend routes, we must immediately audit and update primary developer guides (such as `CLAUDE.md`) to prevent documentation drift. Always verify directory structure and route mappings against actual files and codebase metadata rather than assuming documentation is up to date.
+
+
+
