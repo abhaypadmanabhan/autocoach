@@ -91,7 +91,7 @@ frontend/src/
                    # date.ts, errorMessages.ts, milestones.ts, utils.ts
 
 backend/app/
-├── api/routes/    # health, documents, quiz, sessions, concepts, review, xp, onboarding
+├── api/routes/    # documents, health, onboarding, review, sessions, xp
 ├── services/      # ingestion, text_extraction, chunking, embeddings, retrieval,
 │                  # quiz_generator, session_manager, answer_evaluator, concepts,
 │                  # llm, usage, abuse_controls
@@ -120,8 +120,6 @@ backend/app/
 - `GET /progress/summary` — aggregate progress
 - `GET /{id}/progress` — per-doc progress
 
-**Quiz** (prefix `/quiz`)
-- `POST /generate` — one-shot quiz generation (legacy)
 
 **Quiz Sessions** (prefix `/quiz/sessions`)
 - `POST /` — create session + first question
