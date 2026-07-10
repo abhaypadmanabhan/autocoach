@@ -100,7 +100,7 @@ All four metrics clear the starting pass bars on every doc. `context_recall=1.00
 
 ## CI
 
-`.github/workflows/ci.yml` runs the eval harness's **hermetic** tests (`evals/tests` + `tests/test_evals_review_fixes.py`) in the backend job with only `pandas`+`datasets` added — ragas-dependent tests `importorskip` there because ragas cannot coexist with the app's `openai==2.x` pin (see Environment above). The **live** Ragas run is deliberately NOT a CI gate: it needs real Qdrant/Supabase/Kimi/OpenAI keys, spends money, and takes ~30 min for 90 rows. Tracked as a follow-up (scheduled/manual job with its own secrets + a dedicated eval venv).
+`.github/workflows/ci.yml` runs the eval harness's **hermetic** tests (`evals/tests` + `tests/test_evals_review_fixes.py`) in the backend job with only `pandas`+`datasets` added — ragas-dependent tests `importorskip` there because ragas cannot coexist with the app's `openai==2.x` pin (see Environment above). The **live** Ragas run is deliberately NOT a CI gate: it needs real Qdrant/Supabase/Kimi/OpenAI keys, spends money, and takes ~30 min for 90 rows. Tracked in #83 as a scheduled/manual job with its own secrets + a dedicated eval venv.
 
 ## Cost
 

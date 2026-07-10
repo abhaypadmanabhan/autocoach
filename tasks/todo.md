@@ -132,7 +132,7 @@ no paid rerankers. Phased: P0 Langfuse Cloud → P1 Ragas → P2 latency profili
       `temperature=0.6` (K2.6 rejects everything else — all metrics were NaN before).
       Ran with `--no-langfuse`: local `LANGFUSE_*` keys 401 on both cloud regions (rotated?);
       score upload deferred until keys are refreshed. CI now runs the hermetic eval tests;
-      live-Ragas CI gate deferred (needs secrets + spend — see follow-up issue).
+      live-Ragas CI gate deferred to #83 (needs secrets + spend).
 - [ ] Re-baseline metric bars after reviewing the first-run CSVs
 - [ ] Rotate local `LANGFUSE_PUBLIC_KEY`/`SECRET_KEY` in `backend/.env` (present keys 401),
       then re-run `--doc all` without `--no-langfuse` to publish scores
