@@ -1,4 +1,5 @@
 {
-  "document_id": "REPLACE_WITH_ATTENTION_DOCUMENT_UUID_FROM_SUPABASE",
-  "label": "Attention Is All You Need"
+  "document_id": "26f80abb-7a11-41c3-a3de-da8ce18156df",
+  "label": "Attention Is All You Need",
+  "notes": "Uploaded as 'attention_paper.pdf' (41 chunks, status=ready). Tuples curated 2026-07-10 from real chunk contents."
 }

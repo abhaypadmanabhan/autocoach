@@ -8,6 +8,7 @@ Local-only Ragas runner. Measures retrieval + answer quality on a hand-curated g
 backend/evals/
 ├── requirements.txt          # ragas, langchain-openai, pandas
 ├── kimi_judge.py             # LangChain-compatible Kimi wrapper for Ragas
+│                             # (pins temperature=0.6 — the only value K2.6 accepts)
 ├── run_ragas.py              # CLI runner
 ├── golden/
 │   ├── ddia.config.json
@@ -16,17 +17,25 @@ backend/evals/
 │   ├── product_analytics.jsonl
 │   ├── attention.config.json
 │   └── attention.jsonl
-└── results/                  # CSV outputs (gitignored)
+└── results/                  # CSV outputs (gitignored; baseline CSVs force-added)
 ```
 
 ## Setup (one-time)
 
+### Environment
+
+The eval stack **cannot be installed into the app venv as-is**: `backend/requirements.txt` pins `openai==2.x` and `langchain-core==1.x`, while `ragas 0.2.x` + `langchain-openai 0.2.x` require `openai<2` and `langchain-core 0.3.x`. Build a dedicated eval venv that relaxes only those pins (the app's `llm.py` uses the v1-style `OpenAI` client, which works on `openai 1.x`):
+
 ```bash
-source backend/venv/bin/activate
-pip install -r backend/evals/requirements.txt
+cd backend
+python3 -m venv venv            # or a separate eval-venv
+grep -vE "^(langchain|openai)" requirements.txt > /tmp/req-eval.txt
+./venv/bin/pip install -r /tmp/req-eval.txt -r evals/requirements.txt
 ```
 
-`backend/.env` must already have `SUPABASE_*`, `QDRANT_*`, `KIMI_API_KEY`, `OPENAI_API_KEY` for retrieval + judge. `LANGFUSE_*` is optional — set it to upload per-row scores to Langfuse Cloud.
+(`langchain-core`/`langchain-text-splitters` are only used by `app/services/chunking.py`, which the eval path never imports.)
+
+`backend/.env` must already have `SUPABASE_*`, `QDRANT_*`, `KIMI_API_KEY`, `OPENAI_API_KEY` for retrieval + judge. `LANGFUSE_*` is optional — set it to upload per-row scores to Langfuse Cloud. Note the app reads `LANGFUSE_HOST` (not `LANGFUSE_BASE_URL`).
 
 ## Step 1 — Curate the golden set
 
@@ -72,6 +81,26 @@ Output:
 | `answer_relevancy` | Does the answer address the question? | ≥ 0.75 |
 
 Bars are starting points — re-baseline after first run.
+
+## First real baseline (2026-07-10)
+
+Full `python -m evals.run_ragas --doc all` (90 curated tuples, top_k=5, Kimi K2.6 judge, `--no-langfuse`). Per-row CSVs in `results/*_20260710T*.csv`; 0 NaN scores.
+
+| Doc | context_precision | context_recall | faithfulness | answer_relevancy |
+| --- | --- | --- | --- | --- |
+| attention (n=30) | 0.782 ± 0.273 | 1.000 ± 0.000 | 0.919 ± 0.136 | 0.776 ± 0.126 |
+| ddia (n=30) | 0.804 ± 0.265 | 1.000 ± 0.000 | 0.941 ± 0.139 | 0.858 ± 0.100 |
+| product_analytics (n=30) | 0.911 ± 0.208 | 1.000 ± 0.000 | 0.861 ± 0.264 | 0.846 ± 0.136 |
+
+All four metrics clear the starting pass bars on every doc. `context_recall=1.000` across the board warrants a skeptical look during re-baselining (Kimi-as-judge may be lenient on recall).
+
+## Langfuse score upload
+
+`maybe_upload_to_langfuse` pushes per-doc metric means to Langfuse Cloud when `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST` are set and valid. As of 2026-07-10 the keys in the local `backend/.env` return **401 Unauthorized** against both `us.cloud.langfuse.com` and `cloud.langfuse.com` (verified with `curl -u pk:sk .../api/public/projects`) — they appear rotated. The first real baseline was therefore run with `--no-langfuse`; rotate the local keys and re-run without the flag to publish scores. (Railway's production keys are managed separately and unaffected.)
+
+## CI
+
+`.github/workflows/ci.yml` runs the eval harness's **hermetic** tests (`evals/tests` + `tests/test_evals_review_fixes.py`) in the backend job with only `pandas`+`datasets` added — ragas-dependent tests `importorskip` there because ragas cannot coexist with the app's `openai==2.x` pin (see Environment above). The **live** Ragas run is deliberately NOT a CI gate: it needs real Qdrant/Supabase/Kimi/OpenAI keys, spends money, and takes ~30 min for 90 rows. Tracked as a follow-up (scheduled/manual job with its own secrets + a dedicated eval venv).
 
 ## Cost
 

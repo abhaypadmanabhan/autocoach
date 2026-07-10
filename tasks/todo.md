@@ -121,11 +121,21 @@ no paid rerankers. Phased: P0 Langfuse Cloud → P1 Ragas → P2 latency profili
       per doc (DDIA, Product Analytics, Attention)
 - [x] **1b runner code** — `backend/evals/{run_ragas.py,kimi_judge.py,requirements.txt}`
 - [x] **1c admin runbook** — appended Langfuse Cloud monitoring section to `docs/HANDOFF.md`
-- [ ] **1a (user task):** upload the 3 PDFs in dev → paste real `documents.id` UUIDs into the
-      `.config.json` files → hand-curate 30 tuples per doc
-- [ ] **1b first run:** `pip install -r backend/evals/requirements.txt` then
-      `python -m evals.run_ragas --doc ddia --limit 5` to smoke-test against live Qdrant
-- [ ] Re-baseline metric bars after first real run
+- [x] **1a real golden data (2026-07-10, #76):** all 3 configs now point at real, `ready`
+      `documents.id` UUIDs (DDIA `0b8f0bc9…`, Attention `26f80abb…`, Product Analytics
+      `b78cb4e7…` — PA PDF ingested through the real pipeline). 30 curated tuples per doc
+      (90 total), every `source_chunk_text` machine-verified as a verbatim substring of the
+      real Supabase chunks.
+- [x] **1b first real baseline run (2026-07-10, #76):** full `python -m evals.run_ragas
+      --doc all` completed against live Qdrant + Kimi; per-row CSVs committed under
+      `backend/evals/results/` (force-added past gitignore). Fixed `kimi_judge.py` to pin
+      `temperature=0.6` (K2.6 rejects everything else — all metrics were NaN before).
+      Ran with `--no-langfuse`: local `LANGFUSE_*` keys 401 on both cloud regions (rotated?);
+      score upload deferred until keys are refreshed. CI now runs the hermetic eval tests;
+      live-Ragas CI gate deferred (needs secrets + spend — see follow-up issue).
+- [ ] Re-baseline metric bars after reviewing the first-run CSVs
+- [ ] Rotate local `LANGFUSE_PUBLIC_KEY`/`SECRET_KEY` in `backend/.env` (present keys 401),
+      then re-run `--doc all` without `--no-langfuse` to publish scores
 
 ## Phase 2 — Latency profiling (no code surgery yet)
 
