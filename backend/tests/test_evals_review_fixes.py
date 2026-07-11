@@ -61,8 +61,8 @@ def test_kimi_judge_passes_thinking_as_top_level_extra_body(monkeypatch):
     monkeypatch.setitem(sys.modules, "app.services.llm", fake_llm)
 
 
-def test_ragas_upload_uses_langfuse_v4_create_score(monkeypatch):
-    """Ragas aggregate upload must use v4 create_score, not trace/score."""
+def test_ragas_upload_uses_row_traces_and_aggregate_scores(monkeypatch):
+    """Ragas upload must use v4 create_score with row traces + aggregate means."""
     _stub_module(monkeypatch, "datasets", Dataset=object)
     _stub_module(monkeypatch, "ragas", evaluate=lambda *_args, **_kwargs: None)
     _stub_module(
@@ -87,7 +87,14 @@ def test_ragas_upload_uses_langfuse_v4_create_score(monkeypatch):
     )
 
     fake_client = MagicMock()
-    fake_client.create_trace_id.return_value = "0" * 32
+    aggregate_trace_id = "0" * 32
+    row_trace_1 = "1" * 32
+    row_trace_2 = "2" * 32
+    fake_client.create_trace_id.side_effect = [
+        aggregate_trace_id,
+        row_trace_1,
+        row_trace_2,
+    ]
     fake_span = MagicMock()
     fake_client.start_as_current_observation.return_value.__enter__.return_value = (
         fake_span
@@ -109,43 +116,119 @@ def test_ragas_upload_uses_langfuse_v4_create_score(monkeypatch):
     module = importlib.import_module("evals.run_ragas")
 
     class FakeSeries:
-        empty = False
+        def __init__(self, values):
+            self.values = values
+            self.empty = not values
 
         def mean(self):
-            return 0.75
+            return sum(self.values) / len(self.values)
 
     class FakeColumn:
+        def __init__(self, values):
+            self.values = values
+
         def dropna(self):
-            return FakeSeries()
+            return FakeSeries([v for v in self.values if v is not None])
 
     class FakeDataFrame:
-        columns = ("context_precision", "faithfulness")
+        rows = [
+            {
+                "row_index": 1,
+                "question": "TEST FIXTURE question one?",
+                "document_label": "TEST FIXTURE doc",
+                "concept_label": "concept-one",
+                "answer": "TEST FIXTURE generated answer one.",
+                "context_count": 3,
+                "retrieval_hit_at_k": True,
+                "context_precision": 0.5,
+                "context_recall": 0.6,
+                "faithfulness": 0.7,
+                "answer_relevancy": 0.8,
+                "contexts": ["DO NOT UPLOAD FULL CONTEXT"],
+                "source_chunk_text": "DO NOT UPLOAD SOURCE",
+            },
+            {
+                "row_index": 2,
+                "question": "TEST FIXTURE question two?",
+                "document_label": "TEST FIXTURE doc",
+                "concept_label": "concept-two",
+                "answer": "TEST FIXTURE generated answer two.",
+                "context_count": 2,
+                "retrieval_hit_at_k": False,
+                "context_precision": 1.0,
+                "context_recall": 0.8,
+                "faithfulness": 0.9,
+                "answer_relevancy": 1.0,
+                "contexts": ["DO NOT UPLOAD FULL CONTEXT"],
+                "source_chunk_text": "DO NOT UPLOAD SOURCE",
+            },
+        ]
+        columns = tuple(rows[0].keys())
 
         def __len__(self):
-            return 2
+            return len(self.rows)
 
-        def __getitem__(self, _key):
-            return FakeColumn()
+        def __getitem__(self, key):
+            return FakeColumn([row[key] for row in self.rows])
+
+        def iterrows(self):
+            for idx, row in enumerate(self.rows):
+                yield idx, row
 
     module._maybe_upload_to_langfuse("ddia", FakeDataFrame())
 
     assert fake_client.trace.call_count == 0
     assert fake_client.score.call_count == 0
-    assert fake_client.create_score.call_count == 2
+    assert fake_client.create_trace_id.call_count == 3
+    assert fake_client.create_score.call_count == len(module.REPORTED_METRIC_COLUMNS) * 3
     for call in fake_client.create_score.call_args_list:
-        assert call.kwargs["trace_id"] == "0" * 32
         assert call.kwargs["data_type"] == "NUMERIC"
-    fake_client.start_as_current_observation.assert_called_once_with(
-        name="ragas_eval",
+    fake_client.start_as_current_observation.assert_any_call(
+        name="ragas_eval_aggregate",
         as_type="span",
-        trace_context={"trace_id": "0" * 32},
-        metadata={"doc": "ddia", "rows": 2},
+        trace_context={"trace_id": aggregate_trace_id},
+        metadata={"doc": "ddia", "rows": 2, "document_label": "TEST FIXTURE doc"},
     )
-    fake_propagate.assert_called_once_with(
-        trace_name="ragas_eval",
-        metadata={"doc": "ddia", "rows": 2},
-        tags=["eval", "ragas", "ddia"],
+    fake_propagate.assert_any_call(
+        trace_name="ragas_eval_aggregate",
+        metadata={"doc": "ddia", "rows": 2, "document_label": "TEST FIXTURE doc"},
+        tags=["eval", "ragas", "ddia", "aggregate"],
     )
+    row_calls = [
+        call for call in fake_client.start_as_current_observation.call_args_list
+        if call.kwargs["name"] == "ragas_eval_row"
+    ]
+    assert len(row_calls) == 2
+    first_row_metadata = row_calls[0].kwargs["metadata"]
+    assert first_row_metadata["question"] == "TEST FIXTURE question one?"
+    assert first_row_metadata["document_label"] == "TEST FIXTURE doc"
+    assert first_row_metadata["concept_label"] == "concept-one"
+    assert first_row_metadata["generated_answer"] == "TEST FIXTURE generated answer one."
+    assert first_row_metadata["retrieval_hit_at_k"] is True
+    assert first_row_metadata["retrieved_contexts"] == {
+        "context_count": 3,
+        "chunk_ids": [],
+    }
+    assert "contexts" not in first_row_metadata
+    assert "source_chunk_text" not in first_row_metadata
+
+    aggregate_scores = {
+        call.kwargs["name"]: call.kwargs["value"]
+        for call in fake_client.create_score.call_args_list
+        if call.kwargs["trace_id"] == aggregate_trace_id
+    }
+    assert aggregate_scores["context_precision"] == 0.75
+    assert aggregate_scores["context_recall"] == 0.7
+    assert aggregate_scores["retrieval_hit_at_k"] == 0.5
+    assert aggregate_scores["faithfulness"] == 0.8
+    assert aggregate_scores["answer_relevancy"] == 0.9
+
+    fake_propagate.assert_any_call(
+        trace_name="ragas_eval_row",
+        metadata={"doc": "ddia", "rows": 2},
+        tags=["eval", "ragas", "ddia", "row"],
+    )
+    assert fake_propagate.call_count == 3
     fake_client.flush.assert_called_once()
 
     sys.modules.pop("evals.run_ragas", None)
