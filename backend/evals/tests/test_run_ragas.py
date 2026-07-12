@@ -29,12 +29,12 @@ class _StubResult:
 
 def _stub_retrieve(query, document_id, top_k):
     if "sky" in query:
-        return ["Retrieved chunk. TEST FIXTURE: the toy doc states the sky is blue during the day."]
+        return [{"id": "pt-sky-1", "content": "Retrieved chunk. TEST FIXTURE: the toy doc states the sky is blue during the day."}]
     if "two plus two" in query:
-        return ["Retrieved chunk. TEST FIXTURE: the toy doc says two plus two equals four."]
+        return [{"id": "pt-math-1", "content": "Retrieved chunk. TEST FIXTURE: the toy doc says two plus two equals four."}]
     if "animal" in query or "meows" in query:
-        return ["Retrieved chunk. TEST FIXTURE: the toy doc mentions a cat that meows."]
-    return [f"TEST FIXTURE context for: {query}"]
+        return [{"id": "pt-cat-1", "content": "Retrieved chunk. TEST FIXTURE: the toy doc mentions a cat that meows."}]
+    return [{"id": "pt-generic-1", "content": f"TEST FIXTURE context for: {query}"}]
 
 
 def _stub_empty_retrieve(query, document_id, top_k):
@@ -90,6 +90,47 @@ def test_build_dataset_uses_injected_adapters():
     assert ds["ground_truth"] == ["a1", "a2"]
     assert all(len(c) == 1 for c in ds["contexts"])
     assert ds["answer"][0].startswith("TEST FIXTURE answer to: q1")
+    assert ds["retrieved_chunk_ids"] == [["pt-generic-1"], ["pt-generic-1"]]
+
+
+def test_build_dataset_preserves_chunk_ids_in_retrieval_order():
+    pytest.importorskip("datasets")
+
+    def multi_chunk_retrieve(query, document_id, top_k):
+        return [
+            {"id": "pt-first", "content": "TEST FIXTURE chunk one"},
+            {"id": "pt-second", "content": "TEST FIXTURE chunk two"},
+            {"id": "pt-third", "content": "TEST FIXTURE chunk three"},
+        ]
+
+    tuples = [{"question": "q1", "ideal_answer": "a1",
+               "source_chunk_text": "s1", "concept_label": "c1"}]
+    ds = rr.build_dataset(tuples, document_id="doc-id", top_k=3,
+                          retrieve=multi_chunk_retrieve, answer=_stub_answer, doc="t")
+    assert ds["retrieved_chunk_ids"] == [["pt-first", "pt-second", "pt-third"]]
+    assert ds["contexts"] == [[
+        "TEST FIXTURE chunk one", "TEST FIXTURE chunk two", "TEST FIXTURE chunk three",
+    ]]
+
+
+def test_build_dataset_missing_chunk_id_records_null_and_warns(caplog):
+    pytest.importorskip("datasets")
+
+    def idless_retrieve(query, document_id, top_k):
+        return [
+            {"id": "pt-ok", "content": "TEST FIXTURE chunk with id"},
+            {"content": "TEST FIXTURE chunk without id"},
+            "TEST FIXTURE bare string chunk",
+        ]
+
+    tuples = [{"question": "q1", "ideal_answer": "a1",
+               "source_chunk_text": "s1", "concept_label": "c1"}]
+    with caplog.at_level(logging.WARNING):
+        ds = rr.build_dataset(tuples, document_id="doc-id", top_k=3,
+                              retrieve=idless_retrieve, answer=_stub_answer, doc="t")
+    assert ds["retrieved_chunk_ids"] == [["pt-ok", None, None]]
+    warnings = [r.getMessage() for r in caplog.records if "no stable ID" in r.getMessage()]
+    assert len(warnings) == 2
 
 
 def test_run_one_end_to_end_writes_csv(fixtures_dir, tmp_path, capsys):
@@ -111,8 +152,38 @@ def test_run_one_end_to_end_writes_csv(fixtures_dir, tmp_path, capsys):
     assert written["question"].tolist() == [r["question"] for r in golden_rows]
     assert written["reference"].tolist() == [r["ideal_answer"] for r in golden_rows]
     assert written["retrieval_hit_at_k"].tolist() == [True, True, True]
+    assert "retrieved_chunk_ids" in written.columns
+    assert df["retrieved_chunk_ids"].tolist() == [
+        ["pt-sky-1"], ["pt-math-1"], ["pt-cat-1"],
+    ]
     out = capsys.readouterr().out
     assert "ddia_valid" in out and "faithfulness" in out
+
+
+def test_live_retrieve_maps_point_ids_and_content_only(monkeypatch):
+    import sys
+    import types
+
+    fake = types.ModuleType("app.services.retrieval")
+    fake.retrieve_relevant_chunks = lambda **_kwargs: [
+        {"id": "pt-1", "content": "TEST FIXTURE c1", "chunk_index": 0, "score": 0.9},
+        {"content": "TEST FIXTURE c2", "chunk_index": 1, "score": 0.8},
+    ]
+    monkeypatch.setitem(sys.modules, "app.services.retrieval", fake)
+
+    out = rr.live_retrieve(query="q", document_id="d", top_k=2)
+
+    assert out == [
+        {"id": "pt-1", "content": "TEST FIXTURE c1"},
+        {"id": None, "content": "TEST FIXTURE c2"},
+    ]
+
+
+def test_safe_chunk_ids_keeps_order_and_null_gaps():
+    row = {"retrieved_chunk_ids": ["pt-a", None, 42, "pt-b"]}
+    assert rr._safe_chunk_ids(row) == ["pt-a", None, "42", "pt-b"]
+    assert rr._safe_chunk_ids({"retrieved_chunk_ids": "not-a-list"}) == []
+    assert rr._safe_chunk_ids({}) == []
 
 
 def test_run_one_zero_context_retrieval_aborts_before_csv(fixtures_dir, tmp_path):
