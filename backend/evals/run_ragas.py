@@ -73,6 +73,7 @@ _RESULT_METADATA_COLUMNS = (
     "concept_label",
     "context_count",
     "retrieval_hit_at_k",
+    "retrieved_chunk_ids",
 )
 
 _SKIP_RESULT_COLUMNS = frozenset({
@@ -88,6 +89,7 @@ _SKIP_RESULT_COLUMNS = frozenset({
     "concept_label",
     "context_count",
     "retrieval_hit_at_k",
+    "retrieved_chunk_ids",
     "source_chunk_text",
 })
 
@@ -97,7 +99,7 @@ class RetrievalCoverageError(RuntimeError):
 
 
 class RetrieveFn(Protocol):
-    def __call__(self, query: str, document_id: str, top_k: int) -> list[str]: ...
+    def __call__(self, query: str, document_id: str, top_k: int) -> list[dict[str, Any]]: ...
 
 
 class AnswerFn(Protocol):
@@ -125,12 +127,38 @@ def retrieval_hit_at_k(source_chunk_text: str, contexts: list[str]) -> bool:
     return any(expected in _normalize_evidence_text(ctx or "") for ctx in contexts)
 
 
-def live_retrieve(query: str, document_id: str, top_k: int) -> list[str]:
-    """Live retrieval adapter — returns chunk *contents* (not the full dicts)."""
+def live_retrieve(query: str, document_id: str, top_k: int) -> list[dict[str, Any]]:
+    """Live retrieval adapter — returns content + stable Qdrant point ID per chunk."""
     from app.services.retrieval import retrieve_relevant_chunks  # lazy
 
     chunks = retrieve_relevant_chunks(query=query, document_id=document_id, top_k=top_k)
-    return [c["content"] for c in chunks] if chunks else []
+    return [{"id": c.get("id"), "content": c["content"]} for c in chunks] if chunks else []
+
+
+def _split_contexts_and_chunk_ids(
+    retrieved: list[Any], *, doc: str, row_index: int
+) -> tuple[list[str], list[Optional[str]]]:
+    """Split retrieved items into parallel content / chunk-ID lists (order kept).
+
+    Items missing a stable ID get an explicit ``None`` (never a fabricated ID)
+    plus a warning, so gaps are visible downstream instead of silently dropped.
+    """
+    contexts: list[str] = []
+    chunk_ids: list[Optional[str]] = []
+    for position, item in enumerate(retrieved):
+        if isinstance(item, dict):
+            contexts.append(item.get("content", "") or "")
+            raw_id = item.get("id")
+            chunk_ids.append(str(raw_id) if isinstance(raw_id, (str, int)) else None)
+        else:
+            contexts.append(str(item))
+            chunk_ids.append(None)
+        if chunk_ids[-1] is None:
+            logger.warning(
+                "[%s row %d] retrieved chunk %d has no stable ID — recording null",
+                doc or "?", row_index, position,
+            )
+    return contexts, chunk_ids
 
 
 def live_answer(question: str, contexts: list[str]) -> str:
@@ -194,9 +222,11 @@ def build_dataset(
 
     questions, answers, contexts, ground_truths, concept_labels = [], [], [], [], []
     source_chunk_texts, retrieval_hits, context_counts, row_indexes = [], [], [], []
+    retrieved_chunk_ids = []
     for i, row in enumerate(tuples, 1):
         q = row["question"]
-        ctxs = list(retrieve(query=q, document_id=document_id, top_k=top_k) or [])
+        retrieved = list(retrieve(query=q, document_id=document_id, top_k=top_k) or [])
+        ctxs, chunk_ids = _split_contexts_and_chunk_ids(retrieved, doc=doc, row_index=i)
         ans = answer(question=q, contexts=ctxs)
         source_chunk_text = row["source_chunk_text"]
         questions.append(q)
@@ -207,6 +237,7 @@ def build_dataset(
         source_chunk_texts.append(source_chunk_text)
         retrieval_hits.append(retrieval_hit_at_k(source_chunk_text, ctxs))
         context_counts.append(len(ctxs))
+        retrieved_chunk_ids.append(chunk_ids)
         row_indexes.append(i)
         logger.info(
             "[%s %d/%d] retrieved=%d answer_chars=%d concept=%s",
@@ -222,6 +253,7 @@ def build_dataset(
             "source_chunk_text": source_chunk_texts,
             "retrieval_hit_at_k": retrieval_hits,
             "context_count": context_counts,
+            "retrieved_chunk_ids": retrieved_chunk_ids,
             "row_index": row_indexes,
         }
     )
@@ -277,6 +309,7 @@ def build_output_dataframe(
         "concept_label": dataset["concept_label"],
         "context_count": dataset["context_count"],
         "retrieval_hit_at_k": dataset["retrieval_hit_at_k"],
+        "retrieved_chunk_ids": dataset["retrieved_chunk_ids"],
     })
 
     for col in METRIC_COLUMNS:
@@ -351,15 +384,12 @@ def _first_value(df: Any, column: str, default: Any = "") -> Any:
         return default
 
 
-def _safe_chunk_ids(row: Any) -> list[str]:
+def _safe_chunk_ids(row: Any) -> list[Optional[str]]:
+    """Chunk IDs in retrieval order; missing IDs stay as explicit ``None``."""
     raw = _row_get(row, "retrieved_chunk_ids", _row_get(row, "chunk_ids", []))
     if not isinstance(raw, (list, tuple)):
         return []
-    safe_ids: list[str] = []
-    for item in raw:
-        if isinstance(item, (str, int)):
-            safe_ids.append(str(item))
-    return safe_ids
+    return [str(item) if isinstance(item, (str, int)) else None for item in raw]
 
 
 def _upload_scores(langfuse: Any, *, trace_id: str, values: dict[str, Any], metadata: dict) -> None:

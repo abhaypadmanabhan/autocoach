@@ -140,6 +140,7 @@ def test_ragas_upload_uses_row_traces_and_aggregate_scores(monkeypatch):
                 "answer": "TEST FIXTURE generated answer one.",
                 "context_count": 3,
                 "retrieval_hit_at_k": True,
+                "retrieved_chunk_ids": ["pt-1a", None, "pt-1c"],
                 "context_precision": 0.5,
                 "context_recall": 0.6,
                 "faithfulness": 0.7,
@@ -155,6 +156,7 @@ def test_ragas_upload_uses_row_traces_and_aggregate_scores(monkeypatch):
                 "answer": "TEST FIXTURE generated answer two.",
                 "context_count": 2,
                 "retrieval_hit_at_k": False,
+                "retrieved_chunk_ids": ["pt-2a", "pt-2b"],
                 "context_precision": 1.0,
                 "context_recall": 0.8,
                 "faithfulness": 0.9,
@@ -207,10 +209,17 @@ def test_ragas_upload_uses_row_traces_and_aggregate_scores(monkeypatch):
     assert first_row_metadata["retrieval_hit_at_k"] is True
     assert first_row_metadata["retrieved_contexts"] == {
         "context_count": 3,
-        "chunk_ids": [],
+        "chunk_ids": ["pt-1a", None, "pt-1c"],
     }
-    assert "contexts" not in first_row_metadata
-    assert "source_chunk_text" not in first_row_metadata
+    second_row_metadata = row_calls[1].kwargs["metadata"]
+    assert second_row_metadata["retrieved_contexts"] == {
+        "context_count": 2,
+        "chunk_ids": ["pt-2a", "pt-2b"],
+    }
+    for metadata in (first_row_metadata, second_row_metadata):
+        assert "contexts" not in metadata
+        assert "source_chunk_text" not in metadata
+        assert "DO NOT UPLOAD" not in repr(metadata)
 
     aggregate_scores = {
         call.kwargs["name"]: call.kwargs["value"]

@@ -26,7 +26,8 @@ def retrieve_relevant_chunks(query: str, document_id: str, top_k: int = 5) -> li
 
     Returns:
         List of dictionaries containing chunk information:
-        [{"content": str, "chunk_index": int, "score": float}]
+        [{"id": str, "content": str, "chunk_index": int, "score": float}]
+        where "id" is the stable Qdrant point ID.
     """
     try:
         # Get embedding for the query
