@@ -18,8 +18,11 @@ Autocoach_Design/
 tasks/bugs.md
 tasks/design-handoff-prompt.md
 
-# Eval CSV outputs (regenerated per run)
+# Eval CSV outputs (regenerated per run). Both forms: the trailing-slash rule
+# matches a real directory, the bare path also matches a symlink to one (a
+# worktree points this at the main checkout's results rather than re-running).
 backend/evals/results/
+backend/evals/results
 
 # Worktree scaffolding: symlinks to the main checkout's venvs. `venv/` above
 # only matches real directories, not the symlinks a worktree needs.

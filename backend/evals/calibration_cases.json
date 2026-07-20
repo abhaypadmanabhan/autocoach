@@ -1,0 +1,384 @@
+{
+  "schema_version": 1,
+  "about": "Balanced judge-calibration cases. Each case is a deterministic mutation of an answer the pipeline really produced, scored against the contexts that answer was really generated from. This file contains NO questions, answers, or retrieved contexts - only identifiers, mutation instructions, expected labels, and hashes that make silent baseline drift fail loudly. Materialise locally with: python -m evals.calibration_cases --validate",
+  "faithfulness_rubric": {
+    "faithful": "Every claim in the answer is supported by the retrieved contexts.",
+    "unfaithful": "At least one claim is unsupported by, or contradicts, the retrieved contexts.",
+    "note": "Binary by design. Ragas returns a fraction whose denominator is however many statements its own splitter produced - not a quantity any human labelled - so no fractional ground truth is asserted here."
+  },
+  "quality_rubric": {
+    "responsive": "Addresses what was asked. Independent of correctness: a confidently wrong answer is still responsive.",
+    "partially_responsive": "Addresses part of a multi-part request and omits the rest.",
+    "non_responsive": "Does not address the request, however true the content may be."
+  },
+  "labelled_on": "2026-07-20",
+  "labelled_from": "backend/evals/results/{doc}_20260711T04*.csv (gitignored)",
+  "cases": [
+    {
+      "case_id": 1,
+      "doc": "ddia",
+      "source_row": 12,
+      "concept_label": "indexes",
+      "mutation": "identity",
+      "params": {},
+      "expected_faithfulness": "faithful",
+      "expected_quality": "responsive",
+      "rationale": "Unmodified pipeline answer; its single claim restates the retrieved definition of an index.",
+      "question_sha": "e608c7fc7bf4a0a1",
+      "answer_sha": "df210d50a5dd630f"
+    },
+    {
+      "case_id": 2,
+      "doc": "ddia",
+      "source_row": 8,
+      "concept_label": "network model",
+      "mutation": "identity",
+      "params": {},
+      "expected_faithfulness": "faithful",
+      "expected_quality": "responsive",
+      "rationale": "Unmodified; both claims about pointer links and access paths appear in the retrieved contexts.",
+      "question_sha": "92fe3694cd9b0b19",
+      "answer_sha": "88811ff54bb90171"
+    },
+    {
+      "case_id": 3,
+      "doc": "attention",
+      "source_row": 18,
+      "concept_label": "positional encoding",
+      "mutation": "identity",
+      "params": {},
+      "expected_faithfulness": "faithful",
+      "expected_quality": "responsive",
+      "rationale": "Unmodified; the stated reason and the equal-results finding are both in the contexts.",
+      "question_sha": "c39562e86af68758",
+      "answer_sha": "fadaa9f584786f6e"
+    },
+    {
+      "case_id": 4,
+      "doc": "attention",
+      "source_row": 2,
+      "concept_label": "translation results",
+      "mutation": "identity",
+      "params": {},
+      "expected_faithfulness": "faithful",
+      "expected_quality": "responsive",
+      "rationale": "Unmodified; both reported scores match the contexts. Paired with case 15, which alters one of them.",
+      "question_sha": "a7b22667580839be",
+      "answer_sha": "7449680f00b84209"
+    },
+    {
+      "case_id": 5,
+      "doc": "product_analytics",
+      "source_row": 19,
+      "concept_label": "tracking plan",
+      "mutation": "identity",
+      "params": {},
+      "expected_faithfulness": "faithful",
+      "expected_quality": "responsive",
+      "rationale": "Unmodified; the definition restates the retrieved description of a tracking plan.",
+      "question_sha": "cf416e849a31189a",
+      "answer_sha": "ed4f39d31e416540"
+    },
+    {
+      "case_id": 6,
+      "doc": "product_analytics",
+      "source_row": 28,
+      "concept_label": "retention analysis",
+      "mutation": "identity",
+      "params": {},
+      "expected_faithfulness": "faithful",
+      "expected_quality": "responsive",
+      "rationale": "Unmodified; both definitions are supported by the contexts.",
+      "question_sha": "a9858dc516947c5d",
+      "answer_sha": "0232a43485563acf"
+    },
+    {
+      "case_id": 7,
+      "doc": "ddia",
+      "source_row": 15,
+      "concept_label": "b-trees",
+      "mutation": "append_claim",
+      "params": {
+        "text": "B-trees were introduced by Google in 2006 for use in Bigtable."
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Original two claims stay supported; the appended attribution is absent from the contexts and false.",
+      "question_sha": "b0e64494c2e3841e",
+      "answer_sha": "92d5be56cbb052db"
+    },
+    {
+      "case_id": 8,
+      "doc": "ddia",
+      "source_row": 25,
+      "concept_label": "replication vs partitioning",
+      "mutation": "combine",
+      "params": {
+        "keep": [
+          0
+        ],
+        "text": "Partitioning always doubles write throughput compared with replication."
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Supported first sentence plus an invented quantitative claim the contexts never make.",
+      "question_sha": "22205c9730b8a187",
+      "answer_sha": "3b0edadbcae8d4db"
+    },
+    {
+      "case_id": 9,
+      "doc": "attention",
+      "source_row": 6,
+      "concept_label": "self-attention",
+      "mutation": "append_claim",
+      "params": {
+        "text": "Self-attention was first introduced by the Transformer paper in 2017."
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Appended claim contradicts the contexts, which cite earlier work using self-attention.",
+      "question_sha": "3eb90b5c1e31a8bf",
+      "answer_sha": "21e472a317aadfb8"
+    },
+    {
+      "case_id": 10,
+      "doc": "attention",
+      "source_row": 15,
+      "concept_label": "encoder self-attention",
+      "mutation": "combine",
+      "params": {
+        "keep": [
+          0
+        ],
+        "text": "Each encoder layer uses a separate learned key matrix that is discarded after training."
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Supported first sentence plus a fabricated architectural detail.",
+      "question_sha": "eb3f290f7cb3fc08",
+      "answer_sha": "3d9513f7cd6e6f47"
+    },
+    {
+      "case_id": 11,
+      "doc": "product_analytics",
+      "source_row": 22,
+      "concept_label": "acquisition metrics",
+      "mutation": "append_claim",
+      "params": {
+        "text": "Acquisition metrics should be reviewed on an hourly basis to be useful."
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Appended cadence prescription appears nowhere in the contexts.",
+      "question_sha": "20671d193fef310a",
+      "answer_sha": "a086476f859de7de"
+    },
+    {
+      "case_id": 12,
+      "doc": "product_analytics",
+      "source_row": 30,
+      "concept_label": "behavioral analysis",
+      "mutation": "combine",
+      "params": {
+        "keep": [
+          0
+        ],
+        "text": "Historical Counts requires at least twelve months of data before it produces valid results."
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Supported definition plus an invented data-volume precondition.",
+      "question_sha": "b3544789246655c2",
+      "answer_sha": "f073581da80ce540"
+    },
+    {
+      "case_id": 13,
+      "doc": "ddia",
+      "source_row": 3,
+      "concept_label": "hardware faults",
+      "mutation": "replace_number",
+      "params": {
+        "occurrence": 3,
+        "replacement": "500"
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Upper bound of the failure-rate range altered to a value the contexts contradict.",
+      "question_sha": "7f37b0feee5fae59",
+      "answer_sha": "f3e7ff2b5465d637"
+    },
+    {
+      "case_id": 14,
+      "doc": "attention",
+      "source_row": 24,
+      "concept_label": "training hardware",
+      "mutation": "replace_number",
+      "params": {
+        "occurrence": 1,
+        "replacement": "64"
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "GPU count altered to a figure the contexts contradict.",
+      "question_sha": "53fc44fa1f67619d",
+      "answer_sha": "d7dcd9cd4bd1dbeb"
+    },
+    {
+      "case_id": 15,
+      "doc": "attention",
+      "source_row": 2,
+      "concept_label": "translation results",
+      "mutation": "replace_number",
+      "params": {
+        "occurrence": 1,
+        "replacement": "38.9"
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "One reported score altered. Same contexts as case 4, so difficulty is held constant across the pair.",
+      "question_sha": "a7b22667580839be",
+      "answer_sha": "7449680f00b84209"
+    },
+    {
+      "case_id": 16,
+      "doc": "ddia",
+      "source_row": 9,
+      "concept_label": "schema-on-read",
+      "mutation": "reverse_causal",
+      "params": {
+        "connective": "because"
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Cause and effect swapped; the contexts assert the relationship in the opposite direction.",
+      "question_sha": "054f9ec7899a181b",
+      "answer_sha": "6d0cc1fe1b4190d9"
+    },
+    {
+      "case_id": 17,
+      "doc": "attention",
+      "source_row": 22,
+      "concept_label": "interpretability",
+      "mutation": "reverse_causal",
+      "params": {
+        "connective": "because"
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Cause and effect swapped, inverting the claim the contexts actually support.",
+      "question_sha": "3125ee63daf195d6",
+      "answer_sha": "ebee5734c592982b"
+    },
+    {
+      "case_id": 18,
+      "doc": "product_analytics",
+      "source_row": 6,
+      "concept_label": "retention",
+      "mutation": "fabricate",
+      "params": {
+        "text": "The Form Coaching Tips feature reduced MapMyRun's day-seven retention by 12 percent, which led the team to remove the feature from the app."
+      },
+      "expected_faithfulness": "unfaithful",
+      "expected_quality": "responsive",
+      "rationale": "Wholly invented answer that reverses the direction and magnitude reported in the contexts.",
+      "question_sha": "1f14d4211b0e8b66",
+      "answer_sha": "ed0035aea7f2aaa2"
+    },
+    {
+      "case_id": 19,
+      "doc": "ddia",
+      "source_row": 16,
+      "concept_label": "write-ahead log",
+      "mutation": "drop_sentence",
+      "params": {
+        "keep": [
+          0
+        ]
+      },
+      "expected_faithfulness": "faithful",
+      "expected_quality": "partially_responsive",
+      "rationale": "Every retained claim is supported, but the question asks two things and only the first is answered.",
+      "question_sha": "e868b938b2f5ad3a",
+      "answer_sha": "0e9eac9d9b6a1ffc"
+    },
+    {
+      "case_id": 20,
+      "doc": "attention",
+      "source_row": 17,
+      "concept_label": "embeddings and weight sharing",
+      "mutation": "drop_sentence",
+      "params": {
+        "keep": [
+          0
+        ]
+      },
+      "expected_faithfulness": "faithful",
+      "expected_quality": "partially_responsive",
+      "rationale": "Supported, but the weight-sharing half of the question is dropped.",
+      "question_sha": "154d9cdb1445fb54",
+      "answer_sha": "2361df09b95f480f"
+    },
+    {
+      "case_id": 21,
+      "doc": "ddia",
+      "source_row": 29,
+      "concept_label": "monotonic reads",
+      "mutation": "drop_sentence",
+      "params": {
+        "keep": [
+          0
+        ]
+      },
+      "expected_faithfulness": "faithful",
+      "expected_quality": "partially_responsive",
+      "rationale": "Supported, but the requested comparison to other consistency levels is dropped.",
+      "question_sha": "ab81591a93c54960",
+      "answer_sha": "4474b84b28a79a8f"
+    },
+    {
+      "case_id": 22,
+      "doc": "ddia",
+      "source_row": 20,
+      "concept_label": "avro schema resolution",
+      "mutation": "swap_question",
+      "params": {},
+      "expected_faithfulness": "faithful",
+      "expected_quality": "non_responsive",
+      "rationale": "Answer is fully supported by its own contexts but addresses a different question than the one asked.",
+      "question_sha": "232b62df8524cece",
+      "answer_sha": "6174a3eca10963aa",
+      "question_from_row": 22
+    },
+    {
+      "case_id": 23,
+      "doc": "attention",
+      "source_row": 10,
+      "concept_label": "attention function",
+      "mutation": "swap_question",
+      "params": {},
+      "expected_faithfulness": "faithful",
+      "expected_quality": "non_responsive",
+      "rationale": "Answer is fully supported by its own contexts but does not address the question posed.",
+      "question_sha": "0d271084a23250a6",
+      "answer_sha": "9a71f01d394307a4",
+      "question_from_row": 26
+    },
+    {
+      "case_id": 24,
+      "doc": "attention",
+      "source_row": 18,
+      "concept_label": "positional encoding",
+      "mutation": "evade_request",
+      "params": {
+        "keep": [
+          1
+        ]
+      },
+      "expected_faithfulness": "faithful",
+      "expected_quality": "non_responsive",
+      "rationale": "Retains only a supported side observation; the question asks why one option was chosen and that is never addressed.",
+      "question_sha": "c39562e86af68758",
+      "answer_sha": "fadaa9f584786f6e"
+    }
+  ]
+}

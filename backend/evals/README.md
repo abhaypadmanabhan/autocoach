@@ -139,6 +139,38 @@ The aggregates CSV is deliberately not committed; `--replay` reproduces it byte-
 
 Langfuse upload is opt-in via `--upload-langfuse`; calibration is local by default.
 
+## Balanced calibration cases
+
+The six-row label set above is all positive examples, so it can measure a judge's false-negative rate and nothing else — a judge that called every answer faithful would score perfectly against it. `calibration_cases.json` adds a balanced set that measures both error directions.
+
+A case is not a hand-written answer. It is a deterministic **mutation** of an answer the pipeline really produced, scored against the contexts that answer was really generated from — so the negatives are failure modes the system actually exhibits, and the label follows from what the mutation changed.
+
+```bash
+# structural validation + distribution, no baselines needed
+python -m evals.calibration_cases --summary
+
+# materialise every case from the local baselines and check hashes
+python -m evals.calibration_cases --validate
+
+# inspect one case locally (prints source-derived text — never redirect into a tracked file)
+python -m evals.calibration_cases --show 13
+
+# judge-vs-human agreement
+python -m evals.calibration_agreement --dry-run
+python -m evals.calibration_agreement --judges kimi,openai --repeats 3
+
+# rebuild the report from saved scores, no judge calls
+python -m evals.calibration_agreement --replay evals/reports/balanced_cases_observations.csv
+```
+
+**What is committed.** Only document and row identifiers, mutation instructions, expected labels, short original-wording rationales, and 16-character hashes of the source question and answer. No questions, answers or retrieved contexts — those derive from third-party PDFs. Mutation `text` params are invented claims, verified by test to appear in none of the contexts they are applied to.
+
+**Why the hashes.** Materialisation fails loudly when a source row is missing, or when its text no longer hashes to the committed value, so a case can never be silently scored against different inputs than the ones it was labelled against. Re-verify a case by hand before re-hashing it.
+
+**Labels.** `expected_faithfulness` is binary (`faithful` / `unfaithful`): faithful means every claim in the answer is supported by the retrieved contexts. No fractional ground truth is asserted — Ragas returns a fraction whose denominator is however many statements its own splitter produced, which is not a quantity any human labelled. `expected_quality` is separate and ordinal (`responsive` / `partially_responsive` / `non_responsive`) and says nothing about correctness: a confidently wrong answer is still responsive.
+
+Findings from the first run are in `reports/balanced_cases_agreement.md`, with the raw scores in `reports/balanced_cases_observations.csv`.
+
 ## Langfuse score upload
 
 `maybe_upload_to_langfuse` pushes document-level means to a `ragas_eval_aggregate` trace and creates one `ragas_eval_row` trace per golden row when `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST` are set and valid. Row traces include question, document label, `concept_label`, generated answer, context count/chunk IDs when available, `retrieval_hit_at_k`, and row metric scores. They do not upload full retrieved chunk text by default.
