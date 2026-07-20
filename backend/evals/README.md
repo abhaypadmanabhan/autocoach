@@ -109,6 +109,29 @@ Full `python -m evals.run_ragas --doc all` (90 curated tuples, top_k=5, Kimi K2.
 
 All four Ragas metrics clear the starting pass bars on every doc. `context_recall=1.000` across the board warrants a skeptical look during re-baselining (Kimi-as-judge may be lenient on recall). That baseline predates `retrieval_hit_at_k`; the next live re-baseline should report it. Detailed baseline CSVs containing retrieved book text are no longer tracked; repository history cleanup/copyright remediation is follow-up issue [#84](https://github.com/abhaypadmanabhan/autocoach/issues/84).
 
+## Judge calibration
+
+`run_ragas` varies retrieval, answer generation and judging all at once, so a moved score cannot be attributed to any one of them. `evals/calibrate.py` holds the first two fixed — it replays rows already saved in a results CSV and re-scores them N times per judge, so everything that moves is the judge. It never calls Qdrant, never generates an answer, and never writes to the CSV it reads.
+
+```bash
+# plan + estimated judge calls, no API calls
+python -m evals.calibrate --dry-run
+
+# repeatability experiment across both judges
+python -m evals.calibrate \
+    --rows product_analytics:20,product_analytics:3,ddia:26,ddia:3,attention:7,attention:19 \
+    --judges kimi,openai --repeats 3
+
+# rebuild the report from saved scores, no API calls
+python -m evals.calibrate --replay evals/reports/judge_calibration_observations_*.csv
+```
+
+Judge backends live in `evals/judges.py`. `kimi` (Moonshot K2.6, temperature locked at 0.6 by the provider) remains the default everywhere; `openai` (`gpt-4o-mini`, `temperature=0`, `seed=0`) is selectable for calibration and uses the `OPENAI_API_KEY` the project already requires. Selection is always an explicit CLI argument — no env var can flip the judge mid-run, and `run_ragas` still builds the Kimi judge directly.
+
+Outputs land in `evals/reports/`: a per-observation CSV (every individual score), an aggregates CSV (mean / stdev / min / max / range), and a Markdown report. All three carry identifiers and numbers only — no questions, answers, retrieved context, or credentials. Hand-graded expectations used for the judge-vs-human comparison live in `calibration_labels.json`.
+
+Langfuse upload is opt-in via `--upload-langfuse`; calibration is local by default.
+
 ## Langfuse score upload
 
 `maybe_upload_to_langfuse` pushes document-level means to a `ragas_eval_aggregate` trace and creates one `ragas_eval_row` trace per golden row when `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST` are set and valid. Row traces include question, document label, `concept_label`, generated answer, context count/chunk IDs when available, `retrieval_hit_at_k`, and row metric scores. They do not upload full retrieved chunk text by default.

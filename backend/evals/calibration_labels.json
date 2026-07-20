@@ -1,0 +1,43 @@
+{
+  "about": "Hand-graded expectations for judge-calibration rows. Each answer was read against its own retrieved contexts and every claim traced to supporting text, so the human faithfulness expectation is 1.000 throughout. Rationales cite where support was found without reproducing the source text. answer_relevancy has no defensible human scalar (it measures embedding distance between the question and questions reverse-generated from the answer, not answer quality), so it is deliberately unlabelled.",
+  "graded_on": "2026-07-19",
+  "graded_from": "backend/evals/results/{doc}_20260711T04*.csv",
+  "labels": [
+    {
+      "doc": "product_analytics",
+      "row_index": 20,
+      "faithfulness_human": 1.0,
+      "rationale": "Single-claim answer; the claim is a near-verbatim restatement of one sentence in retrieved context rank 1. Baseline judge returned 0.000."
+    },
+    {
+      "doc": "product_analytics",
+      "row_index": 3,
+      "faithfulness_human": 1.0,
+      "rationale": "Every clause maps to retrieved context rank 1 verbatim. Baseline judge returned 0.375."
+    },
+    {
+      "doc": "ddia",
+      "row_index": 26,
+      "faithfulness_human": 1.0,
+      "rationale": "Two claims; first supported by contexts rank 1 and rank 3, second by rank 3. Baseline judge returned 0.400."
+    },
+    {
+      "doc": "ddia",
+      "row_index": 3,
+      "faithfulness_human": 1.0,
+      "rationale": "Both the per-day death rate and the MTTF range appear in retrieved context rank 1. Scored 1.000/1.000/0.667 across three identical prior runs."
+    },
+    {
+      "doc": "attention",
+      "row_index": 7,
+      "faithfulness_human": 1.0,
+      "rationale": "Answer is a verbatim reproduction of the sentence in retrieved context rank 1. Baseline judge agreed (1.000); included as a positive control."
+    },
+    {
+      "doc": "attention",
+      "row_index": 19,
+      "faithfulness_human": 1.0,
+      "rationale": "All three desiderata listed appear in retrieved context rank 1. Baseline judge agreed (1.000); included as a positive control."
+    }
+  ]
+}
