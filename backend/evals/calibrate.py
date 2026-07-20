@@ -44,6 +44,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 
 EVAL_DIR = Path(__file__).resolve().parent
 RESULTS_DIR = EVAL_DIR / "results"
+#: Default output location. Sits under the gitignored results tree so an ad-hoc
+#: run produces disposable artifacts. Evidence worth keeping is promoted into
+#: ``evals/reports/`` by hand — deliberately, not as a side effect of running.
+RUN_OUTPUT_DIR = RESULTS_DIR / "calibration"
 REPORTS_DIR = EVAL_DIR / "reports"
 HUMAN_LABELS_PATH = EVAL_DIR / "calibration_labels.json"
 
@@ -647,6 +651,12 @@ def build_report(
                      "supported by its retrieved contexts, so the human expectation is 1.000. "
                      "See `calibration_labels.json`.")
         lines.append("")
+        lines.append("**Read this table narrowly.** With every label at 1.000 the set contains "
+                     "no negative examples, so a judge that called everything faithful would "
+                     "score a perfect 0.000 error. These numbers bound each judge's "
+                     "false-negative rate; they do not establish which judge is more correct, "
+                     "and a lower error here may reflect leniency rather than accuracy.")
+        lines.append("")
         lines.append("| judge | rows labelled | mean abs error | max abs error |")
         lines.append("|---|---|---|---|")
         for judge in judges:
@@ -736,8 +746,9 @@ def main(
                         help=f"Comma-separated metrics from: {', '.join(ALL_METRICS)}.")
     parser.add_argument("--baseline-dir", type=Path, default=RESULTS_DIR,
                         help="Directory of saved run_ragas result CSVs (read-only).")
-    parser.add_argument("--out-dir", type=Path, default=REPORTS_DIR,
-                        help="Where the calibration CSVs + report are written.")
+    parser.add_argument("--out-dir", type=Path, default=RUN_OUTPUT_DIR,
+                        help="Where the calibration CSVs + report are written. Defaults to a "
+                             "gitignored run directory; promote artifacts worth keeping by hand.")
     parser.add_argument("--tag", default="", help="Optional suffix for output filenames.")
     parser.add_argument("--upload-langfuse", action="store_true",
                         help="Opt in to Langfuse upload. Off by default; calibration is local.")

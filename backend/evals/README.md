@@ -123,12 +123,19 @@ python -m evals.calibrate \
     --judges kimi,openai --repeats 3
 
 # rebuild the report from saved scores, no API calls
-python -m evals.calibrate --replay evals/reports/judge_calibration_observations_*.csv
+python -m evals.calibrate --replay evals/reports/sixrow_observations.csv
 ```
 
 Judge backends live in `evals/judges.py`. `kimi` (Moonshot K2.6, temperature locked at 0.6 by the provider) remains the default everywhere; `openai` (`gpt-4o-mini`, `temperature=0`, `seed=0`) is selectable for calibration and uses the `OPENAI_API_KEY` the project already requires. Selection is always an explicit CLI argument — no env var can flip the judge mid-run, and `run_ragas` still builds the Kimi judge directly.
 
-Outputs land in `evals/reports/`: a per-observation CSV (every individual score), an aggregates CSV (mean / stdev / min / max / range), and a Markdown report. All three carry identifiers and numbers only — no questions, answers, retrieved context, or credentials. Hand-graded expectations used for the judge-vs-human comparison live in `calibration_labels.json`.
+Each run writes three files to `--out-dir`: a per-observation CSV (every individual score), an aggregates CSV (mean / stdev / min / max / range), and a Markdown report. All three carry identifiers and numbers only — no questions, answers, retrieved context, or credentials.
+
+`--out-dir` defaults to `evals/results/calibration/`, which is gitignored: **a run produces disposable artifacts.** Only two things are committed under `evals/reports/`, promoted by hand:
+
+- `sixrow_observations.csv` — the raw scores from the 2026-07-20 six-row experiment. Kept because it is the one artifact that *cannot* be regenerated: the judge calls cost money and are not deterministic.
+- `sixrow_calibration.md` — the decision document those scores support.
+
+The aggregates CSV is deliberately not committed; `--replay` reproduces it byte-identically from the observations for free. Hand-graded expectations used for the judge-vs-human comparison live in `calibration_labels.json` (configuration, not output).
 
 Langfuse upload is opt-in via `--upload-langfuse`; calibration is local by default.
 

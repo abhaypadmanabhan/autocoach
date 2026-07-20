@@ -131,14 +131,21 @@ def make_evaluator(script):
 # --------------------------------------------------------------------------
 
 
-def test_score_once_uses_saved_rows_and_never_retrieves(rows, monkeypatch):
-    """Offline scoring must not import or call the retrieval/generation path."""
+def test_score_once_opens_no_network_connection(rows, monkeypatch):
+    """Offline scoring must not touch the network at all.
 
-    def explode(*_args, **_kwargs):  # pragma: no cover - only runs on failure
-        raise AssertionError("live retrieval/generation must not be called")
+    Patching ``evals.run_ragas.live_retrieve`` would prove nothing here —
+    ``calibrate`` never imports ``run_ragas``, so such a patch can never fire.
+    Blocking the socket layer is the claim actually worth making: no Qdrant, no
+    Supabase, no answer generation, no judge call, by construction.
+    """
+    import socket
 
-    monkeypatch.setattr("evals.run_ragas.live_retrieve", explode, raising=False)
-    monkeypatch.setattr("evals.run_ragas.live_answer", explode, raising=False)
+    def blocked(*_args, **_kwargs):  # pragma: no cover - only runs on failure
+        raise AssertionError("offline scoring opened a network connection")
+
+    monkeypatch.setattr(socket, "socket", blocked)
+    monkeypatch.setattr(socket, "create_connection", blocked)
 
     evaluator = make_evaluator({"kimi": [{"faithfulness": 1.0, "answer_relevancy": 0.9}]})
     observations = score_once(
@@ -147,6 +154,27 @@ def test_score_once_uses_saved_rows_and_never_retrieves(rows, monkeypatch):
 
     assert len(observations) == len(rows) * len(METRICS)
     assert {o.value for o in observations if o.metric == "faithfulness"} == {1.0}
+
+
+def test_full_experiment_and_artifacts_open_no_network_connection(rows, tmp_path, monkeypatch):
+    """The whole offline path — score, aggregate, write — stays off the network."""
+    import socket
+
+    def blocked(*_args, **_kwargs):  # pragma: no cover - only runs on failure
+        raise AssertionError("calibration opened a network connection")
+
+    monkeypatch.setattr(socket, "socket", blocked)
+    monkeypatch.setattr(socket, "create_connection", blocked)
+
+    stub = make_evaluator({"kimi": [{"faithfulness": 1.0, "answer_relevancy": 0.9}] * 3})
+    observations = run_experiment(
+        rows, judges=("kimi",), metrics=METRICS, repeats=3, evaluator=stub
+    )
+    aggregates = aggregate(observations)
+    write_observations_csv(observations, tmp_path / "obs.csv")
+    write_aggregates_csv(aggregates, tmp_path / "agg.csv")
+
+    assert len(observations) == len(rows) * len(METRICS) * 3
 
 
 def test_offline_dataset_carries_saved_question_answer_contexts_reference(rows):
@@ -376,6 +404,27 @@ def test_shipped_human_labels_file_is_valid():
     for key in ("product_analytics:20", "ddia:3", "attention:7"):
         assert labels[key]["faithfulness_human"] == 1.0
         assert labels[key]["rationale"]
+
+
+def test_shipped_labels_document_their_own_limitations():
+    """The label set is all-1.000, which makes agreement figures easy to over-read."""
+    raw = json.loads(calibrate.HUMAN_LABELS_PATH.read_text())
+    limitations = " ".join(raw["known_limitations"]).lower()
+    assert "no negative examples" in limitations
+    assert "not a random sample" in limitations
+
+
+def test_agreement_section_warns_against_over_reading(baseline_dir):
+    rows = load_baseline_rows("ddia", [1], baseline_dir=baseline_dir)
+    aggregates = [Aggregate("ddia", 1, "kimi", "faithfulness", 3, 0.6, 0.2, 0.4, 1.0, 0.6)]
+    report = build_report(
+        observations=[], aggregates=aggregates, rows=rows, judges=("kimi",),
+        metrics=("faithfulness",), repeats=3,
+        labels={"ddia:1": {"doc": "ddia", "row_index": 1, "faithfulness_human": 1.0}},
+        generated_at="20260720T000000Z",
+    )
+    assert "no negative examples" in report
+    assert "leniency rather than accuracy" in report
 
 
 def test_estimate_llm_calls_matches_ragas_call_shape():

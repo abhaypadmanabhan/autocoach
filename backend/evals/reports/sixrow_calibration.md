@@ -1,6 +1,6 @@
 # Ragas judge calibration
 
-Generated 20260720T072027Z · 3 replicates/judge · 6 rows · judges: kimi, openai
+Generated 20260720T074243Z · 3 replicates/judge · 6 rows · judges: kimi, openai
 
 Retrieval and answer generation are held fixed — every score below was produced by replaying already-saved rows, so all observed variation is judge variation.
 
@@ -91,6 +91,8 @@ Retrieval and answer generation are held fixed — every score below was produce
 ## Agreement with manual inspection (faithfulness)
 
 Every calibration row was hand-checked: each answer's claims are all supported by its retrieved contexts, so the human expectation is 1.000. See `calibration_labels.json`.
+
+**Read this table narrowly.** With every label at 1.000 the set contains no negative examples, so a judge that called everything faithful would score a perfect 0.000 error. These numbers bound each judge's false-negative rate; they do not establish which judge is more correct, and a lower error here may reflect leniency rather than accuracy.
 
 | judge | rows labelled | mean abs error | max abs error |
 |---|---|---|---|
