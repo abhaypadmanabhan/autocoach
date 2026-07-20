@@ -130,6 +130,8 @@ Judge backends live in `evals/judges.py`. `kimi` (Moonshot K2.6, temperature loc
 
 Each run writes three files to `--out-dir`: a per-observation CSV (every individual score), an aggregates CSV (mean / stdev / min / max / range), and a Markdown report. All three carry identifiers and numbers only — no questions, answers, retrieved context, or credentials.
 
+Balanced calibration cases in `calibration_cases.json` carry hashes for the source question and answer. A swapped-question case also hashes the neighboring question actually scored. Materialization refuses missing rows, drifted text, or an ambiguous mutation before any judge call. Threshold sweeps reuse one fixed observation set and are exploratory sensitivity analysis, not held-out validation or a metric gate.
+
 `--out-dir` defaults to `evals/results/calibration/`, which is gitignored: **a run produces disposable artifacts.** Only two things are committed under `evals/reports/`, promoted by hand:
 
 - `sixrow_observations.csv` — the raw scores from the 2026-07-20 six-row experiment. Kept because it is the one artifact that *cannot* be regenerated: the judge calls cost money and are not deterministic.
@@ -138,6 +140,38 @@ Each run writes three files to `--out-dir`: a per-observation CSV (every individ
 The aggregates CSV is deliberately not committed; `--replay` reproduces it byte-identically from the observations for free. Hand-graded expectations used for the judge-vs-human comparison live in `calibration_labels.json` (configuration, not output).
 
 Langfuse upload is opt-in via `--upload-langfuse`; calibration is local by default.
+
+## Balanced calibration cases
+
+The six-row label set above is all positive examples, so it can measure a judge's false-negative rate and nothing else — a judge that called every answer faithful would score perfectly against it. `calibration_cases.json` adds a balanced set that measures both error directions.
+
+A case is not a hand-written answer. It is a deterministic **mutation** of an answer the pipeline really produced, scored against the contexts that answer was really generated from — so the negatives are failure modes the system actually exhibits, and the label follows from what the mutation changed.
+
+```bash
+# structural validation + distribution, no baselines needed
+python -m evals.calibration_cases --summary
+
+# materialise every case from the local baselines and check hashes
+python -m evals.calibration_cases --validate
+
+# inspect one case locally (prints source-derived text — never redirect into a tracked file)
+python -m evals.calibration_cases --show 13
+
+# judge-vs-human agreement
+python -m evals.calibration_agreement --dry-run
+python -m evals.calibration_agreement --judges kimi,openai --repeats 3
+
+# rebuild the report from saved scores, no judge calls
+python -m evals.calibration_agreement --replay evals/reports/balanced_cases_observations.csv
+```
+
+**What is committed.** Only document and row identifiers, mutation instructions, expected labels, short original-wording rationales, and 16-character hashes of the source question and answer. No questions, answers or retrieved contexts — those derive from third-party PDFs. Mutation `text` params are invented claims, verified by test to appear in none of the contexts they are applied to.
+
+**Why the hashes.** Materialisation fails loudly when a source row is missing, or when its text no longer hashes to the committed value, so a case can never be silently scored against different inputs than the ones it was labelled against. Re-verify a case by hand before re-hashing it.
+
+**Labels.** `expected_faithfulness` is binary (`faithful` / `unfaithful`): faithful means every claim in the answer is supported by the retrieved contexts. No fractional ground truth is asserted — Ragas returns a fraction whose denominator is however many statements its own splitter produced, which is not a quantity any human labelled. `expected_quality` is separate and ordinal (`responsive` / `partially_responsive` / `non_responsive`) and says nothing about correctness: a confidently wrong answer is still responsive.
+
+Findings from the first run are in `reports/balanced_cases_agreement.md`, with the raw scores in `reports/balanced_cases_observations.csv`.
 
 ## Langfuse score upload
 
