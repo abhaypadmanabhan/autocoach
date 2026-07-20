@@ -347,7 +347,8 @@
       "rationale": "Answer is fully supported by its own contexts but addresses a different question than the one asked.",
       "question_sha": "232b62df8524cece",
       "answer_sha": "6174a3eca10963aa",
-      "question_from_row": 22
+      "question_from_row": 22,
+      "question_from_sha": "09a7979cd5c31a4a"
     },
     {
       "case_id": 23,
@@ -361,7 +362,8 @@
       "rationale": "Answer is fully supported by its own contexts but does not address the question posed.",
       "question_sha": "0d271084a23250a6",
       "answer_sha": "9a71f01d394307a4",
-      "question_from_row": 26
+      "question_from_row": 26,
+      "question_from_sha": "34f3d7363d7053f8"
     },
     {
       "case_id": 24,

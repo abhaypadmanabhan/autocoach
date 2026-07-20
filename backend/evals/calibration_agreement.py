@@ -76,7 +76,7 @@ _AGREEMENT_COLUMNS = (
     "true_positive", "false_negative", "true_negative", "false_positive",
     "positive_recall", "negative_recall", "false_positive_rate",
     "false_negative_rate", "balanced_accuracy",
-    "mean_range", "max_range", "missing_score_rate",
+    "insufficient_data", "mean_range", "max_range", "missing_score_rate",
 )
 
 
@@ -91,6 +91,7 @@ class ConfusionMatrix:
     false_negative: int
     true_negative: int
     false_positive: int
+    insufficient_data: int = 0
 
     @property
     def positives(self) -> int:
@@ -127,7 +128,9 @@ class ConfusionMatrix:
             return None
         return (self.positive_recall + self.negative_recall) / 2
 
-    def as_row(self, *, mean_range: float, max_range: float, missing: float) -> dict[str, Any]:
+    def as_row(
+        self, *, mean_range: float, max_range: float, missing: Optional[float]
+    ) -> dict[str, Any]:
         def fmt(value: Optional[float]) -> str:
             return "" if value is None else f"{value:.4f}"
 
@@ -146,9 +149,10 @@ class ConfusionMatrix:
             "false_positive_rate": fmt(self.false_positive_rate),
             "false_negative_rate": fmt(self.false_negative_rate),
             "balanced_accuracy": fmt(self.balanced_accuracy),
+            "insufficient_data": self.insufficient_data,
             "mean_range": f"{mean_range:.4f}",
             "max_range": f"{max_range:.4f}",
-            "missing_score_rate": f"{missing:.4f}",
+            "missing_score_rate": fmt(missing),
         }
 
 
@@ -210,7 +214,7 @@ def run_cases(
 
 def confusion(
     aggregates: Sequence[Aggregate],
-    cases_by_id: dict[int, Any],
+    cases_by_key: dict[tuple[str, int], Any],
     *,
     judge: str,
     metric: str,
@@ -220,19 +224,33 @@ def confusion(
     """Confusion matrix from per-case mean scores against human labels.
 
     The per-case *mean* across replicates is used rather than a single draw, so
-    one unlucky replicate cannot decide a cell. Cells with no usable score at
-    all are excluded here and counted separately as missing.
+    one unlucky replicate cannot decide a cell. Cases with fewer than two usable
+    scores are excluded and counted as ``insufficient_data``; missing attempts
+    are reported separately by :func:`missing_score_rate`.
     """
     classifier = _CLASSIFIERS[metric]
-    tp = fn = tn = fp = 0
+    relevant: dict[tuple[str, int], Aggregate] = {}
     for agg in aggregates:
         if agg.judge != judge or agg.metric != metric or agg.n == 0:
             continue
-        case = cases_by_id.get(agg.row_index)
-        if case is None:
-            continue
+        key = (agg.doc, agg.row_index)
+        if key not in cases_by_key:
+            raise CalibrationError(
+                f"observation {agg.doc}:{agg.row_index} has no calibration case; "
+                "refusing ambiguous source-row attribution."
+            )
+        if key in relevant:
+            raise CalibrationError(f"duplicate aggregate for {agg.doc}:{agg.row_index}.")
+        relevant[key] = agg
+
+    tp = fn = tn = fp = insufficient = 0
+    for key, case in cases_by_key.items():
         expected = classifier(case) if metric == "faithfulness" else classifier(case, strict=strict)
         if expected is None:
+            continue
+        agg = relevant.get(key)
+        if agg is None or agg.n < 2:
+            insufficient += 1
             continue
         predicted = agg.mean >= threshold
         if expected and predicted:
@@ -246,16 +264,17 @@ def confusion(
     return ConfusionMatrix(
         judge=judge, metric=metric, threshold=threshold,
         true_positive=tp, false_negative=fn, true_negative=tn, false_positive=fp,
+        insufficient_data=insufficient,
     )
 
 
 def missing_score_rate(
     observations: Iterable[Observation], *, judge: str, metric: str
-) -> float:
+) -> Optional[float]:
     """Share of scoring attempts that produced no usable number."""
     relevant = [o for o in observations if o.judge == judge and o.metric == metric]
     if not relevant:
-        return 0.0
+        return None
     return sum(1 for o in relevant if o.value is None) / len(relevant)
 
 
@@ -273,7 +292,7 @@ def spread(aggregates: Sequence[Aggregate], *, judge: str, metric: str) -> tuple
 def build_agreement_rows(
     observations: Sequence[Observation],
     aggregates: Sequence[Aggregate],
-    cases_by_id: dict[int, Any],
+    cases_by_key: dict[tuple[str, int], Any],
     *,
     judges: Sequence[str],
     metrics: Sequence[str],
@@ -286,7 +305,7 @@ def build_agreement_rows(
             missing = missing_score_rate(observations, judge=judge, metric=metric)
             for threshold in thresholds:
                 matrix = confusion(
-                    aggregates, cases_by_id, judge=judge, metric=metric, threshold=threshold
+                    aggregates, cases_by_key, judge=judge, metric=metric, threshold=threshold
                 )
                 rows.append(
                     matrix.as_row(mean_range=mean_range, max_range=max_range, missing=missing)
@@ -367,6 +386,8 @@ def build_report(
     lines.append("")
     lines.append("Balanced accuracy of 0.500 is chance. A judge with a high false-positive "
                  "rate is lenient: it waves through answers a human rejected.")
+    lines.append("Cells with fewer than two usable judge observations are excluded as "
+                 "insufficient data rather than treated as stable classifications.")
     lines.append("")
 
     lines.append("## Stability and coverage")
@@ -391,6 +412,8 @@ def build_report(
     lines.append("")
     lines.append("Binary human labels versus a continuous score need a cutoff. If the verdict "
                  "flips across this sweep, the headline number is an artefact of the cutoff.")
+    lines.append("Every threshold reuses the same fixed observations. This is exploratory "
+                 "sensitivity analysis, not held-out validation.")
     lines.append("")
     lines.append("| metric | judge | threshold | pos recall | neg recall | balanced acc |")
     lines.append("|---|---|---|---|---|---|")
@@ -424,17 +447,42 @@ def build_report(
             lines.append(f"| {metric} | `{judge}` | {threshold} | {accuracy:.3f} |")
         lines.append("")
 
+    lines.append("## Methodological limitations")
+    lines.append("")
+    lines.append(f"This is a small sample ({len(cases)} cases), selected to cover known failure "
+                 "modes rather than sampled to estimate production prevalence. Confidence "
+                 "intervals would therefore overstate what the set establishes.")
+    lines.append("")
+    lines.append("The best cutoff has threshold selection bias because it was selected and "
+                 "measured on these same observations; it is exploratory and must not be read "
+                 "as held-out validation or a deployment threshold.")
+    lines.append("")
+    lines.append("Faithfulness has a relational inversion blind spot: a metric that decomposes "
+                 "an answer into independently supported statements can miss a reversed causal "
+                 "relationship even when both entities or events appear in the context.")
+    lines.append("")
+    lines.append("Answer relevancy measures responsiveness rather than correctness or "
+                 "faithfulness. A topical but fabricated answer can score highly, so its label "
+                 "and confusion matrix stay separate from factual support.")
+    lines.append("")
+    lines.append("Judge limitations and metric limitations are different. Judge limitations "
+                 "include model-specific leniency and run-to-run variation; metric limitations "
+                 "include the task definition, statement decomposition, and what evidence the "
+                 "score is structurally able to represent. Agreement between judges does not "
+                 "remove a shared metric limitation.")
+    lines.append("")
+
     lines.append("## Per-case detail")
     lines.append("")
     lines.append("| case | doc:row | mutation | expected faith | expected quality | "
                  + " | ".join(f"{m} ({j})" for m in metrics for j in judges) + " |")
     lines.append("|---|---|---|---|---|" + "---|" * (len(metrics) * len(judges)))
-    by_key = {(a.row_index, a.judge, a.metric): a for a in aggregates}
+    by_key = {(a.doc, a.row_index, a.judge, a.metric): a for a in aggregates}
     for case in sorted(cases, key=lambda c: c.case_id):
         cells = []
         for metric in metrics:
             for judge in judges:
-                agg = by_key.get((case.case_id, judge, metric))
+                agg = by_key.get((case.doc, case.case_id, judge, metric))
                 cells.append("n/a" if agg is None or agg.n == 0 else f"{agg.mean:.3f}")
         lines.append(
             f"| {case.case_id} | `{case.doc}:{case.source_row}` | {case.mutation} | "
@@ -514,9 +562,9 @@ def main(
                 materialised, judges=judges, repeats=repeats, evaluator=evaluator
             )
         aggregates = aggregate(observations)
-        cases_by_id = {c.case_id: c for c in cases}
+        cases_by_key = {(c.doc, c.case_id): c for c in cases}
         agreement_rows = build_agreement_rows(
-            observations, aggregates, cases_by_id,
+            observations, aggregates, cases_by_key,
             judges=judges, metrics=AGREEMENT_METRICS, thresholds=THRESHOLD_SWEEP,
         )
 

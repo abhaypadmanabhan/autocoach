@@ -24,6 +24,8 @@ Positive class: `faithful` for faithfulness, `responsive` for answer relevancy. 
 
 Balanced accuracy of 0.500 is chance. A judge with a high false-positive rate is lenient: it waves through answers a human rejected.
 
+Cells with fewer than two usable judge observations are excluded as insufficient data rather than treated as stable classifications. No cell in this run was insufficient.
+
 ## Stability and coverage
 
 | metric | judge | replicates/row | mean range | max range | missing-score rate |
@@ -36,6 +38,8 @@ Balanced accuracy of 0.500 is chance. A judge with a high false-positive rate is
 ## Threshold sensitivity
 
 Binary human labels versus a continuous score need a cutoff. If the verdict flips across this sweep, the headline number is an artefact of the cutoff.
+
+Every threshold below reuses the same fixed observations. This is exploratory sensitivity analysis, not held-out validation.
 
 | metric | judge | threshold | pos recall | neg recall | balanced acc |
 |---|---|---|---|---|---|
@@ -82,6 +86,18 @@ Chosen by looking at these same cases, so it is an optimistic estimate — a thr
 | answer_relevancy | `openai` | 0.3 | 1.000 |
 | faithfulness | `kimi` | 0.9 | 0.875 |
 | faithfulness | `openai` | 0.9 | 0.833 |
+
+## Methodological limitations
+
+This is a small sample (24 cases), selected to cover known failure modes rather than sampled to estimate their prevalence in production. Confidence intervals would therefore overstate what the set establishes.
+
+The best cutoff has threshold selection bias because it was selected and measured on these same observations. It is exploratory and must not be read as held-out validation or a deployment threshold.
+
+Faithfulness has a relational inversion blind spot in this experiment. Both reverse-causal cases scored 1.000 from both judges: statement decomposition verified the component facts independently but missed that the relationship between them had been reversed. This is a metric limitation in what the scoring construction represents, not evidence that the reversed claims are faithful.
+
+Answer relevancy measures responsiveness rather than correctness or faithfulness. The fabricated answer remained topical and scored 0.757–0.969 for relevancy while scoring 0.000 for faithfulness, so the two labels and confusion matrices must remain separate.
+
+Judge limitations and metric limitations are different. Judge limitations include model-specific leniency and run-to-run variation; metric limitations include the task definition, statement decomposition, and what evidence the score is structurally able to represent. Agreement between the Kimi and OpenAI judges does not remove a limitation shared by the metric construction.
 
 ## Per-case detail
 

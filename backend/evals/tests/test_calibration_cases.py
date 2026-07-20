@@ -111,8 +111,21 @@ def test_shipped_set_contains_both_positive_and_negative_faithfulness():
 
 def test_shipped_set_is_balanced():
     counts = distribution(load_cases())["faithfulness"]
-    smaller, larger = sorted((counts[FAITHFUL], counts[UNFAITHFUL]))
-    assert smaller / larger >= 0.5, f"set is skewed: {counts}"
+    assert counts == {FAITHFUL: 12, UNFAITHFUL: 12}
+
+
+def test_mutation_polarities_match_their_semantic_contracts():
+    faithful_mutations = {"identity", "drop_sentence", "evade_request", "swap_question"}
+    unfaithful_mutations = {
+        "append_claim", "combine", "replace_number", "reverse_causal", "fabricate",
+    }
+    for case in load_cases():
+        if case.mutation in faithful_mutations:
+            assert case.expected_faithfulness == FAITHFUL, case.key
+        elif case.mutation in unfaithful_mutations:
+            assert case.expected_faithfulness == UNFAITHFUL, case.key
+        else:  # protects the contract when a mutation is added to the shipped set
+            pytest.fail(f"mutation {case.mutation!r} has no polarity contract")
 
 
 def test_shipped_set_covers_all_three_quality_labels():
@@ -267,6 +280,19 @@ def test_reverse_causal_without_a_connective_fails_loudly():
         apply_mutation(obj, "No causal connective here.")
 
 
+def test_reverse_causal_with_multiple_candidate_clauses_fails_loudly():
+    obj = cc.CalibrationCase(
+        case_id=1, doc="d", source_row=1, mutation="reverse_causal",
+        params={"connective": "because"}, expected_faithfulness=UNFAITHFUL,
+        expected_quality=RESPONSIVE, rationale="r", question_sha="x", answer_sha="y",
+    )
+    with pytest.raises(CaseError, match="ambiguous"):
+        apply_mutation(
+            obj,
+            "The system halts because a node failed. Recovery starts because a peer responds.",
+        )
+
+
 def test_drop_sentence_keeps_only_requested_indices():
     obj = cc.CalibrationCase(
         case_id=1, doc="d", source_row=1, mutation="drop_sentence",
@@ -289,6 +315,7 @@ def test_keep_index_out_of_range_fails_loudly():
 def test_swap_question_moves_the_question_and_keeps_the_answer(baseline_dir, tmp_path):
     path = _write_cases(tmp_path / "cases.json", [
         _case_dict(case_id=1, mutation="swap_question", question_from_row=2,
+                   question_from_sha=text_sha("What does beta follow?"),
                    expected_quality=NON_RESPONSIVE),
     ])
     (materialised,) = materialise_cases(load_cases(path), baseline_dir=baseline_dir)
@@ -326,9 +353,23 @@ def test_changed_baseline_answer_fails_loudly(baseline_dir, tmp_path):
 
 def test_missing_neighbour_question_row_fails_loudly(baseline_dir, tmp_path):
     path = _write_cases(tmp_path / "cases.json", [
-        _case_dict(case_id=1, mutation="swap_question", question_from_row=99),
+        _case_dict(case_id=1, mutation="swap_question", question_from_row=99,
+                   question_from_sha="0" * 16),
     ])
     with pytest.raises(CaseError):
+        materialise_cases(load_cases(path), baseline_dir=baseline_dir)
+
+
+def test_changed_neighbour_question_fails_loudly(baseline_dir, tmp_path):
+    path = _write_cases(tmp_path / "cases.json", [
+        _case_dict(
+            case_id=1,
+            mutation="swap_question",
+            question_from_row=2,
+            question_from_sha="0" * 16,
+        ),
+    ])
+    with pytest.raises(CaseError, match="swapped question .* changed"):
         materialise_cases(load_cases(path), baseline_dir=baseline_dir)
 
 
@@ -386,7 +427,7 @@ def test_committed_case_file_holds_no_source_text():
     allowed_case_keys = {
         "case_id", "doc", "source_row", "concept_label", "mutation", "params",
         "expected_faithfulness", "expected_quality", "rationale",
-        "question_sha", "answer_sha", "question_from_row",
+        "question_sha", "answer_sha", "question_from_row", "question_from_sha",
     }
     for case in raw["cases"]:
         assert set(case) <= allowed_case_keys, f"unexpected key in case {case['case_id']}"
@@ -396,6 +437,8 @@ def test_committed_case_file_holds_no_source_text():
         assert "retrieved_contexts" not in case
         assert len(case["question_sha"]) == 16
         assert len(case["answer_sha"]) == 16
+        if case.get("question_from_row") is not None:
+            assert len(case["question_from_sha"]) == 16
 
 
 def test_committed_case_file_does_not_contain_baseline_answers():

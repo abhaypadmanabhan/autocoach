@@ -130,6 +130,8 @@ Judge backends live in `evals/judges.py`. `kimi` (Moonshot K2.6, temperature loc
 
 Each run writes three files to `--out-dir`: a per-observation CSV (every individual score), an aggregates CSV (mean / stdev / min / max / range), and a Markdown report. All three carry identifiers and numbers only — no questions, answers, retrieved context, or credentials.
 
+Balanced calibration cases in `calibration_cases.json` carry hashes for the source question and answer. A swapped-question case also hashes the neighboring question actually scored. Materialization refuses missing rows, drifted text, or an ambiguous mutation before any judge call. Threshold sweeps reuse one fixed observation set and are exploratory sensitivity analysis, not held-out validation or a metric gate.
+
 `--out-dir` defaults to `evals/results/calibration/`, which is gitignored: **a run produces disposable artifacts.** Only two things are committed under `evals/reports/`, promoted by hand:
 
 - `sixrow_observations.csv` — the raw scores from the 2026-07-20 six-row experiment. Kept because it is the one artifact that *cannot* be regenerated: the judge calls cost money and are not deterministic.

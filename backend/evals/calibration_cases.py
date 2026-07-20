@@ -129,6 +129,7 @@ class CalibrationCase:
     answer_sha: str
     concept_label: str = ""
     question_from_row: Optional[int] = None
+    question_from_sha: Optional[str] = None
 
     @property
     def key(self) -> str:
@@ -206,19 +207,25 @@ def _mutate_reverse_causal(answer: str, params: dict, _ctx: dict) -> str:
     """
     connective = params.get("connective", "because")
     sentences = split_sentences(answer)
-    for index, sentence in enumerate(sentences):
-        marker = f" {connective} "
-        if marker not in sentence:
-            continue
-        head, _, tail = sentence.partition(marker)
-        tail = tail.rstrip()
-        trailing = ""
-        if tail and tail[-1] in ".!?":
-            tail, trailing = tail[:-1], tail[-1]
-        swapped = f"{_capitalise(tail)}{marker}{_decapitalise(head)}{trailing or '.'}"
-        sentences[index] = swapped
-        return " ".join(sentences)
-    raise CaseError(f"reverse_causal found no {connective!r} clause to reverse.")
+    marker = f" {connective} "
+    candidates = [index for index, sentence in enumerate(sentences) if marker in sentence]
+    if not candidates:
+        raise CaseError(f"reverse_causal found no {connective!r} clause to reverse.")
+    if len(candidates) != 1:
+        raise CaseError(
+            f"reverse_causal is ambiguous: found {len(candidates)} "
+            f"{connective!r} clauses; expected exactly one."
+        )
+
+    index = candidates[0]
+    head, _, tail = sentences[index].partition(marker)
+    tail = tail.rstrip()
+    trailing = ""
+    if tail and tail[-1] in ".!?":
+        tail, trailing = tail[:-1], tail[-1]
+    swapped = f"{_capitalise(tail)}{marker}{_decapitalise(head)}{trailing or '.'}"
+    sentences[index] = swapped
+    return " ".join(sentences)
 
 
 def _mutate_drop_sentence(answer: str, params: dict, _ctx: dict) -> str:
@@ -326,6 +333,10 @@ def load_cases(path: Path = CASES_PATH) -> list[CalibrationCase]:
             )
         if not entry.get("rationale", "").strip():
             raise CaseError(f"case {case_id}: rationale is required.")
+        if entry.get("question_from_row") is not None and not entry.get("question_from_sha"):
+            raise CaseError(
+                f"case {case_id}: question_from_sha is required when question_from_row is set."
+            )
 
         cases.append(
             CalibrationCase(
@@ -341,6 +352,7 @@ def load_cases(path: Path = CASES_PATH) -> list[CalibrationCase]:
                 answer_sha=entry["answer_sha"],
                 concept_label=entry.get("concept_label", ""),
                 question_from_row=entry.get("question_from_row"),
+                question_from_sha=entry.get("question_from_sha"),
             )
         )
     if not cases:
@@ -401,6 +413,15 @@ def materialise_cases(
                 raise CaseError(
                     f"case {case.case_id}: question_from_row "
                     f"{case.doc}:{case.question_from_row} not found."
+                )
+            actual_swapped_q = text_sha(neighbour.question)
+            if actual_swapped_q != case.question_from_sha:
+                raise CaseError(
+                    f"case {case.case_id}: swapped question for "
+                    f"{case.doc}:{case.question_from_row} changed "
+                    f"(committed {case.question_from_sha}, found {actual_swapped_q}). "
+                    "The responsiveness label was derived from the old question — "
+                    "re-verify it by hand before re-hashing."
                 )
             question = neighbour.question
 

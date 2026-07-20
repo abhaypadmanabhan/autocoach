@@ -92,7 +92,14 @@ def cases_path(tmp_path: Path) -> Path:
         case(1, "identity", FAITHFUL, RESPONSIVE),
         case(2, "append_claim", UNFAITHFUL, RESPONSIVE, {"text": "Invented."}),
         case(3, "drop_sentence", FAITHFUL, PARTIALLY_RESPONSIVE, {"keep": [0]}),
-        case(4, "swap_question", FAITHFUL, NON_RESPONSIVE, question_from_row=2),
+        case(
+            4,
+            "swap_question",
+            FAITHFUL,
+            NON_RESPONSIVE,
+            question_from_row=2,
+            question_from_sha=text_sha("What does beta follow?"),
+        ),
     ]}))
     return path
 
@@ -177,7 +184,7 @@ def test_perfect_and_worthless_judges_score_as_expected():
 
 
 def test_confusion_uses_mean_and_threshold(cases_path):
-    cases = {c.case_id: c for c in load_cases(cases_path)}
+    cases = {(c.doc, c.case_id): c for c in load_cases(cases_path)}
     aggregates = [
         Aggregate("ddia", 1, "kimi", "faithfulness", 3, 0.90, 0, 0.9, 0.9, 0.0),  # faithful  -> TP
         Aggregate("ddia", 2, "kimi", "faithfulness", 3, 0.80, 0, 0.8, 0.8, 0.0),  # unfaithful-> FP
@@ -189,7 +196,7 @@ def test_confusion_uses_mean_and_threshold(cases_path):
 
 
 def test_threshold_changes_the_verdict(cases_path):
-    cases = {c.case_id: c for c in load_cases(cases_path)}
+    cases = {(c.doc, c.case_id): c for c in load_cases(cases_path)}
     aggregates = [
         Aggregate("ddia", 1, "kimi", "faithfulness", 3, 0.6, 0, 0.6, 0.6, 0.0),
         Aggregate("ddia", 2, "kimi", "faithfulness", 3, 0.6, 0, 0.6, 0.6, 0.0),
@@ -200,8 +207,42 @@ def test_threshold_changes_the_verdict(cases_path):
     assert (high.false_negative, high.true_negative) == (1, 1)
 
 
+def test_score_exactly_at_threshold_is_positive(cases_path):
+    cases = {(c.doc, c.case_id): c for c in load_cases(cases_path)}
+    aggregates = [
+        Aggregate("ddia", 1, "kimi", "faithfulness", 2, 0.5, 0, 0.5, 0.5, 0.0),
+        Aggregate("ddia", 2, "kimi", "faithfulness", 2, 0.5, 0, 0.5, 0.5, 0.0),
+    ]
+    matrix = confusion(
+        aggregates, cases, judge="kimi", metric="faithfulness", threshold=0.5
+    )
+    assert (matrix.true_positive, matrix.false_positive) == (1, 1)
+
+
+def test_confusion_rejects_wrong_document_attribution(cases_path):
+    cases = {(c.doc, c.case_id): c for c in load_cases(cases_path)}
+    aggregates = [
+        Aggregate("attention", 1, "kimi", "faithfulness", 2, 1.0, 0, 1.0, 1.0, 0.0),
+    ]
+    with pytest.raises(ag.CalibrationError, match="no calibration case"):
+        confusion(aggregates, cases, judge="kimi", metric="faithfulness")
+
+
+def test_confusion_excludes_and_counts_insufficient_replicates(cases_path):
+    cases = {(c.doc, c.case_id): c for c in load_cases(cases_path)}
+    aggregates = [
+        Aggregate("ddia", 1, "kimi", "faithfulness", 1, 1.0, 0, 1.0, 1.0, 0.0),
+        Aggregate("ddia", 2, "kimi", "faithfulness", 2, 0.0, 0, 0.0, 0.0, 0.0),
+        Aggregate("ddia", 3, "kimi", "faithfulness", 2, 1.0, 0, 1.0, 1.0, 0.0),
+        Aggregate("ddia", 4, "kimi", "faithfulness", 2, 1.0, 0, 1.0, 1.0, 0.0),
+    ]
+    matrix = confusion(aggregates, cases, judge="kimi", metric="faithfulness")
+    assert matrix.insufficient_data == 1
+    assert (matrix.positives, matrix.negatives) == (2, 1)
+
+
 def test_partially_responsive_excluded_from_strict_relevancy_matrix(cases_path):
-    cases = {c.case_id: c for c in load_cases(cases_path)}
+    cases = {(c.doc, c.case_id): c for c in load_cases(cases_path)}
     aggregates = [
         Aggregate("ddia", i, "kimi", "answer_relevancy", 3, 0.9, 0, 0.9, 0.9, 0.0)
         for i in (1, 2, 3, 4)
@@ -242,6 +283,10 @@ def test_missing_score_rate():
     assert missing_score_rate(observations, judge="kimi", metric="answer_relevancy") == 0.0
 
 
+def test_missing_score_rate_is_undefined_without_attempts():
+    assert missing_score_rate([], judge="kimi", metric="faithfulness") is None
+
+
 def test_spread_reports_mean_and_max_range():
     aggregates = [
         Aggregate("d", 1, "kimi", "faithfulness", 3, 0.5, 0.1, 0.4, 0.8, 0.4),
@@ -275,7 +320,7 @@ def test_judge_failure_is_insufficient_not_stable():
 
 
 def test_cells_with_no_usable_score_are_excluded_from_confusion(cases_path):
-    cases = {c.case_id: c for c in load_cases(cases_path)}
+    cases = {(c.doc, c.case_id): c for c in load_cases(cases_path)}
     observations = [Observation("ddia", 1, "kimi", r, "faithfulness", None) for r in (1, 2, 3)]
     m = confusion(aggregate(observations), cases, judge="kimi", metric="faithfulness")
     assert (m.positives, m.negatives) == (0, 0)
@@ -417,7 +462,7 @@ def test_agreement_csv_has_all_required_columns(baseline_dir, cases_path, tmp_pa
     header = matrix.read_text().splitlines()[0].split(",")
     for column in ("positive_recall", "negative_recall", "false_positive_rate",
                    "false_negative_rate", "balanced_accuracy", "mean_range",
-                   "max_range", "missing_score_rate"):
+                   "max_range", "missing_score_rate", "insufficient_data"):
         assert column in header
 
 
@@ -428,7 +473,7 @@ def test_report_holds_no_case_text(baseline_dir, cases_path):
     observations = run_cases(materialised, judges=("kimi",), repeats=2, evaluator=stub)
     aggregates = aggregate(observations)
     rows = build_agreement_rows(
-        observations, aggregates, {c.case_id: c for c in cases},
+        observations, aggregates, {(c.doc, c.case_id): c for c in cases},
         judges=("kimi",), metrics=METRICS,
     )
     report = build_report(
@@ -444,3 +489,41 @@ def test_report_holds_no_case_text(baseline_dir, cases_path):
     assert "ddia:1" in report
     assert "faithfulness" in report
     assert "balanced acc" in report
+
+
+def test_report_states_required_methodological_limitations(baseline_dir, cases_path):
+    cases = load_cases(cases_path)
+    materialised = materialise_cases(cases, baseline_dir=baseline_dir)
+    stub = make_evaluator({
+        i: {"faithfulness": 1.0, "answer_relevancy": 0.9} for i in range(1, 5)
+    })
+    observations = run_cases(materialised, judges=("kimi",), repeats=2, evaluator=stub)
+    aggregates = aggregate(observations)
+    rows = build_agreement_rows(
+        observations,
+        aggregates,
+        {(c.doc, c.case_id): c for c in cases},
+        judges=("kimi",),
+        metrics=METRICS,
+    )
+    report = build_report(
+        observations=observations,
+        aggregates=aggregates,
+        agreement_rows=rows,
+        cases=cases,
+        judges=("kimi",),
+        metrics=METRICS,
+        repeats=2,
+        generated_at="20260720T000000Z",
+    ).lower()
+    for required in (
+        "small sample",
+        "threshold selection bias",
+        "relational inversion",
+        "responsiveness rather than correctness",
+        "judge limitation",
+        "metric limitation",
+        "exploratory",
+        "not held-out validation",
+    ):
+        assert required in report
