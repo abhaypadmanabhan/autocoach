@@ -104,10 +104,16 @@ class StubResult:
         return self._frame
 
 
-def make_evaluator(script):
+def make_evaluator(script, *, echo_questions=True, reverse_rows=False, per_row=None):
     """Build a stub evaluator. ``script`` maps judge -> list of per-call value dicts.
 
-    Records every dataset it is handed so tests can assert what the judge saw.
+    Mirrors ragas 0.2.15, whose ``to_pandas()`` concatenates the input dataset
+    with the score frame — so the ``question`` column comes back too. Emitting
+    it is what makes row/score misattribution observable at all.
+
+    ``per_row`` overrides the flat script with one value dict per row, so tests
+    can tell rows apart. ``reverse_rows`` simulates a judge returning results
+    out of order.
     """
     import pandas as pd
 
@@ -118,9 +124,17 @@ def make_evaluator(script):
         calls.append({"dataset": dataset, "metrics": list(metrics), "judge": judge})
         index = cursors.get(judge, 0)
         cursors[judge] = index + 1
-        values = script[judge][index]
-        n = len(dataset["question"])
-        return StubResult(pd.DataFrame({m: [values[m]] * n for m in metrics}))
+        questions = list(dataset["question"])
+        n = len(questions)
+        if per_row is not None:
+            data = {m: [per_row[i][m] for i in range(n)] for m in metrics}
+        else:
+            values = script[judge][index]
+            data = {m: [values[m]] * n for m in metrics}
+        frame = pd.DataFrame(data)
+        if echo_questions:
+            frame.insert(0, "question", questions[::-1] if reverse_rows else questions)
+        return StubResult(frame)
 
     evaluator.calls = calls  # type: ignore[attr-defined]
     return evaluator
@@ -131,41 +145,54 @@ def make_evaluator(script):
 # --------------------------------------------------------------------------
 
 
-def test_score_once_opens_no_network_connection(rows, monkeypatch):
+@pytest.fixture
+def network_watch(monkeypatch):
+    """Record socket use instead of raising on it.
+
+    Raising is not enough: ``app.services.retrieval.retrieve_relevant_chunks``
+    wraps its body in ``except Exception`` and returns ``[]``, so a guard that
+    raises inside it is swallowed and the test passes while the call really
+    went out. Recording moves the assertion into the test, where nothing can
+    catch it.
+    """
+    import socket
+
+    attempts: list[str] = []
+    real_socket = socket.socket
+
+    def watched_socket(*args, **kwargs):
+        attempts.append("socket.socket")
+        return real_socket(*args, **kwargs)
+
+    def watched_connect(*args, **kwargs):
+        attempts.append(f"create_connection{args[:1]}")
+        raise OSError("network disabled in test")
+
+    monkeypatch.setattr(socket, "socket", watched_socket)
+    monkeypatch.setattr(socket, "create_connection", watched_connect)
+    return attempts
+
+
+def test_score_once_opens_no_network_connection(rows, network_watch):
     """Offline scoring must not touch the network at all.
 
     Patching ``evals.run_ragas.live_retrieve`` would prove nothing here —
     ``calibrate`` never imports ``run_ragas``, so such a patch can never fire.
-    Blocking the socket layer is the claim actually worth making: no Qdrant, no
-    Supabase, no answer generation, no judge call, by construction.
+    Watching the socket layer is the claim worth making: no Qdrant, no
+    Supabase, no answer generation, no judge call.
     """
-    import socket
-
-    def blocked(*_args, **_kwargs):  # pragma: no cover - only runs on failure
-        raise AssertionError("offline scoring opened a network connection")
-
-    monkeypatch.setattr(socket, "socket", blocked)
-    monkeypatch.setattr(socket, "create_connection", blocked)
-
     evaluator = make_evaluator({"kimi": [{"faithfulness": 1.0, "answer_relevancy": 0.9}]})
     observations = score_once(
         rows, judge="kimi", metrics=METRICS, replicate=1, evaluator=evaluator
     )
 
+    assert network_watch == [], f"offline scoring hit the network: {network_watch}"
     assert len(observations) == len(rows) * len(METRICS)
     assert {o.value for o in observations if o.metric == "faithfulness"} == {1.0}
 
 
-def test_full_experiment_and_artifacts_open_no_network_connection(rows, tmp_path, monkeypatch):
+def test_full_experiment_and_artifacts_open_no_network_connection(rows, tmp_path, network_watch):
     """The whole offline path — score, aggregate, write — stays off the network."""
-    import socket
-
-    def blocked(*_args, **_kwargs):  # pragma: no cover - only runs on failure
-        raise AssertionError("calibration opened a network connection")
-
-    monkeypatch.setattr(socket, "socket", blocked)
-    monkeypatch.setattr(socket, "create_connection", blocked)
-
     stub = make_evaluator({"kimi": [{"faithfulness": 1.0, "answer_relevancy": 0.9}] * 3})
     observations = run_experiment(
         rows, judges=("kimi",), metrics=METRICS, repeats=3, evaluator=stub
@@ -174,7 +201,23 @@ def test_full_experiment_and_artifacts_open_no_network_connection(rows, tmp_path
     write_observations_csv(observations, tmp_path / "obs.csv")
     write_aggregates_csv(aggregates, tmp_path / "agg.csv")
 
+    assert network_watch == [], f"calibration hit the network: {network_watch}"
     assert len(observations) == len(rows) * len(METRICS) * 3
+
+
+def test_calibrate_source_never_imports_the_live_pipeline():
+    """Static guard: a swallowed exception can hide a runtime call, not an import."""
+    source = (Path(calibrate.EVAL_DIR) / "calibrate.py").read_text()
+    code = "\n".join(
+        line for line in source.splitlines()
+        if not line.lstrip().startswith("#")
+    )
+    for banned in (
+        "from evals.run_ragas import", "import evals.run_ragas",
+        "from app.services.retrieval", "from app.core.qdrant",
+        "from app.services.llm", "from app.core.supabase",
+    ):
+        assert banned not in code, f"calibrate.py imports the live pipeline: {banned}"
 
 
 def test_offline_dataset_carries_saved_question_answer_contexts_reference(rows):
@@ -194,10 +237,14 @@ def test_no_qdrant_or_retrieval_imported_by_module():
     Checked in a subprocess: asserting on this process's ``sys.modules`` would
     pass or fail depending on what the rest of the suite imported first.
     """
+    # Prefix matching, not a fixed allow-list: the claim covers Supabase and
+    # Langfuse too, and a hardcoded set silently stops covering whatever gets
+    # added later.
     probe = (
         "import sys; import evals.calibrate; "
-        "print(sorted(m for m in sys.modules "
-        "if m in {'app.core.qdrant', 'app.services.retrieval', 'ragas', 'qdrant_client'}))"
+        "banned=('qdrant_client','supabase','langfuse','ragas','datasets',"
+        "'app.core','app.services','app.observability','openai'); "
+        "print(sorted(m for m in sys.modules if m.startswith(banned)))"
     )
     result = subprocess.run(
         [sys.executable, "-c", probe],
@@ -208,6 +255,48 @@ def test_no_qdrant_or_retrieval_imported_by_module():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "[]", f"calibrate pulled in live deps: {result.stdout}"
+
+
+def test_scores_land_on_the_row_they_were_computed_for(rows):
+    """Scores are read positionally — prove they are attributed to the right row."""
+    per_row = [
+        {"faithfulness": 0.10, "answer_relevancy": 0.11},
+        {"faithfulness": 0.90, "answer_relevancy": 0.99},
+    ]
+    evaluator = make_evaluator({}, per_row=per_row)
+    observations = score_once(
+        rows, judge="kimi", metrics=METRICS, replicate=1, evaluator=evaluator
+    )
+
+    got = {(o.row_index, o.metric): o.value for o in observations}
+    assert got[(rows[0].row_index, "faithfulness")] == 0.10
+    assert got[(rows[1].row_index, "faithfulness")] == 0.90
+    assert got[(rows[0].row_index, "answer_relevancy")] == 0.11
+    assert got[(rows[1].row_index, "answer_relevancy")] == 0.99
+
+
+def test_out_of_order_judge_result_is_rejected_not_misattributed(rows):
+    """A reordered result frame must fail loudly, never silently swap scores."""
+    evaluator = make_evaluator(
+        {},
+        per_row=[
+            {"faithfulness": 0.10, "answer_relevancy": 0.11},
+            {"faithfulness": 0.90, "answer_relevancy": 0.99},
+        ],
+        reverse_rows=True,
+    )
+    with pytest.raises(CalibrationError, match="out of order"):
+        score_once(rows, judge="kimi", metrics=METRICS, replicate=1, evaluator=evaluator)
+
+
+def test_alignment_check_warns_when_it_cannot_verify(rows, caplog):
+    """No echoed question column: fall back to positional, but say so."""
+    evaluator = make_evaluator(
+        {"kimi": [{"faithfulness": 1.0, "answer_relevancy": 0.9}]}, echo_questions=False
+    )
+    with caplog.at_level("WARNING"):
+        score_once(rows, judge="kimi", metrics=METRICS, replicate=1, evaluator=evaluator)
+    assert "cannot be verified" in caplog.text
 
 
 def test_parse_contexts_accepts_repr_and_json():
@@ -260,6 +349,48 @@ def test_each_judge_receives_its_own_name(rows):
     )
     seen = [c["judge"] for c in evaluator.calls]  # type: ignore[attr-defined]
     assert seen == ["kimi", "kimi", "openai", "openai"]
+
+
+def test_cli_judges_flag_actually_drives_judge_selection(baseline_dir, tmp_path):
+    """End-to-end: --judges must reach the evaluator, not just be parsed."""
+    stub = make_evaluator({
+        "openai": [{"faithfulness": 1.0, "answer_relevancy": 0.9}] * 2,
+    })
+    exit_code = calibrate.main(evaluator=stub, argv=[
+        "--rows", "ddia:1", "--judges", "openai", "--repeats", "2",
+        "--metrics", "faithfulness,answer_relevancy",
+        "--baseline-dir", str(baseline_dir), "--out-dir", str(tmp_path / "out"),
+    ])
+
+    assert exit_code == 0
+    assert [c["judge"] for c in stub.calls] == ["openai", "openai"]  # type: ignore[attr-defined]
+
+
+def test_environment_variables_cannot_change_judge_selection(baseline_dir, tmp_path, monkeypatch):
+    """No env var may override an explicit --judges. Selection is CLI-only."""
+    for name in ("EVAL_JUDGE", "JUDGE", "RAGAS_JUDGE", "CALIBRATION_JUDGE", "EVAL_JUDGE_MODEL"):
+        monkeypatch.setenv(name, "openai")
+
+    stub = make_evaluator({"kimi": [{"faithfulness": 1.0, "answer_relevancy": 0.9}] * 2})
+    calibrate.main(evaluator=stub, argv=[
+        "--rows", "ddia:1", "--judges", "kimi", "--repeats", "2",
+        "--metrics", "faithfulness,answer_relevancy",
+        "--baseline-dir", str(baseline_dir), "--out-dir", str(tmp_path / "out"),
+    ])
+
+    assert [c["judge"] for c in stub.calls] == ["kimi", "kimi"]  # type: ignore[attr-defined]
+
+
+def test_judge_registry_ignores_environment(monkeypatch):
+    """build_judge_llm resolves purely from its argument."""
+    from evals import judges
+
+    monkeypatch.setenv("EVAL_JUDGE", "openai")
+    built: list[str] = []
+    monkeypatch.setitem(judges._JUDGE_BUILDERS, "kimi", lambda: built.append("kimi"))
+
+    judges.build_judge_llm("kimi")
+    assert built == ["kimi"]
 
 
 def test_unknown_judge_rejected():
@@ -385,6 +516,56 @@ def test_metric_stability_rollup():
     assert stats["max_range"] == pytest.approx(0.4)
     assert stats["mean_range"] == pytest.approx(0.2)
     assert stats["unstable_rows"] == 1
+    assert stats["min_n"] == 3
+
+
+def test_unmeasured_metric_is_not_reported_as_stable_or_gateable(baseline_dir):
+    """A metric that mostly failed to score must never read as STABLE.
+
+    Regression guard: range is 0.0 when a cell has one usable value, which is
+    indistinguishable from real stability unless coverage travels with it. The
+    dangerous outcome is a silently-unmeasurable metric being marked gate-safe.
+    """
+    rows = load_baseline_rows("ddia", [1], baseline_dir=baseline_dir)
+    aggregates = [Aggregate("ddia", 1, "kimi", "faithfulness", 1, 1.0, 0.0, 1.0, 1.0, 0.0)]
+
+    stats = metric_stability(aggregates)[("faithfulness", "kimi")]
+    assert stats["min_n"] == 1
+    assert calibrate._verdict(stats) == "INSUFFICIENT DATA"
+    assert calibrate._gate_eligible(stats)[0] is False
+
+    report = build_report(
+        observations=[], aggregates=aggregates, rows=rows, judges=("kimi",),
+        metrics=("faithfulness",), repeats=3, labels={},
+        generated_at="20260720T000000Z",
+    )
+    assert "INSUFFICIENT DATA" in report
+    assert "insufficient data" in report          # noise band
+    assert "only 1 replicate(s)" in report        # gate table
+
+
+def test_none_scores_do_not_masquerade_as_stability():
+    """Dropping a failed replicate must shrink n, not just narrow the range."""
+    observations = [
+        Observation("d", 1, "kimi", 1, "faithfulness", 1.0),
+        Observation("d", 1, "kimi", 2, "faithfulness", None),
+        Observation("d", 1, "kimi", 3, "faithfulness", None),
+    ]
+    stats = metric_stability(aggregate(observations))[("faithfulness", "kimi")]
+    assert stats["max_range"] == 0.0
+    assert stats["min_n"] == 1
+    assert calibrate._verdict(stats) == "INSUFFICIENT DATA"
+
+
+def test_infinite_score_is_discarded_not_averaged_in():
+    assert calibrate._metric_value(float("inf")) is None
+    assert calibrate._metric_value(float("nan")) is None
+    assert calibrate._metric_value(0.5) == 0.5
+
+
+def test_duplicate_row_selectors_are_deduped():
+    """Duplicates would double-count into one bucket and shrink apparent spread."""
+    assert parse_row_selector("ddia:3,ddia:3,attention:7") == (("ddia", 3), ("attention", 7))
 
 
 def test_human_agreement_scores_judges_against_manual_labels():
@@ -461,12 +642,26 @@ def test_baseline_csv_not_mutated_by_full_experiment(baseline_dir, tmp_path):
     assert _digest(source) == before
 
 
-def test_outputs_are_written_outside_the_baseline_dir(baseline_dir, tmp_path):
-    before = sorted(p.name for p in baseline_dir.iterdir())
-    write_observations_csv(
-        [Observation("ddia", 1, "kimi", 1, "faithfulness", 1.0)], tmp_path / "out" / "obs.csv"
-    )
-    assert sorted(p.name for p in baseline_dir.iterdir()) == before
+def test_baseline_files_survive_main_writing_into_the_baseline_dir(baseline_dir):
+    """The adversarial case: point --out-dir *at* the baseline directory.
+
+    Writing beside the source files is the only way a run could plausibly
+    clobber them, so digest every pre-existing file across a full main() run.
+    """
+    before = {p.name: _digest(p) for p in baseline_dir.iterdir()}
+    stub = make_evaluator({"kimi": [{"faithfulness": 1.0, "answer_relevancy": 0.9}] * 2})
+
+    exit_code = calibrate.main(evaluator=stub, argv=[
+        "--rows", "ddia:1,ddia:2", "--judges", "kimi", "--repeats", "2",
+        "--metrics", "faithfulness,answer_relevancy",
+        "--baseline-dir", str(baseline_dir), "--out-dir", str(baseline_dir),
+    ])
+
+    assert exit_code == 0
+    after = {p.name: _digest(p) for p in baseline_dir.iterdir()}
+    for name, digest in before.items():
+        assert name in after, f"run deleted baseline file {name}"
+        assert after[name] == digest, f"run modified baseline file {name}"
 
 
 # --------------------------------------------------------------------------

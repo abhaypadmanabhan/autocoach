@@ -186,7 +186,13 @@ def parse_row_selector(selector: str) -> tuple[tuple[str, int], ...]:
         rows.append((doc, index))
     if not rows:
         raise CalibrationError("No rows selected.")
-    return tuple(rows)
+    # Duplicates would be scored twice per replicate and land in the same
+    # aggregation bucket, inflating n and shrinking the apparent spread.
+    deduped = tuple(dict.fromkeys(rows))
+    if len(deduped) != len(rows):
+        dropped = len(rows) - len(deduped)
+        logger.warning("Dropped %d duplicate row selector(s).", dropped)
+    return deduped
 
 
 def _read_baseline_csv(path: Path) -> list[dict[str, str]]:
@@ -333,7 +339,45 @@ def _metric_value(raw: Any) -> Optional[float]:
         value = float(raw)
     except (TypeError, ValueError):
         return None
-    return None if math.isnan(value) else value
+    # NaN *and* inf are both unusable: inf would silently poison mean and range.
+    return value if math.isfinite(value) else None
+
+
+#: Columns ragas 0.2.15 carries through from the input dataset into
+#: ``to_pandas()`` (it concatenates the dataset frame with the score frame).
+#: Any one of them lets us prove a score landed on the row it was computed for.
+_ALIGNMENT_COLUMNS = ("user_input", "question")
+
+
+def _assert_row_alignment(frame: Any, rows: Sequence[BaselineRow], *, judge: str) -> None:
+    """Fail loudly if returned scores do not line up with the rows sent.
+
+    Scores are read positionally, so a reordered result frame would silently
+    attribute one row's score to another — the worst possible failure for a
+    calibration tool, because every number stays plausible. ragas echoes the
+    input question back, so verify against it rather than trusting order.
+    """
+    for column in _ALIGNMENT_COLUMNS:
+        if column not in getattr(frame, "columns", ()):
+            continue
+        returned = [str(value) for value in frame[column]]
+        expected = [row.question for row in rows]
+        if returned != expected:
+            mismatched = [
+                f"position {i}: sent {e[:40]!r}, got back {g[:40]!r}"
+                for i, (e, g) in enumerate(zip(expected, returned))
+                if e != g
+            ]
+            raise CalibrationError(
+                f"Judge {judge!r} returned rows out of order — scores would be "
+                f"attributed to the wrong rows. Mismatches: {'; '.join(mismatched[:3])}"
+            )
+        return
+    logger.warning(
+        "Result frame from judge %r carries none of %s — row alignment is "
+        "assumed positional and cannot be verified.",
+        judge, ", ".join(_ALIGNMENT_COLUMNS),
+    )
 
 
 def score_once(
@@ -357,6 +401,7 @@ def score_once(
         raise CalibrationError(
             f"Judge {judge!r} returned {len(frame)} rows for {len(rows)} inputs."
         )
+    _assert_row_alignment(frame, rows, judge=judge)
 
     observations: list[Observation] = []
     for position, row in enumerate(rows):
@@ -417,8 +462,10 @@ def aggregate(observations: Iterable[Observation]) -> list[Aggregate]:
 
     Uses the *sample* standard deviation (n-1), which is the right estimator for
     a handful of replicates drawn from the judge's output distribution. Cells
-    with a single usable value report stdev/range 0.0 — that is an absence of
-    evidence, not evidence of stability, so ``n`` is always reported alongside.
+    with a single usable value report stdev/range 0.0 — an absence of evidence,
+    not evidence of stability — so every consumer of these aggregates must read
+    ``n`` alongside the spread. :func:`metric_stability` carries ``min_n``
+    forward for exactly that reason.
     """
     buckets: dict[tuple[str, int, str, str], list[float]] = {}
     for obs in observations:
@@ -447,7 +494,13 @@ def aggregate(observations: Iterable[Observation]) -> list[Aggregate]:
 
 
 def metric_stability(aggregates: Sequence[Aggregate]) -> dict[tuple[str, str], dict[str, float]]:
-    """Per-(metric, judge) rollup: worst-case range and mean dispersion."""
+    """Per-(metric, judge) rollup: worst-case range, mean dispersion, and coverage.
+
+    ``min_n`` matters as much as the ranges. A cell that scored once — or not at
+    all — has a range of 0.0, which is indistinguishable from genuine stability
+    unless coverage is carried alongside. Without it, a metric that silently
+    stopped returning values reads as STABLE and gate-eligible.
+    """
     buckets: dict[tuple[str, str], list[Aggregate]] = {}
     for agg in aggregates:
         buckets.setdefault((agg.metric, agg.judge), []).append(agg)
@@ -458,6 +511,8 @@ def metric_stability(aggregates: Sequence[Aggregate]) -> dict[tuple[str, str], d
             "mean_range": statistics.fmean([c.value_range for c in cells]),
             "mean_stdev": statistics.fmean([c.stdev for c in cells]),
             "unstable_rows": sum(1 for c in cells if c.value_range > 0.0),
+            "min_n": min(c.n for c in cells),
+            "max_n": max(c.n for c in cells),
         }
         for key, cells in buckets.items()
     }
@@ -551,7 +606,14 @@ def write_aggregates_csv(aggregates: Sequence[Aggregate], path: Path) -> Path:
 GATE_MAX_RANGE = 0.05
 
 
+#: Replicates a cell needs before its spread means anything. Below this, a
+#: range of 0.0 is an absence of evidence, not evidence of stability.
+MIN_REPLICATES_FOR_VERDICT = 2
+
+
 def _verdict(stats: dict[str, float]) -> str:
+    if stats["min_n"] < MIN_REPLICATES_FOR_VERDICT:
+        return "INSUFFICIENT DATA"
     if stats["max_range"] == 0.0:
         return "STABLE"
     if stats["max_range"] <= GATE_MAX_RANGE:
@@ -559,6 +621,15 @@ def _verdict(stats: dict[str, float]) -> str:
     if stats["max_range"] <= 0.20:
         return "NOISY"
     return "UNSTABLE"
+
+
+def _gate_eligible(stats: dict[str, float]) -> tuple[bool, str]:
+    """Gate eligibility plus the reason, so the report never just says 'yes'."""
+    if stats["min_n"] < MIN_REPLICATES_FOR_VERDICT:
+        return False, f"no — only {int(stats['min_n'])} replicate(s) on some row"
+    if stats["max_range"] > GATE_MAX_RANGE:
+        return False, "no — diagnostic only"
+    return True, "yes"
 
 
 def build_report(
@@ -618,15 +689,17 @@ def build_report(
 
     lines.append("## Stability by metric and judge")
     lines.append("")
-    lines.append("| metric | judge | rows | rows that moved | max range | mean range | mean stdev | verdict |")
-    lines.append("|---|---|---|---|---|---|---|---|")
+    lines.append("| metric | judge | rows | replicates/row | rows that moved | max range | mean range | mean stdev | verdict |")
+    lines.append("|---|---|---|---|---|---|---|---|---|")
     for metric in metrics:
         for judge in judges:
             stats = stability.get((metric, judge))
             if not stats:
                 continue
+            n_span = (f"{int(stats['min_n'])}" if stats["min_n"] == stats["max_n"]
+                      else f"{int(stats['min_n'])}-{int(stats['max_n'])}")
             lines.append(
-                f"| {metric} | `{judge}` | {stats['rows']} | "
+                f"| {metric} | `{judge}` | {stats['rows']} | {n_span} | "
                 f"{stats['unstable_rows']}/{stats['rows']} | {stats['max_range']:.3f} | "
                 f"{stats['mean_range']:.3f} | {stats['mean_stdev']:.3f} | {_verdict(stats)} |"
             )
@@ -673,13 +746,18 @@ def build_report(
     lines.append("Largest range observed on identical input — a score change smaller than "
                  "this is not evidence of a regression.")
     lines.append("")
-    lines.append("| metric | judge | treat as noise below |")
-    lines.append("|---|---|---|")
+    lines.append("A band of +/-0.000 means no variance was seen at this replicate count; "
+                 "it is not proof that none exists.")
+    lines.append("")
+    lines.append("| metric | judge | replicates/row | treat as noise below |")
+    lines.append("|---|---|---|---|")
     for metric in metrics:
         for judge in judges:
             stats = stability.get((metric, judge))
             if stats:
-                lines.append(f"| {metric} | `{judge}` | ±{stats['max_range']:.3f} |")
+                band = ("insufficient data" if stats["min_n"] < MIN_REPLICATES_FOR_VERDICT
+                        else f"±{stats['max_range']:.3f}")
+                lines.append(f"| {metric} | `{judge}` | {int(stats['min_n'])} | {band} |")
     lines.append("")
 
     lines.append("## Gate recommendation")
@@ -699,8 +777,8 @@ def build_report(
         for judge in judges:
             stats = stability.get((metric, judge))
             if stats:
-                eligible = "yes" if stats["max_range"] <= GATE_MAX_RANGE else "no — diagnostic only"
-                lines.append(f"| {metric} | `{judge}` | {stats['max_range']:.3f} | {eligible} |")
+                _, reason = _gate_eligible(stats)
+                lines.append(f"| {metric} | `{judge}` | {stats['max_range']:.3f} | {reason} |")
     lines.append("")
     lines.append(f"Raw observations: {len(observations)} individual scores.")
     lines.append("")
@@ -710,6 +788,13 @@ def build_report(
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
+
+
+def _known_judge_names() -> tuple[str, ...]:
+    """Judge names the registry accepts. Lazy so --help works without env."""
+    from evals.judges import available_judges  # lazy
+
+    return available_judges()
 
 
 def estimate_llm_calls(
@@ -770,6 +855,17 @@ def main(
         if not judges:
             raise CalibrationError("No judges selected.")
 
+        unknown_judges = [j for j in judges if j not in _known_judge_names()]
+        if unknown_judges:
+            raise CalibrationError(
+                f"Unknown judge(s): {', '.join(unknown_judges)}. "
+                f"Available: {', '.join(_known_judge_names())}."
+            )
+        if not args.replay and args.repeats < 2:
+            raise CalibrationError(
+                f"--repeats must be >= 2 to measure variance, got {args.repeats}."
+            )
+
         if args.dry_run:
             calls = estimate_llm_calls(
                 rows=len(selection), judges=len(judges), repeats=args.repeats, metrics=metrics
@@ -791,7 +887,15 @@ def main(
             )
             judges = tuple(dict.fromkeys(o.judge for o in observations))
             metrics = tuple(dict.fromkeys(o.metric for o in observations))
-            repeats = max(o.replicate for o in observations)
+            per_judge = {
+                judge: max(o.replicate for o in observations if o.judge == judge)
+                for judge in judges
+            }
+            repeats = max(per_judge.values())
+            if len(set(per_judge.values())) > 1:
+                logger.warning(
+                    "Replicate counts differ between judges: %s", per_judge
+                )
             rows = load_selected_rows(selection, baseline_dir=args.baseline_dir)
             logger.info("Replaying %d observations from %s", len(observations), args.replay.name)
         else:

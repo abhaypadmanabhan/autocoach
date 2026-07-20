@@ -1,6 +1,6 @@
 # Ragas judge calibration
 
-Generated 20260720T074243Z · 3 replicates/judge · 6 rows · judges: kimi, openai
+Generated 20260720T074833Z · 3 replicates/judge · 6 rows · judges: kimi, openai
 
 Retrieval and answer generation are held fixed — every score below was produced by replaying already-saved rows, so all observed variation is judge variation.
 
@@ -24,16 +24,16 @@ Retrieval and answer generation are held fixed — every score below was produce
 
 ## Stability by metric and judge
 
-| metric | judge | rows | rows that moved | max range | mean range | mean stdev | verdict |
-|---|---|---|---|---|---|---|---|
-| faithfulness | `kimi` | 6 | 1/6 | 0.300 | 0.050 | 0.029 | UNSTABLE |
-| faithfulness | `openai` | 6 | 2/6 | 0.667 | 0.153 | 0.088 | UNSTABLE |
-| answer_relevancy | `kimi` | 6 | 6/6 | 0.037 | 0.016 | 0.009 | NEAR-STABLE |
-| answer_relevancy | `openai` | 6 | 4/6 | 0.055 | 0.010 | 0.005 | NOISY |
-| context_precision | `kimi` | 6 | 0/6 | 0.000 | 0.000 | 0.000 | STABLE |
-| context_precision | `openai` | 6 | 0/6 | 0.000 | 0.000 | 0.000 | STABLE |
-| context_recall | `kimi` | 6 | 0/6 | 0.000 | 0.000 | 0.000 | STABLE |
-| context_recall | `openai` | 6 | 0/6 | 0.000 | 0.000 | 0.000 | STABLE |
+| metric | judge | rows | replicates/row | rows that moved | max range | mean range | mean stdev | verdict |
+|---|---|---|---|---|---|---|---|---|
+| faithfulness | `kimi` | 6 | 3 | 1/6 | 0.300 | 0.050 | 0.029 | UNSTABLE |
+| faithfulness | `openai` | 6 | 3 | 2/6 | 0.667 | 0.153 | 0.088 | UNSTABLE |
+| answer_relevancy | `kimi` | 6 | 3 | 6/6 | 0.037 | 0.016 | 0.009 | NEAR-STABLE |
+| answer_relevancy | `openai` | 6 | 3 | 4/6 | 0.055 | 0.010 | 0.005 | NOISY |
+| context_precision | `kimi` | 6 | 3 | 0/6 | 0.000 | 0.000 | 0.000 | STABLE |
+| context_precision | `openai` | 6 | 3 | 0/6 | 0.000 | 0.000 | 0.000 | STABLE |
+| context_recall | `kimi` | 6 | 3 | 0/6 | 0.000 | 0.000 | 0.000 | STABLE |
+| context_recall | `openai` | 6 | 3 | 0/6 | 0.000 | 0.000 | 0.000 | STABLE |
 
 ## Per-row detail
 
@@ -103,16 +103,18 @@ Every calibration row was hand-checked: each answer's claims are all supported b
 
 Largest range observed on identical input — a score change smaller than this is not evidence of a regression.
 
-| metric | judge | treat as noise below |
-|---|---|---|
-| faithfulness | `kimi` | ±0.300 |
-| faithfulness | `openai` | ±0.667 |
-| answer_relevancy | `kimi` | ±0.037 |
-| answer_relevancy | `openai` | ±0.055 |
-| context_precision | `kimi` | ±0.000 |
-| context_precision | `openai` | ±0.000 |
-| context_recall | `kimi` | ±0.000 |
-| context_recall | `openai` | ±0.000 |
+A band of +/-0.000 means no variance was seen at this replicate count; it is not proof that none exists.
+
+| metric | judge | replicates/row | treat as noise below |
+|---|---|---|---|
+| faithfulness | `kimi` | 3 | ±0.300 |
+| faithfulness | `openai` | 3 | ±0.667 |
+| answer_relevancy | `kimi` | 3 | ±0.037 |
+| answer_relevancy | `openai` | 3 | ±0.055 |
+| context_precision | `kimi` | 3 | ±0.000 |
+| context_precision | `openai` | 3 | ±0.000 |
+| context_recall | `kimi` | 3 | ±0.000 |
+| context_recall | `openai` | 3 | ±0.000 |
 
 ## Gate recommendation
 
