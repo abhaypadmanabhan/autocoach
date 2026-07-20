@@ -20,3 +20,8 @@ tasks/design-handoff-prompt.md
 
 # Eval CSV outputs (regenerated per run)
 backend/evals/results/
+
+# Worktree scaffolding: symlinks to the main checkout's venvs. `venv/` above
+# only matches real directories, not the symlinks a worktree needs.
+.venv-evals
+backend/venv
