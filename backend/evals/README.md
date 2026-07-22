@@ -173,6 +173,32 @@ python -m evals.calibration_agreement --replay evals/reports/balanced_cases_obse
 
 Findings from the first run are in `reports/balanced_cases_agreement.md`, with the raw scores in `reports/balanced_cases_observations.csv`.
 
+## Relation-aware grounded correctness (experimental)
+
+Ragas `faithfulness` decomposes an answer into independently-supported statements and NLI-checks each against the contexts. That structure is blind to **relational** errors — a reversed causal direction, a fact attributed to the wrong entity, a flipped comparison, a swapped number — because every individual entity can still be "present" while the combined meaning is wrong. On this 24-case set, faithfulness at threshold 0.5 catches almost no negatives (see `reports/balanced_cases_agreement.md`).
+
+`relational_eval.py` + `relational_agreement.py` add an **experimental, diagnostic** evaluator that asks one judge, in a single structured call, whether the *complete meaning* of an answer is supported by the contexts. It is **not a gate**, it does **not** replace Ragas faithfulness, and it does **not** change the default judge.
+
+- **One structured call** per (case, judge, replicate). Input: question, generated answer, retrieved contexts. Output JSON: `verdict` (`supported` / `partially_supported` / `unsupported`), `unsupported_claims`, `contradictions`, `relational_errors`, `reasoning_summary` (a short audit note, not hidden chain-of-thought), `confidence`.
+- **Raw `openai` SDK transport** (no ragas/langchain) — runs in the app venv, not the `.venv-evals`. Judge selection is always explicit (`--judges kimi,openai`).
+- **Defensive parsing**: an unknown verdict, a non-JSON body, or a transport error becomes `insufficient_data` — never silently coerced to `supported`. Missing replicates are excluded from the confusion matrix and reported, not treated as classifications.
+- **Verdict → binary label**: `supported` → faithful; `partially_supported` / `unsupported` → unfaithful; `insufficient_data` → excluded (reported). Partial-support behaviour is also reported separately.
+- **Grounded correctness is kept separate from responsiveness.** The evaluator judges grounding only; a grounded but non-responsive answer stays grounded. Responsiveness lives in `expected_quality`, unchanged.
+
+```bash
+# plan + call estimate, no API
+python -m evals.relational_agreement --dry-run
+
+# score all 24 cases, both judges, 3 replicates, compared against retained Ragas obs
+python -m evals.relational_agreement --judges kimi,openai --repeats 3 \
+    --ragas-observations evals/reports/balanced_cases_observations.csv
+
+# rebuild the report from a saved records CSV, no judge calls
+python -m evals.relational_agreement --replay evals/results/relational/relational_observations_*.csv
+```
+
+Run from `backend/` with `KIMI_API_KEY` + `OPENAI_API_KEY` in the environment (or `backend/.env`). Raw per-call output (which may quote model claim text) is written to the gitignored `results/relational/*.jsonl` for local debugging only. Committed evidence — `reports/relational_grounded.md` and `reports/relational_grounded_observations.csv` — carries identifiers, labels, and numbers only, never questions, answers, or contexts.
+
 ## Langfuse score upload
 
 `maybe_upload_to_langfuse` pushes document-level means to a `ragas_eval_aggregate` trace and creates one `ragas_eval_row` trace per golden row when `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY`/`LANGFUSE_HOST` are set and valid. Row traces include question, document label, `concept_label`, generated answer, context count/chunk IDs when available, `retrieval_hit_at_k`, and row metric scores. They do not upload full retrieved chunk text by default.
