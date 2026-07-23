@@ -365,9 +365,73 @@ def verdict_counts(records: Sequence[RelationalRecord], *, judge: str) -> dict[s
     return counts
 
 
+def collapsed_verdict_counts(
+    records: Sequence[RelationalRecord], *, judge: str
+) -> dict[str, int]:
+    """Repeated-call verdicts collapsed to the binary comparison contract."""
+    counts = {"faithful": 0, "unfaithful": 0, "excluded": 0}
+    for record in records:
+        if record.judge != judge:
+            continue
+        if record.mapped_faithful is True:
+            counts["faithful"] += 1
+        elif record.mapped_faithful is False:
+            counts["unfaithful"] += 1
+        else:
+            counts["excluded"] += 1
+    return counts
+
+
 # --------------------------------------------------------------------------
 # Ragas comparison over the retained observations
 # --------------------------------------------------------------------------
+
+
+def require_exact_case_coverage(
+    observed: set[tuple[str, int]],
+    expected: set[tuple[str, int]],
+    *,
+    artifact: str,
+) -> None:
+    """Require exact ``(document, case_id)`` parity; never match on ID alone."""
+    if observed == expected:
+        return
+    missing = sorted(expected - observed)
+    unexpected = sorted(observed - expected)
+    raise CalibrationError(
+        f"{artifact} lacks exact composite-key parity with the calibration cases; "
+        f"missing={missing}, unexpected={unexpected}. "
+        "Attribution never falls back to case_id alone."
+    )
+
+
+def require_complete_replicate_grid(
+    records: Sequence[RelationalRecord],
+    cases_by_key: dict[tuple[str, int], Any],
+    *,
+    judges: Sequence[str],
+    repeats: int,
+) -> None:
+    """Require one record per case, judge, and replicate before reporting."""
+    expected = {
+        (doc, case_id, judge, replicate)
+        for doc, case_id in cases_by_key
+        for judge in judges
+        for replicate in range(1, repeats + 1)
+    }
+    observed_counts: dict[tuple[str, int, str, int], int] = {}
+    for record in records:
+        key = (record.doc, record.case_id, record.judge, record.replicate)
+        observed_counts[key] = observed_counts.get(key, 0) + 1
+    observed = set(observed_counts)
+    duplicates = sorted(key for key, count in observed_counts.items() if count != 1)
+    if observed == expected and not duplicates:
+        return
+    raise CalibrationError(
+        "relational observations do not form the required replicate grid; "
+        f"missing={sorted(expected - observed)}, "
+        f"unexpected={sorted(observed - expected)}, duplicates={duplicates}."
+    )
 
 
 def ragas_faithfulness_confusion(
@@ -379,22 +443,31 @@ def ragas_faithfulness_confusion(
 ) -> tuple[ConfusionMatrix, int, int]:
     """Reproduce the Ragas faithfulness confusion on the same cases.
 
-    Foreign observations (a ``(doc, case_id)`` with no local case) are filtered
-    out and counted rather than raising, so a subset of cases still compares. The
-    kept observations are aggregated and scored with the sibling harness's
-    :func:`confusion` at ``threshold``.
+    The comparison is refused unless the retained observations have exact
+    ``(document, case_id)`` parity with the local case registry. Attribution
+    never falls back to case ID alone and subsets are not presented as same-case
+    comparisons.
     """
     observations = [
         o for o in read_observations_csv(path)
         if o.metric == "faithfulness" and o.judge == judge
     ]
-    kept = [o for o in observations if (o.doc, o.row_index) in cases_by_key]
-    used = len({(o.doc, o.row_index) for o in kept})
-    skipped = len({(o.doc, o.row_index) for o in observations} - set(cases_by_key))
-    matrix = confusion(
-        aggregate(kept), cases_by_key, judge=judge, metric="faithfulness", threshold=threshold
+    observed_keys = {(o.doc, o.row_index) for o in observations}
+    expected_keys = set(cases_by_key)
+    require_exact_case_coverage(
+        observed_keys,
+        expected_keys,
+        artifact=f"Ragas faithfulness observations for {judge}",
     )
-    return matrix, used, skipped
+    used = len(observed_keys)
+    matrix = confusion(
+        aggregate(observations),
+        cases_by_key,
+        judge=judge,
+        metric="faithfulness",
+        threshold=threshold,
+    )
+    return matrix, used, 0
 
 
 # --------------------------------------------------------------------------
@@ -436,19 +509,39 @@ def read_records_csv(path: Path) -> list[RelationalRecord]:
     with path.open(newline="", encoding="utf-8") as handle:
         records = []
         for row in csv.DictReader(handle):
+            verdict = row["verdict"]
+            if verdict not in (*KNOWN_VERDICTS, INSUFFICIENT_DATA):
+                raise CalibrationError(
+                    f"{path.name} has unknown verdict {verdict!r} for "
+                    f"{row['doc']}:{row['case_id']}."
+                )
             mapped = row["mapped_faithful"]
+            mapped_faithful = None if mapped == "" else mapped == "1"
+            expected_mapping = verdict_to_faithful(verdict)
+            if mapped_faithful != expected_mapping:
+                raise CalibrationError(
+                    f"{path.name} mapping contradicts verdict for "
+                    f"{row['doc']}:{row['case_id']}: verdict={verdict!r}, "
+                    f"mapped_faithful={mapped!r}."
+                )
+            insufficient = row["insufficient"] == "1"
+            if insufficient != (verdict == INSUFFICIENT_DATA):
+                raise CalibrationError(
+                    f"{path.name} insufficient flag contradicts verdict for "
+                    f"{row['doc']}:{row['case_id']}."
+                )
             records.append(RelationalRecord(
                 doc=row["doc"],
                 case_id=int(row["case_id"]),
                 judge=row["judge"],
                 replicate=int(row["replicate"]),
-                verdict=row["verdict"],
-                mapped_faithful=None if mapped == "" else mapped == "1",
+                verdict=verdict,
+                mapped_faithful=mapped_faithful,
                 confidence=None if row["confidence"] == "" else float(row["confidence"]),
                 n_unsupported=int(row["n_unsupported"]),
                 n_contradiction=int(row["n_contradiction"]),
                 n_relational=int(row["n_relational"]),
-                insufficient=row["insufficient"] == "1",
+                insufficient=insufficient,
             ))
     return records
 
@@ -503,6 +596,7 @@ def build_metric_rows(
         agreement = verdict_agreement(records, judge=judge)
         calibration = confidence_calibration(records, cases_by_key, judge=judge)
         counts = verdict_counts(records, judge=judge)
+        collapsed = collapsed_verdict_counts(records, judge=judge)
         detections = {
             fam: detection_result(records, cases_by_key, judge=judge, mutations=muts, family=fam)
             for fam, muts in (
@@ -513,12 +607,16 @@ def build_metric_rows(
         }
         rows.append({
             "judge": judge,
-            "positives": matrix.positives,
-            "negatives": matrix.negatives,
-            "positive_recall": _fmt_float(matrix.positive_recall),
-            "negative_recall": _fmt_float(matrix.negative_recall),
-            "false_positive_rate": _fmt_float(matrix.false_positive_rate),
-            "false_negative_rate": _fmt_float(matrix.false_negative_rate),
+            "faithful_cases": matrix.positives,
+            "unfaithful_cases": matrix.negatives,
+            "true_faithful_accepted": matrix.true_positive,
+            "faithful_rejected": matrix.false_negative,
+            "true_unfaithful_detected": matrix.true_negative,
+            "unfaithful_missed": matrix.false_positive,
+            "faithful_acceptance_rate": _fmt_float(matrix.positive_recall),
+            "faithful_rejection_rate": _fmt_float(matrix.false_negative_rate),
+            "unfaithful_detection_rate": _fmt_float(matrix.negative_recall),
+            "unfaithful_miss_rate": _fmt_float(matrix.false_positive_rate),
             "balanced_accuracy": _fmt_float(matrix.balanced_accuracy),
             "insufficient_data": matrix.insufficient_data,
             "missing_result_rate": _fmt_float(missing_result_rate(records, judge=judge)),
@@ -533,6 +631,9 @@ def build_metric_rows(
             "n_partially_supported": counts.get(PARTIALLY_SUPPORTED, 0),
             "n_unsupported": counts.get("unsupported", 0),
             "n_insufficient": counts.get(INSUFFICIENT_DATA, 0),
+            "collapsed_faithful": collapsed["faithful"],
+            "collapsed_unfaithful": collapsed["unfaithful"],
+            "collapsed_excluded": collapsed["excluded"],
         })
     return rows
 
@@ -548,9 +649,16 @@ def build_report(
 ) -> str:
     """Markdown report. Identifiers, labels, and numbers only — never case text."""
     cases_by_key = {(c.doc, c.case_id): c for c in cases}
+    require_complete_replicate_grid(
+        records,
+        cases_by_key,
+        judges=judges,
+        repeats=repeats,
+    )
     counts = distribution(cases)
     metric_rows = build_metric_rows(records, cases_by_key, judges=judges)
     by_judge = {row["judge"]: row for row in metric_rows}
+    grouped = {judge: _group_by_case(records, judge) for judge in judges}
 
     lines: list[str] = []
     lines.append("# Relation-aware grounded correctness on balanced calibration cases")
@@ -558,11 +666,18 @@ def build_report(
     lines.append(f"Generated {generated_at} · {len(cases)} cases · {repeats} replicates/judge · "
                  f"judges: {', '.join(judges)}")
     lines.append("")
+    repeated_verdicts = len(cases) * repeats
+    lines.append(
+        f"Each judge produced {repeated_verdicts} repeated verdicts: {repeats} measurements "
+        f"of each of {len(cases)} cases, not {repeated_verdicts} independent benchmark examples."
+    )
+    lines.append("")
     lines.append("Experimental, diagnostic evaluator. It asks one judge, in a single structured "
                  "call, whether the COMPLETE MEANING of an answer is supported by the retrieved "
-                 "contexts — a question Ragas faithfulness cannot ask, because decomposing an "
-                 "answer into independently-supported statements is blind to reversed causality "
-                 "and other relational errors. No gate is added; Ragas faithfulness is unchanged.")
+                 "contexts. On this benchmark, Ragas faithfulness missed both tested causal "
+                 "inversions; statement-level decomposition can miss a wrong relationship even "
+                 "when component facts are supported. No gate is added; Ragas faithfulness is "
+                 "unchanged.")
     lines.append("")
     lines.append("Grounded correctness is reported separately from responsiveness. This evaluator "
                  "judges grounding only; a grounded but non-responsive answer is still grounded.")
@@ -575,26 +690,38 @@ def build_report(
         lines.append(f"- **{name}** — {rendered}")
     lines.append("")
 
-    lines.append("## Agreement with binary human labels")
+    lines.append("## Comparison with binary human labels")
     lines.append("")
     lines.append("Positive class: `faithful` (verdict `supported`). `partially_supported` and "
                  "`unsupported` both map to `unfaithful` per the label contract. Prediction = the "
                  "per-case majority verdict across replicates; cases with fewer than two usable "
                  "verdicts are excluded as insufficient data.")
     lines.append("")
-    lines.append("| judge | pos | neg | pos recall | neg recall | FPR | FNR | balanced acc | insufficient | missing-result rate |")
-    lines.append("|---|---|---|---|---|---|---|---|---|---|")
+    lines.append("| judge | faithful accepted | faithful rejected | unfaithful detected | unfaithful missed |")
+    lines.append("|---|---|---|---|---|")
     for judge in judges:
         r = by_judge[judge]
         lines.append(
-            f"| `{judge}` | {r['positives']} | {r['negatives']} | {r['positive_recall']} | "
-            f"{r['negative_recall']} | {r['false_positive_rate']} | {r['false_negative_rate']} | "
-            f"{r['balanced_accuracy']} | {r['insufficient_data']} | {r['missing_result_rate']} |"
+            f"| `{judge}` | {r['true_faithful_accepted']} | {r['faithful_rejected']} | "
+            f"{r['true_unfaithful_detected']} | {r['unfaithful_missed']} |"
         )
     lines.append("")
-    lines.append("Negative recall is the headline: it is the share of genuinely unfaithful answers "
-                 "the evaluator caught. A high false-positive rate means unfaithful answers were "
-                 "waved through.")
+    lines.append("| judge | faithful acceptance rate | faithful rejection rate | unfaithful detection rate | unfaithful miss rate | balanced accuracy | insufficient cases | missing-call rate |")
+    lines.append("|---|---|---|---|---|---|---|---|")
+    for judge in judges:
+        r = by_judge[judge]
+        lines.append(
+            f"| `{judge}` | {r['faithful_acceptance_rate']} | "
+            f"{r['faithful_rejection_rate']} | {r['unfaithful_detection_rate']} | "
+            f"{r['unfaithful_miss_rate']} | {r['balanced_accuracy']} | "
+            f"{r['insufficient_data']} | {r['missing_result_rate']} |"
+        )
+    lines.append("")
+    lines.append("Rate formulas: faithful acceptance = accepted faithful / all faithful; faithful "
+                 "rejection = rejected faithful / all faithful; unfaithful detection = detected "
+                 "unfaithful / all unfaithful; unfaithful miss = missed unfaithful / all "
+                 "unfaithful. Balanced accuracy is the mean of faithful acceptance and "
+                 "unfaithful detection.")
     lines.append("")
 
     lines.append("## Relational-failure detection")
@@ -613,10 +740,57 @@ def build_report(
                  "faithfulness on this set: same words, opposite direction of causation.")
     lines.append("")
 
-    lines.append("## Verdict distribution and partial support")
+    lines.append("## Family-level case counts")
     lines.append("")
-    lines.append("Partial support is reported separately: it maps to unfaithful, but a judge that "
-                 "leans on it behaves differently from one that commits to `unsupported`.")
+    lines.append("| family | cases | judge | predicted unfaithful | predicted faithful | excluded |")
+    lines.append("|---|---|---|---|---|---|")
+    families = sorted({case.mutation for case in cases})
+    for family in families:
+        family_cases = [case for case in cases if case.mutation == family]
+        for judge in judges:
+            predictions = [
+                case_prediction(grouped[judge].get((case.doc, case.case_id), []))
+                for case in family_cases
+            ]
+            lines.append(
+                f"| {family} | {len(family_cases)} | `{judge}` | "
+                f"{sum(value is False for value in predictions)} | "
+                f"{sum(value is True for value in predictions)} | "
+                f"{sum(value is None for value in predictions)} |"
+            )
+    lines.append("")
+
+    lines.append("## Faithful cases rejected")
+    lines.append("")
+    lines.append("These are identified from saved structured verdicts and case labels. The table "
+                 "locates the errors; it does not establish the judge's internal reason for them.")
+    lines.append("")
+    lines.append("| judge | case | doc | family | modal verdict |")
+    lines.append("|---|---|---|---|---|")
+    rejected_rows = 0
+    for judge in judges:
+        for case in sorted(cases, key=lambda item: item.case_id):
+            if case.expected_faithfulness != "faithful":
+                continue
+            case_records = grouped[judge].get((case.doc, case.case_id), [])
+            if case_prediction(case_records) is not False:
+                continue
+            verdict, _confidence = _modal_verdict(case_records)
+            lines.append(
+                f"| `{judge}` | {case.case_id} | `{case.doc}` | "
+                f"{case.mutation} | {verdict} |"
+            )
+            rejected_rows += 1
+    if not rejected_rows:
+        lines.append("| — | — | — | — | none |")
+    lines.append("")
+
+    lines.append("## Original verdicts and collapsed binary calls")
+    lines.append("")
+    lines.append("The first table preserves the original three-class verdicts over repeated calls. "
+                 "The second applies the binary mapping to those same calls. These call counts "
+                 "describe repeatability and verdict tendency; the confusion tables above use one "
+                 "majority prediction per case.")
     lines.append("")
     lines.append("| judge | supported | partially_supported | unsupported | insufficient_data |")
     lines.append("|---|---|---|---|---|")
@@ -624,6 +798,13 @@ def build_report(
         r = by_judge[judge]
         lines.append(f"| `{judge}` | {r['n_supported']} | {r['n_partially_supported']} | "
                      f"{r['n_unsupported']} | {r['n_insufficient']} |")
+    lines.append("")
+    lines.append("| judge | collapsed faithful | collapsed unfaithful | excluded |")
+    lines.append("|---|---|---|---|")
+    for judge in judges:
+        r = by_judge[judge]
+        lines.append(f"| `{judge}` | {r['collapsed_faithful']} | "
+                     f"{r['collapsed_unfaithful']} | {r['collapsed_excluded']} |")
     lines.append("")
 
     lines.append("## Stability and confidence calibration")
@@ -635,27 +816,38 @@ def build_report(
         lines.append(f"| `{judge}` | {r['verdict_agreement']} | {r['unanimous_cases']} | "
                      f"{r['mean_conf_correct']} | {r['mean_conf_incorrect']} |")
     lines.append("")
-    lines.append("Run-to-run verdict agreement is the modal-verdict share across replicates. A "
-                 "well-calibrated judge is more confident when it is right than when it is wrong.")
+    lines.append("Run-to-run verdict agreement is the modal-verdict share across replicates. It "
+                 "measures repeatability on these cases, not validity. A well-calibrated judge is "
+                 "more confident when it is right than when it is wrong.")
     lines.append("")
 
     if ragas:
         lines.append("## Comparison with retained Ragas faithfulness")
         lines.append("")
-        lines.append("Same 24 cases, same judges. Ragas faithfulness thresholded at 0.5 on its "
-                     "retained observations; relational evaluator uses the majority verdict.")
+        lines.append(f"Exact composite-key parity was required for all {len(cases)} "
+                     "`(document, case_id)` records for each judge; attribution never falls back "
+                     "to case ID alone. Source question/answer hashes are validated when the "
+                     "shared case registry is materialised. Ragas faithfulness is thresholded at "
+                     "0.5 on retained observations; the relational evaluator uses the per-case "
+                     "majority verdict.")
         lines.append("")
-        lines.append("| judge | metric | neg recall (catches unfaithful) | FPR (waves through) | balanced acc |")
-        lines.append("|---|---|---|---|---|")
+        lines.append("| judge | metric | faithful acceptance rate | faithful rejection rate | unfaithful detection rate | unfaithful miss rate | balanced accuracy |")
+        lines.append("|---|---|---|---|---|---|---|")
         for judge in judges:
             rel = build_confusion(records, cases_by_key, judge=judge)
-            lines.append(f"| `{judge}` | relational | {_pct(rel.negative_recall)} | "
-                         f"{_pct(rel.false_positive_rate)} | {_pct(rel.balanced_accuracy)} |")
+            lines.append(
+                f"| `{judge}` | relational | {_pct(rel.positive_recall)} | "
+                f"{_pct(rel.false_negative_rate)} | {_pct(rel.negative_recall)} | "
+                f"{_pct(rel.false_positive_rate)} | {_pct(rel.balanced_accuracy)} |"
+            )
             entry = ragas.get(judge)
             if entry is not None:
                 matrix, used, _skipped = entry
                 lines.append(f"| `{judge}` | ragas faithfulness ({used} cases) | "
-                             f"{_pct(matrix.negative_recall)} | {_pct(matrix.false_positive_rate)} | "
+                             f"{_pct(matrix.positive_recall)} | "
+                             f"{_pct(matrix.false_negative_rate)} | "
+                             f"{_pct(matrix.negative_recall)} | "
+                             f"{_pct(matrix.false_positive_rate)} | "
                              f"{_pct(matrix.balanced_accuracy)} |")
         lines.append("")
 
@@ -664,15 +856,17 @@ def build_report(
     for judge in judges:
         r = by_judge[judge]
         inv = r["relational_inversion_detected"]
-        lines.append(f"- `{judge}`: relational inversions detected {inv}; negative recall "
-                     f"{r['negative_recall']}; balanced accuracy {r['balanced_accuracy']}; "
+        lines.append(f"- `{judge}`: relational inversions detected {inv}; unfaithful detection "
+                     f"rate {r['unfaithful_detection_rate']}; balanced accuracy "
+                     f"{r['balanced_accuracy']}; "
                      f"run-to-run agreement {r['verdict_agreement']}; missing-result rate "
                      f"{r['missing_result_rate']}.")
     lines.append("")
     lines.append("Read against the questions this set exists to answer: does it detect both "
-                 "relational inversions; does it reduce false positives on unfaithful answers "
+                 "relational inversions; does it reduce misses on unfaithful answers "
                  "versus Ragas faithfulness; does it preserve recall on faithful answers; which "
-                 "judge is better; is it stable enough for diagnostic use; is it strong enough for "
+                 "judge performs better on this benchmark; is it repeatable enough for diagnostic "
+                 "use; is it strong enough for "
                  "a regression gate. The numeric answers are in the tables above.")
     lines.append("")
 
@@ -687,16 +881,18 @@ def build_report(
                  "accurate. Missing replicates are excluded from the confusion matrix, not "
                  "silently treated as a classification.")
     lines.append("")
-    lines.append("A single call is a single sample of a stochastic judge; the Kimi judge cannot be "
-                 "pinned below temperature 0.6, so its run-to-run verdict agreement is the ceiling "
-                 "on how reproducible any single verdict is. Grounded correctness stays separate "
+    lines.append(f"The {repeats} replicates are repeated measurements of the same "
+                 f"{len(cases)} cases, not {len(cases) * repeats} independent benchmark examples "
+                 "per judge. A single call is one sample of a "
+                 "stochastic judge; the Kimi judge cannot be pinned below temperature 0.6, so "
+                 "run-to-run verdict agreement describes repeatability only and does not validate "
+                 "the verdicts. Grounded correctness stays separate "
                  "from responsiveness; a topical but fabricated answer is caught here, an accurate "
                  "but non-responsive answer is not penalised for grounding.")
     lines.append("")
 
     lines.append("## Per-case detail")
     lines.append("")
-    grouped = {judge: _group_by_case(records, judge) for judge in judges}
     lines.append("| case | doc:row | mutation | expected faith | " + " | ".join(judges) + " |")
     lines.append("|---|---|---|---|" + "---|" * len(judges))
     for case in sorted(cases, key=lambda c: c.case_id):
@@ -709,7 +905,7 @@ def build_report(
             f"{case.expected_faithfulness} | " + " | ".join(cells) + " |"
         )
     lines.append("")
-    lines.append(f"Raw observations: {len(records)} individual verdicts.")
+    lines.append(f"Raw observations: {len(records)} repeated verdicts over {len(cases)} cases.")
     lines.append("")
     return "\n".join(lines)
 
@@ -785,16 +981,27 @@ def main(argv: Optional[list[str]] = None, *, evaluate: Optional[EvaluateFn] = N
             )
 
         cases_by_key = {(c.doc, c.case_id): c for c in cases}
+        require_complete_replicate_grid(
+            records,
+            cases_by_key,
+            judges=judges,
+            repeats=repeats,
+        )
         ragas: Optional[dict[str, tuple[ConfusionMatrix, int, int]]] = None
         if args.ragas_observations:
             ragas = {}
             for judge in judges:
-                try:
-                    ragas[judge] = ragas_faithfulness_confusion(
-                        args.ragas_observations, cases_by_key, judge=judge
-                    )
-                except (CalibrationError, KeyError) as exc:
-                    logger.warning("skipping Ragas comparison for %s: %s", judge, exc)
+                relational_keys = {
+                    record.key for record in records if record.judge == judge
+                }
+                require_exact_case_coverage(
+                    relational_keys,
+                    set(cases_by_key),
+                    artifact=f"relational observations for {judge}",
+                )
+                ragas[judge] = ragas_faithfulness_confusion(
+                    args.ragas_observations, cases_by_key, judge=judge
+                )
 
         obs_path = write_records_csv(records, args.out_dir / f"relational_observations{suffix}_{stamp}.csv")
         metric_rows = build_metric_rows(records, cases_by_key, judges=judges)

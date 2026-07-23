@@ -7,10 +7,9 @@ Status: approved design, implementing.
 ## Problem
 
 Ragas `faithfulness` decomposes an answer into independently-supported statements and
-NLI-checks each against the retrieved contexts. That structure is blind to **relational**
-errors: a reversed causal direction, a fact attributed to the wrong entity, a flipped
-comparison, or a swapped number can leave every individual entity/statement "present" in
-the context while the *combined meaning* is wrong. The committed balanced-case evidence
+NLI-checks each against the retrieved contexts. That structure can miss **relational**
+errors when component statements are supported but their combined relationship is wrong.
+The committed balanced-case evidence
 (`backend/evals/reports/balanced_cases_agreement.md`) documents exactly this: on the 24
 balanced cases, faithfulness at threshold 0.5 catches almost no negatives (kimi neg-recall
 0.083, openai 0.167; balanced accuracy ~0.54–0.58). The two `reverse_causal` cases are the
@@ -91,7 +90,10 @@ Mirrors `calibration_agreement.py`. Reuses `calibration_cases.materialise_cases`
   else `None` (insufficient). Prediction = majority of `mapped_faithful` across valid reps;
   tie → `False` (conservative). Keyed on `(doc, case_id)`.
 - `build_confusion(records, cases_by_key, *, judge) -> ConfusionMatrix` (positive = faithful),
-  giving positive/negative recall, FPR, FNR, balanced accuracy, insufficient_data count.
+  reported as faithful acceptance (accepted faithful / all faithful), faithful rejection
+  (rejected faithful / all faithful), unfaithful detection (detected unfaithful / all
+  unfaithful), unfaithful miss (missed unfaithful / all unfaithful), balanced accuracy, and
+  insufficient-data count.
 - Detection metrics by mutation family: relational-inversion (`reverse_causal`, expect 2),
   wrong-number (`replace_number`, expect 3), added-claim (`append_claim`+`combine`+`fabricate`,
   expect 7). For each, per judge: how many detected (majority prediction == unfaithful).
@@ -102,8 +104,10 @@ Mirrors `calibration_agreement.py`. Reuses `calibration_cases.materialise_cases`
 - `missing_result_rate(records, *, judge)`: share of calls returning insufficient_data.
 - Ragas comparison: `read_observations_csv(--ragas-observations)` → filter
   `metric=="faithfulness"` → `aggregate` → `confusion(..., metric="faithfulness",
-  threshold=0.5)`. Placed side-by-side with the relational confusion. Apples-to-apples on the
-  same 24 cases. `partially_supported` behaviour reported separately.
+  threshold=0.5)`. Placed side-by-side only after exact `(document, case_id)` parity is
+  established for all 24 cases; missing/foreign records abort the comparison and attribution
+  never falls back to case ID alone. Source hashes are validated through the shared case
+  registry during materialisation. `partially_supported` behaviour is reported separately.
 - Outputs (default `--out-dir = RESULTS_DIR/"relational"`, gitignored):
   - `relational_raw_{tag}_{stamp}.jsonl` — raw sanitized per-call output for debugging
     (contains model claim text; **local only, never committed**).
@@ -131,7 +135,8 @@ Committed after the live run (privacy-safe numbers/ids only): `reports/relationa
 
 Dry-run first (`--dry-run` prints plan + 24×J×R call estimate, no API). Live run: 24 cases ×
 2 judges × 3 reps = **144 single structured calls**. Estimated < $0.50 total (OpenAI ~$0.03;
-Kimi ~$0.18). Raw output saved to gitignored `results/relational/`.
+Kimi ~$0.18). The replicates are repeated measurements of 24 cases, not 72 independent
+benchmark examples per judge. Raw output saved to gitignored `results/relational/`.
 
 ## Verdict→label mapping validated against the real class balance
 
@@ -143,6 +148,6 @@ keeps evade_request and swap_question `supported`.
 
 ## What the report must answer
 
-Detect both relational inversions? Reduce false positives on unfaithful answers? Preserve
-recall on faithful answers? Which judge is better under this rubric? Stable enough for
-diagnostic use? Strong enough for a regression gate? What failure modes remain?
+Detect both relational inversions? Reduce the unfaithful miss rate? Preserve faithful
+acceptance? Which judge performs better on this benchmark? Repeatable enough for diagnostic
+use? Strong enough for a regression gate? What failure modes remain?

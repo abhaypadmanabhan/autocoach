@@ -1,11 +1,11 @@
 """Relation-aware grounded-correctness evaluator (experimental, diagnostic).
 
 Ragas ``faithfulness`` decomposes an answer into independently-supported
-statements and NLI-checks each against the retrieved contexts. That structure is
-blind to *relational* errors — a reversed causal direction, a fact attributed to
-the wrong entity, a flipped comparison, a swapped number — because every
-individual entity can still be "present" in the context while the combined
-meaning is wrong. This module asks a single, different question of one LLM call:
+statements and NLI-checks each against the retrieved contexts. On the retained
+24-case benchmark, that structure missed the two tested reversed-causality
+errors; more generally, statement-level decomposition can miss a wrong
+relationship even when the component facts are supported. This module asks a
+single, different question of one LLM call:
 
     Is the *complete meaning* of this answer supported by these contexts?
 

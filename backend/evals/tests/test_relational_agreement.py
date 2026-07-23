@@ -9,6 +9,7 @@ sibling agreement harness tests.
 from __future__ import annotations
 
 import csv
+import dataclasses
 import hashlib
 import json
 from pathlib import Path
@@ -114,6 +115,28 @@ def test_case_prediction_needs_two_valid_replicates():
 def test_partial_support_counts_as_unfaithful_prediction():
     case = make_case(1, "append_claim", UNFAITHFUL)
     assert case_prediction(records_for(case, "k", [PARTIALLY_SUPPORTED, PARTIALLY_SUPPORTED])) is False
+
+
+def test_replay_rejects_binary_mapping_that_contradicts_original_verdict(tmp_path):
+    path = tmp_path / "relational.csv"
+    with path.open("w", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=ra.RELATIONAL_OBS_COLUMNS)
+        writer.writeheader()
+        writer.writerow({
+            "doc": "ddia",
+            "case_id": 1,
+            "judge": "kimi",
+            "replicate": 1,
+            "verdict": SUPPORTED,
+            "mapped_faithful": "0",
+            "confidence": "0.9",
+            "n_unsupported": 0,
+            "n_contradiction": 0,
+            "n_relational": 0,
+            "insufficient": "0",
+        })
+    with pytest.raises(ra.CalibrationError, match="mapping contradicts verdict"):
+        ra.read_records_csv(path)
 
 
 # --------------------------------------------------------------------------
@@ -271,7 +294,7 @@ def test_ragas_faithfulness_confusion_over_retained_observations(tmp_path):
     assert matrix.negative_recall == pytest.approx(0.0)
 
 
-def test_ragas_comparison_skips_foreign_keys_and_reports_count(tmp_path):
+def test_ragas_comparison_rejects_foreign_document_even_when_case_id_exists(tmp_path):
     faithful = make_case(1, "identity", FAITHFUL)
     cases_by_key = {("ddia", 1): faithful}
     obs = tmp_path / "ragas.csv"
@@ -279,10 +302,85 @@ def test_ragas_comparison_skips_foreign_keys_and_reports_count(tmp_path):
         writer = csv.writer(handle)
         writer.writerow(["doc", "row_index", "judge", "replicate", "metric", "value"])
         for r in (1, 2):
+            writer.writerow(["attention", 1, "kimi", r, "faithfulness", 1.0])
+    with pytest.raises(ra.CalibrationError, match="exact composite-key parity"):
+        ragas_faithfulness_confusion(obs, cases_by_key, judge="kimi")
+
+
+def test_ragas_comparison_rejects_missing_case(tmp_path):
+    faithful = make_case(1, "identity", FAITHFUL)
+    unfaithful = make_case(2, "reverse_causal", UNFAITHFUL)
+    cases_by_key = {("ddia", 1): faithful, ("ddia", 2): unfaithful}
+    obs = tmp_path / "ragas.csv"
+    with obs.open("w", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(["doc", "row_index", "judge", "replicate", "metric", "value"])
+        for r in (1, 2):
             writer.writerow(["ddia", 1, "kimi", r, "faithfulness", 1.0])
-            writer.writerow(["attention", 7, "kimi", r, "faithfulness", 1.0])  # foreign key
-    matrix, used, skipped = ragas_faithfulness_confusion(obs, cases_by_key, judge="kimi")
-    assert used == 1 and skipped == 1
+    with pytest.raises(ra.CalibrationError, match="exact composite-key parity"):
+        ragas_faithfulness_confusion(obs, cases_by_key, judge="kimi")
+
+
+def test_exact_coverage_validation_never_falls_back_to_case_id():
+    expected = {("ddia", 1), ("attention", 2)}
+    observed = {("attention", 1), ("attention", 2)}
+    with pytest.raises(ra.CalibrationError, match="exact composite-key parity"):
+        ra.require_exact_case_coverage(
+            observed, expected, artifact="relational observations for kimi"
+        )
+
+
+def test_replicate_grid_rejects_sparse_or_duplicate_replay_records():
+    case = make_case(1, "identity", FAITHFUL)
+    cases_by_key = {("ddia", 1): case}
+    sparse = records_for(case, "kimi", [SUPPORTED])
+    sparse = [dataclasses.replace(sparse[0], replicate=3)]
+    with pytest.raises(ra.CalibrationError, match="replicate grid"):
+        ra.require_complete_replicate_grid(
+            sparse,
+            cases_by_key,
+            judges=("kimi",),
+            repeats=3,
+        )
+
+    complete = records_for(case, "kimi", [SUPPORTED, SUPPORTED, SUPPORTED])
+    duplicate = [*complete, complete[-1]]
+    with pytest.raises(ra.CalibrationError, match="replicate grid"):
+        ra.require_complete_replicate_grid(
+            duplicate,
+            cases_by_key,
+            judges=("kimi",),
+            repeats=3,
+        )
+
+
+def test_report_uses_explicit_class_rates_and_repeated_measurement_counts():
+    faithful = make_case(1, "drop_sentence", FAITHFUL)
+    unfaithful = make_case(2, "reverse_causal", UNFAITHFUL)
+    records = (
+        records_for(faithful, "kimi", [PARTIALLY_SUPPORTED] * 3)
+        + records_for(unfaithful, "kimi", [SUPPORTED] * 3)
+    )
+    report = ra.build_report(
+        records=records,
+        cases=[faithful, unfaithful],
+        judges=("kimi",),
+        repeats=3,
+        generated_at="test",
+    )
+    assert "faithful acceptance rate" in report
+    assert "faithful rejection rate" in report
+    assert "unfaithful detection rate" in report
+    assert "unfaithful miss rate" in report
+    assert "FPR" not in report
+    assert "negative recall" not in report
+    assert "6 repeated verdicts" in report
+    assert "not 6 independent benchmark examples" in report
+    assert "repeated measurements of the same 2 cases" in report
+    assert "| `kimi` | 0 | 1 | 0 | 1 |" in report
+    assert "| `kimi` | 3 | 3 | 0 | 0 |" in report
+    assert "| `kimi` | 3 | 3 | 0 |" in report
+    assert "| 1 | `ddia` | drop_sentence | partially_supported |" in report
 
 
 # --------------------------------------------------------------------------
