@@ -133,7 +133,7 @@ struct EmptyState: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker(kicker)
+            SectionLabel(kicker)
             Hairline()
             Text(message)
                 .font(ACXFont.body(15))
@@ -160,7 +160,7 @@ struct EmptyState: View {
         @State private var difficulty = "medium"
         var body: some View {
             VStack(alignment: .leading, spacing: 20) {
-                Kicker("Difficulty")
+                SectionLabel("Difficulty")
                 SegmentedControl(
                     segments: [
                         .init("easy", "Easy"),

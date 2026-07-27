@@ -60,7 +60,7 @@ struct DocumentDetailView: View {
         }
         .scrollContentBackground(.hidden)
         .background(GroundBackground())
-        .navigationTitle("Document")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(ACXColor.ground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -94,7 +94,7 @@ struct DocumentDetailView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker("DOCUMENT")
+            ScreenTitle("Document")
             Hairline()
             Text(model.title)
                 .font(ACXFont.display(26))
@@ -106,11 +106,11 @@ struct DocumentDetailView: View {
                 HStack(spacing: 10) {
                     TagPill(doc.file_type.uppercased())
                     Text(Self.sizeLabel(doc.file_size))
-                        .font(ACXFont.mono(13))
+                        .font(ACXFont.body(15))
                         .monospacedDigit()
                         .foregroundStyle(ACXColor.muted)
                     Text(Self.dateLabel(doc.created_at))
-                        .font(ACXFont.mono(13))
+                        .font(ACXFont.body(15))
                         .monospacedDigit()
                         .foregroundStyle(ACXColor.muted)
                     Spacer(minLength: 0)
@@ -155,7 +155,7 @@ struct DocumentDetailView: View {
         let mastered = p?.mastered_concepts_count ?? 0
         let line = "CONCEPTS \(total) · PRACTISED \(practised) · WEAK \(weak) · MASTERED \(mastered)"
         return Text(line)
-            .font(ACXFont.mono(13))
+            .font(ACXFont.body(15))
             .monospacedDigit()
             .foregroundStyle(ACXColor.muted)
             .fixedSize(horizontal: false, vertical: true)
@@ -168,7 +168,7 @@ struct DocumentDetailView: View {
     private var conceptTable: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                Kicker("CONCEPTS — WEAKEST FIRST")
+                SectionLabel("Concepts — weakest first")
                 Spacer(minLength: 8)
                 Text("\(model.selection.count)/\(DocumentDetailModel.maxFocusConcepts)")
                     .font(ACXFont.monoBold(13))
@@ -220,7 +220,7 @@ struct DocumentDetailView: View {
                         ImportanceDots(score: concept.importance_score)
                         Text(concept.hasBeenTested
                              ? "\(concept.times_correct)/\(concept.times_tested)"
-                             : "NOT TESTED")
+                             : "Not tested")
                             .font(ACXFont.mono(13))
                             .monospacedDigit()
                             .foregroundStyle(ACXColor.muted)
@@ -267,7 +267,7 @@ struct DocumentDetailView: View {
                         model.toast = .info("Session options arrive in the next release.")
                     }
                 } label: {
-                    Text("OPTIONS")
+                    Text("Options")
                 }
                 .buttonStyle(GhostButtonStyle())
                 .frame(width: 120)
@@ -282,10 +282,10 @@ struct DocumentDetailView: View {
     }
 
     private var startLabel: String {
-        if model.isStarting { return "STARTING…" }
-        if model.quotaExhausted { return "NO CREDITS" }
+        if model.isStarting { return "Starting…" }
+        if model.quotaExhausted { return "No credits" }
         switch model.selection.count {
-        case 0: return "START QUIZ"
+        case 0: return "Start quiz"
         case 1: return "START — 1 FOCUS"
         default: return "START — \(model.selection.count) FOCUS"
         }
@@ -318,7 +318,7 @@ struct DocumentDetailView: View {
     private var processingState: some View {
         VStack(alignment: .leading, spacing: 14) {
             EmptyState(
-                kicker: "STILL READING",
+                kicker: "Still reading",
                 message: "AutoCoach is pulling the concepts out of this document. It takes about a minute, and this screen updates on its own."
             )
             ProgressHairline()
@@ -328,27 +328,27 @@ struct DocumentDetailView: View {
 
     private var noConceptsState: some View {
         EmptyState(
-            kicker: "NO CONCEPTS FOUND",
+            kicker: "No concepts found",
             message: "This document processed, but no concepts came out of it — usually a scanned PDF with no text layer. Try a text-based PDF or PPTX.",
-            actionLabel: "CHECK AGAIN",
+            actionLabel: "Check again",
             action: { Task { await model.load(initial: true) } }
         )
     }
 
     private func offlineState(_ detail: String) -> some View {
         EmptyState(
-            kicker: "OFFLINE",
+            kicker: "Offline",
             message: "This device can't reach the server right now. \(detail)",
-            actionLabel: "TRY AGAIN",
+            actionLabel: "Try again",
             action: { Task { await model.load(initial: true) } }
         )
     }
 
     private func failedState(_ detail: String) -> some View {
         EmptyState(
-            kicker: "COULDN'T LOAD",
+            kicker: "COULDN'T load",
             message: detail,
-            actionLabel: "TRY AGAIN",
+            actionLabel: "Try again",
             action: { Task { await model.load(initial: true) } }
         )
     }

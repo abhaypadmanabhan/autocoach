@@ -113,7 +113,7 @@ struct ACXConfirmDialog: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 14) {
-                Kicker(title)
+                SectionLabel(title)
                 Hairline()
                 Text(message)
                     .font(ACXFont.body(15))

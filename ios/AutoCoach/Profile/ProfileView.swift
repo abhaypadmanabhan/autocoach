@@ -69,15 +69,15 @@ struct ProfileView: View {
         .background(GroundBackground())
         .toolbarBackground(ACXColor.ground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .navigationTitle("Profile")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showSettings = true
                 } label: {
-                    Text("SETTINGS")
-                        .font(ACXFont.monoBold(13))
+                    Text("Settings")
+                        .font(ACXFont.bodySemibold(15))
                         .foregroundStyle(ACXColor.ink)
                         .frame(minHeight: 44)
                 }
@@ -97,7 +97,7 @@ struct ProfileView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker("03 / PROFILE")
+            ScreenTitle("Profile")
             Hairline()
             Text("Profile")
                 .font(ACXFont.display(28))
@@ -112,10 +112,10 @@ struct ProfileView: View {
 
     private var accountBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker("01 / ACCOUNT")
+            SectionLabel("Account")
             Hairline()
-            labeled("EMAIL", value: email)
-            labeled("MEMBER SINCE", value: memberSince)
+            labeled("Email", value: email)
+            labeled("Member since", value: memberSince)
         }
     }
 
@@ -124,10 +124,10 @@ struct ProfileView: View {
         switch loadState {
         case .loading:
             VStack(alignment: .leading, spacing: 10) {
-                Kicker("02 / MASTERY")
+                SectionLabel("Mastery")
                 Hairline()
                 Text("Loading mastery…")
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.muted)
                 ProgressHairline(value: nil)
             }
@@ -141,21 +141,21 @@ struct ProfileView: View {
             EmptyState(
                 kicker: "02 / MASTERY",
                 message: message,
-                actionLabel: "RETRY",
+                actionLabel: "Retry",
                 action: { Task { await load() } }
             )
         case .offline(let message):
             EmptyState(
-                kicker: "OFFLINE",
+                kicker: "Offline",
                 message: message,
-                actionLabel: "RETRY",
+                actionLabel: "Retry",
                 action: { Task { await load() } }
             )
         case .quotaExhausted:
             EmptyState(
-                kicker: "QUOTA USED",
+                kicker: "Quota used",
                 message: "Daily quiz credits are spent. Review sessions stay free — or redeem XP.",
-                actionLabel: "OPEN CREDITS",
+                actionLabel: "Open credits",
                 action: { showCredits = true }
             )
             masteryBlock
@@ -166,7 +166,7 @@ struct ProfileView: View {
 
     private var masteryBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker("02 / MASTERY")
+            SectionLabel("Mastery")
             Hairline()
             HStack(alignment: .firstTextBaseline) {
                 Text("\(aggregateMastery)%")
@@ -178,60 +178,60 @@ struct ProfileView: View {
                     .font(ACXFont.mono(13))
                     .foregroundStyle(ACXColor.muted)
             }
-            MasteryBar(percent: aggregateMastery, label: "AGGREGATE")
+            MasteryBar(percent: aggregateMastery, label: "Aggregate")
         }
     }
 
     private var creditsRow: some View {
+        // A tappable row, not a bordered panel with a green rule down its side.
+        // The accent bar was decoration standing in for hierarchy, and a green
+        // vertical line next to a number reads as a status it does not have.
         Button {
             showCredits = true
         } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                Kicker("03 / CREDITS")
-                Hairline()
-                HStack {
-                    Text("\(creditsUsed) / \(creditsAllowance)")
-                        .font(ACXFont.monoBold(18))
+            ACXRow(
+                label: "Quiz credits",
+                detail: "Reset clock and XP redemption"
+            ) {
+                HStack(spacing: 10) {
+                    CreditPips(
+                        used: min(creditsUsed, max(5, creditsAllowance)),
+                        total: max(5, creditsAllowance),
+                        cell: 8, spacing: 4
+                    )
+                    Text("\(max(0, creditsAllowance - creditsUsed))")
+                        .font(ACXFont.monoBold(17))
+                        .monospacedDigit()
                         .foregroundStyle(ACXColor.ink)
-                    Spacer(minLength: 0)
-                    CreditPips(used: min(creditsUsed, max(5, creditsAllowance)), total: max(5, creditsAllowance))
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(ACXColor.muted)
                 }
-                Text("TAP FOR RESET CLOCK + REDEEM")
-                    .font(ACXFont.mono(13))
-                    .foregroundStyle(ACXColor.muted)
             }
-            .padding(.vertical, 4)
-            .overlay(alignment: .leading) {
-                Rectangle()
-                    .fill(ACXColor.accent)
-                    .frame(width: 2)
-            }
-            .padding(.leading, 10)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Credits \(creditsUsed) of \(creditsAllowance). Opens credits sheet.")
-        .frame(minHeight: 44)
+        .accessibilityLabel("Quiz credits, \(max(0, creditsAllowance - creditsUsed)) of \(creditsAllowance) left. Opens credits.")
     }
 
     private var streakBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker("04 / STREAK")
+            SectionLabel("Streak")
             Hairline()
             HStack(alignment: .firstTextBaseline) {
                 Text("\(streak.count)")
                     .font(ACXFont.monoBold(36))
                     .foregroundStyle(ACXColor.ink)
-                Text(streak.count == 1 ? "DAY" : "DAYS")
+                Text(streak.count == 1 ? "DAY" : "Days")
                     .font(ACXFont.monoBold(13))
                     .foregroundStyle(ACXColor.muted)
                 Spacer(minLength: 0)
                 if streak.freezeAvailable {
-                    TagPill("FREEZE READY")
+                    TagPill("Freeze ready")
                 }
             }
             WeekStrip(activeDays: streak.activeDays, todayIndex: todayIndex)
-            Text("STREAK IS STORED ON THIS DEVICE")
-                .font(ACXFont.mono(13))
+            Text("Streak is stored on this device")
+                .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.muted)
         }
         .accessibilityElement(children: .combine)
@@ -240,14 +240,14 @@ struct ProfileView: View {
 
     private var xpRow: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker("05 / XP")
+            SectionLabel("XP")
             Hairline()
             HStack {
                 Text("\(xp)")
                     .font(ACXFont.monoBold(28))
                     .foregroundStyle(ACXColor.ink)
                 Spacer(minLength: 0)
-                Button("REDEEM") { showCredits = true }
+                Button("Redeem") { showCredits = true }
                     .buttonStyle(GhostButtonStyle())
                     .frame(maxWidth: 140)
                     .accessibilityLabel("Open redeem sheet")
@@ -258,7 +258,7 @@ struct ProfileView: View {
     private func labeled(_ label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(label)
-                .font(ACXFont.mono(13))
+                .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.muted)
             Text(value)
                 .font(ACXFont.body(15))

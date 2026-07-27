@@ -15,12 +15,15 @@ import SwiftUI
 struct ProgressHairline: View {
     /// `nil` == indeterminate.
     var value: Double?
-    var height: CGFloat = 2
+    /// 8pt, not a hairline. A 1–2px bar is unreadable as data — hairlines are for
+    /// dividers. This is the height the bar renders at unless a caller has a
+    /// specific reason to differ.
+    var height: CGFloat = 8
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sweep = false
 
-    init(value: Double? = nil, height: CGFloat = 2) {
+    init(value: Double? = nil, height: CGFloat = 8) {
         self.value = value
         self.height = height
     }
@@ -72,8 +75,9 @@ struct MasteryBar: View {
             if showsLabel {
                 HStack(spacing: 8) {
                     if let label {
+                        // The label is prose; only the percentage beside it is data.
                         Text(label)
-                            .font(ACXFont.mono(11))
+                            .font(ACXFont.body(15))
                             .foregroundStyle(ACXColor.muted)
                     }
                     Spacer(minLength: 0)
@@ -157,9 +161,9 @@ struct MilestoneBadge: View {
 
 #Preview("ProgressHairline") {
     VStack(alignment: .leading, spacing: 24) {
-        Kicker("Determinate")
+        SectionLabel("Determinate")
         ProgressHairline(value: 0.62)
-        Kicker("Indeterminate")
+        SectionLabel("Indeterminate")
         ProgressHairline()
     }
     .padding(24)

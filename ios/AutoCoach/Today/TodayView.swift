@@ -15,6 +15,8 @@ struct TodayView: View {
     let api: APIClient
     /// Switches the shell to the Library tab (the "study anyway" route).
     let onOpenLibrary: () -> Void
+    /// Opens the credits sheet, which Settings owns.
+    var onOpenCredits: () -> Void = {}
 
     /// Built lazily so the two disk-backed stores are read once per screen, not
     /// on every re-evaluation of the parent's body.
@@ -23,10 +25,11 @@ struct TodayView: View {
     var body: some View {
         Group {
             if let model {
-                TodayContent(model: model, onOpenLibrary: onOpenLibrary)
+                TodayContent(model: model, onOpenLibrary: onOpenLibrary, onOpenCredits: onOpenCredits)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
+                        // No credits yet — the model has not been built.
                         TodayHeader(date: Date())
                         TodayLoadingPanel()
                     }
@@ -48,6 +51,8 @@ struct TodayView: View {
 private struct TodayContent: View {
     @Bindable var model: TodayModel
     let onOpenLibrary: () -> Void
+    /// Opens the credits sheet, which Settings owns.
+    var onOpenCredits: () -> Void = {}
 
     /// Re-read whenever the day or the timezone changes, so the header date, the
     /// week strip and the streak decay stay correct without a relaunch.
@@ -58,7 +63,12 @@ private struct TodayContent: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                TodayHeader(date: now)
+                TodayHeader(
+                    date: now,
+                    creditsUsed: model.credits.used,
+                    creditsTotal: model.credits.total,
+                    onOpenCredits: onOpenCredits
+                )
 
                 switch model.phase {
                 case .loading:
@@ -122,9 +132,9 @@ private struct TodayContent: View {
     private var readyBlocks: some View {
         if model.hasNoDocuments {
             EmptyState(
-                kicker: "NOTHING TO STUDY YET",
+                kicker: "Nothing to study yet",
                 message: "Add a document and AutoCoach pulls the concepts out of it, then brings them back for review as they fade.",
-                actionLabel: "OPEN LIBRARY",
+                actionLabel: "Open library",
                 action: onOpenLibrary,
                 showsCrosshair: true
             )
@@ -135,14 +145,6 @@ private struct TodayContent: View {
                 isStarting: model.starting == .review,
                 onStartReview: { Task { await model.startReview() } },
                 onStudyAnyway: onOpenLibrary
-            )
-
-            CreditsRow(
-                used: model.credits.used,
-                total: model.credits.total,
-                isExhausted: model.credits.isExhausted,
-                resetsIn: model.credits.resetsIn(from: now),
-                onOpenLibrary: onOpenLibrary
             )
 
             streakBlock

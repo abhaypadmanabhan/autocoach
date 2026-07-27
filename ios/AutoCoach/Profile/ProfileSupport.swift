@@ -146,12 +146,12 @@ enum CreditsResetCountdown {
         return max(0, Int(next.timeIntervalSince(now)))
     }
 
-    /// `RESETS IN 13h 52m` — mono-friendly, no seconds (PRD §5.11).
+    /// `Resets in 13h 52m` — mono-friendly, no seconds (PRD §5.11).
     static func label(from now: Date = Date()) -> String {
         let total = secondsRemaining(from: now)
         let hours = total / 3600
         let minutes = (total % 3600) / 60
-        return "RESETS IN \(hours)h \(minutes)m"
+        return "Resets in \(hours)h \(minutes)m"
     }
 }
 

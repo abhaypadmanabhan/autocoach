@@ -50,7 +50,7 @@ private struct LegalDocumentView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Kicker(kicker)
+                    SectionLabel(kicker)
                     Hairline()
                     Text(title)
                         .font(ACXFont.display(28))
@@ -69,7 +69,7 @@ private struct LegalDocumentView: View {
 
                 ForEach(sections) { section in
                     VStack(alignment: .leading, spacing: 12) {
-                        Kicker("\(section.id) / \(section.title.uppercased())")
+                        SectionLabel("\(section.id) / \(section.title.uppercased())")
                         Hairline()
                         ForEach(Array(section.blocks.enumerated()), id: \.offset) { _, block in
                             switch block {
@@ -83,7 +83,7 @@ private struct LegalDocumentView: View {
                                     ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                                         HStack(alignment: .top, spacing: 8) {
                                             Text("–")
-                                                .font(ACXFont.mono(13))
+                                                .font(ACXFont.body(15))
                                                 .foregroundStyle(ACXColor.ink)
                                             Text(item)
                                                 .font(ACXFont.body(15))

@@ -14,7 +14,15 @@ struct AppRoot: View {
             if !AppConfig.isConfigured {
                 ConfigMissingView()
             } else if let auth, let api {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-designHarness") {
+                    DesignHarness(auth: auth, api: api)
+                } else {
+                    RootView(auth: auth, api: api)
+                }
+                #else
                 RootView(auth: auth, api: api)
+                #endif
             } else {
                 BootView()
             }
@@ -97,10 +105,10 @@ struct RootView: View {
 struct BootView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker("AUTOCOACH")
+            SectionLabel("Autocoach")
             Hairline()
             Text("Loading…")
-                .font(ACXFont.mono(13))
+                .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.muted)
                 .padding(.top, 6)
         }
@@ -115,7 +123,7 @@ struct BootView: View {
 struct ConfigMissingView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker("CONFIG REQUIRED")
+            SectionLabel("Config required")
             Hairline()
             Text("Configuration missing")
                 .font(ACXFont.display(26))

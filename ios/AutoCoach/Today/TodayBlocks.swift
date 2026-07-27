@@ -30,24 +30,32 @@ extension View {
 
 struct TodayHeader: View {
     let date: Date
+    /// Credits live here as a compact inline indicator rather than as a block of
+    /// their own. Quota is ambient status: it should be glanceable and take almost
+    /// no room. The full story (reset countdown, XP, redeem) lives in Settings, so
+    /// it is told once in the app instead of twice.
+    var creditsUsed: Int?
+    var creditsTotal: Int = 5
+    var onOpenCredits: (() -> Void)?
 
     private var formatted: String {
-        date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).year())
-            .uppercased()
+        date.formatted(.dateTime.weekday(.wide).day().month(.wide))
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Kicker("01 / TODAY")
+                ScreenTitle("Today", subtitle: formatted)
                 Spacer(minLength: 12)
-                Text(formatted)
-                    .font(ACXFont.mono(13))
-                    .foregroundStyle(ACXColor.muted)
+                if let creditsUsed {
+                    Button { onOpenCredits?() } label: {
+                        CreditsInline(used: creditsUsed, total: creditsTotal)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             Hairline()
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -78,15 +86,15 @@ struct DueCard: View {
                     .monospacedDigit()
                     .foregroundStyle(ACXColor.ink)
                     .accessibilityHidden(true)
-                Text(count == 1 ? "CONCEPT DUE" : "CONCEPTS DUE")
-                    .kickerStyle()
+                Text(count == 1 ? "Concept due" : "Concepts due")
+                    .font(ACXFont.body(15)).foregroundStyle(ACXColor.muted)
                     .accessibilityHidden(true)
             }
             .accessibilityElement()
             .accessibilityLabel(count == 1 ? "1 concept due" : "\(count) concepts due")
 
             Button(action: onStartReview) {
-                Text(isStarting ? "STARTING…" : "START REVIEW")
+                Text(isStarting ? "Starting…" : "Start review")
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(isStarting)
@@ -95,8 +103,8 @@ struct DueCard: View {
             .padding(.trailing, 4)
             .padding(.bottom, 4)
 
-            Text("REVIEW SESSIONS DON'T USE CREDITS")
-                .font(ACXFont.mono(13))
+            Text("Review sessions don’t use credits")
+                .font(ACXFont.body(15))
                 .kerning(0.6)
                 .foregroundStyle(ACXColor.muted)
                 .fixedSize(horizontal: false, vertical: true)
@@ -107,7 +115,7 @@ struct DueCard: View {
     /// primary CTA — there is nothing to push the user toward.
     private var aheadBody: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Kicker("NOTHING DUE")
+            SectionLabel("Nothing due")
             Text("Nothing due. You're ahead.")
                 .font(ACXFont.display(24))
                 .foregroundStyle(ACXColor.ink)
@@ -116,7 +124,7 @@ struct DueCard: View {
                 .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.muted)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("STUDY ANYWAY", action: onStudyAnyway)
+            Button("Study anyway", action: onStudyAnyway)
                 .buttonStyle(GhostButtonStyle())
         }
     }
@@ -135,7 +143,7 @@ struct CreditsRow: View {
 
     private var resetsCopy: String {
         guard let resetsIn, let hours = resetsIn.hour, let minutes = resetsIn.minute else {
-            return "RESETS AT MIDNIGHT UTC"
+            return "Resets at midnight UTC"
         }
         return "RESETS IN \(hours)H \(minutes)M"
     }
@@ -143,8 +151,8 @@ struct CreditsRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Text("CREDITS")
-                    .kickerStyle()
+                Text("Credits")
+                    .font(ACXFont.body(15)).foregroundStyle(ACXColor.muted)
                 CreditPips(used: used, total: total)
                 Spacer(minLength: 8)
                 Text("\(remaining) / \(total)")
@@ -174,8 +182,8 @@ struct CreditsRow: View {
                 }
             }
 
-            Text("COUNTED ON THIS DEVICE")
-                .font(ACXFont.mono(13))
+            Text("Counted on this device")
+                .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.muted)
         }
         .todayCard()
@@ -190,22 +198,28 @@ struct StreakRow: View {
     let snapshot: StreakSnapshot
     let activeDays: Set<Int>
     let todayIndex: Int?
-    let isDeviceLocalOnly: Bool
+    /// Kept in the signature for callers, but Today no longer prints the
+    /// "stored on this device" caveat — Settings states it once, where a user
+    /// goes to understand the feature. Repeating a disclaimer on the home screen
+    /// every single day is noise, not honesty.
+    var isDeviceLocalOnly: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("STREAK")
-                    .kickerStyle()
-                Text("\(snapshot.days) \(snapshot.days == 1 ? "DAY" : "DAYS")")
-                    .font(ACXFont.monoBold(15))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(snapshot.days)")
+                    .font(ACXFont.monoBold(20))
                     .monospacedDigit()
                     .foregroundStyle(ACXColor.ink)
+                Text(snapshot.days == 1 ? "day streak" : "day streak")
+                    .font(ACXFont.body(17))
+                    .foregroundStyle(ACXColor.ink)
                 Spacer(minLength: 8)
-                Text("FREEZES \(snapshot.freezesRemaining) / \(StreakRules.maxFreezes)")
-                    .font(ACXFont.mono(13))
-                    .monospacedDigit()
-                    .foregroundStyle(ACXColor.muted)
+                if snapshot.freezesRemaining > 0 {
+                    Text("\(snapshot.freezesRemaining) freeze\(snapshot.freezesRemaining == 1 ? "" : "s")")
+                        .font(ACXFont.body(15))
+                        .foregroundStyle(ACXColor.muted)
+                }
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Streak")
@@ -214,21 +228,11 @@ struct StreakRow: View {
             WeekStrip(activeDays: activeDays, todayIndex: todayIndex)
 
             if snapshot.freezeArmed {
-                Text("A FREEZE WILL COVER YESTERDAY")
-                    .font(ACXFont.mono(13))
+                Text("A freeze will cover yesterday.")
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.muted)
             }
-
-            // Honest about what this number actually is (PRD decision 12.2 —
-            // there is no per-day activity endpoint to sync against).
-            Text(isDeviceLocalOnly
-                 ? "STREAK IS STORED ON THIS DEVICE ONLY"
-                 : "STREAK IS STORED ON THIS DEVICE")
-                .font(ACXFont.mono(13))
-                .foregroundStyle(ACXColor.muted)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .todayCard()
     }
 }
 
@@ -243,7 +247,7 @@ struct ContinueCard: View {
         Button(action: onResume) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Kicker("CONTINUE")
+                    SectionLabel("Continue")
                     Spacer(minLength: 8)
                     Text("Q\(session.answered + 1) / \(session.total)")
                         .font(ACXFont.monoBold(13))
@@ -257,8 +261,8 @@ struct ContinueCard: View {
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
                 ProgressHairline(value: Double(session.answered) / Double(max(session.total, 1)))
-                Text(isResuming ? "RESUMING…" : "TAP TO RESUME")
-                    .font(ACXFont.mono(13))
+                Text(isResuming ? "Resuming…" : "Tap to resume")
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.muted)
             }
             .todayCard()
@@ -284,10 +288,10 @@ struct WeakestConcepts: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                Kicker("WEAKEST CONCEPTS")
+                SectionLabel("Weakest concepts")
                 Spacer(minLength: 8)
-                Text("USES 1 CREDIT")
-                    .font(ACXFont.mono(13))
+                Text("Uses 1 credit")
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.muted)
             }
             .padding(.bottom, 10)
@@ -322,7 +326,7 @@ struct WeakestConcepts: View {
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
-                    MasteryBar(percent: concept.mastery_percent, label: "MASTERY")
+                    MasteryBar(percent: concept.mastery_percent, label: "Mastery")
                 }
                 Text(startingConceptId == concept.id ? "…" : "→")
                     .font(ACXFont.monoBold(15))
@@ -350,7 +354,7 @@ struct WeakestConcepts: View {
 struct TodayLoadingPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Kicker("LOADING TODAY")
+            SectionLabel("Loading today")
             ProgressHairline()
             Text("Checking what's due for review.")
                 .font(ACXFont.body(15))
@@ -370,8 +374,8 @@ struct TodayErrorPanel: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 StatusMark(.failed)
-                Text("COULDN'T LOAD TODAY")
-                    .font(ACXFont.monoBold(13))
+                Text("COULDN'T load today")
+                    .font(ACXFont.bodySemibold(15))
                     .kerning(1.2)
                     .foregroundStyle(ACXColor.error)
             }
@@ -379,7 +383,7 @@ struct TodayErrorPanel: View {
                 .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("TRY AGAIN", action: onRetry)
+            Button("Try again", action: onRetry)
                 .buttonStyle(GhostButtonStyle())
         }
         .todayCard()
@@ -400,8 +404,8 @@ struct TodayOfflinePanel: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 StatusMark(.pending)
-                Text("OFFLINE")
-                    .font(ACXFont.monoBold(13))
+                Text("Offline")
+                    .font(ACXFont.bodySemibold(15))
                     .kerning(1.2)
                     .foregroundStyle(ACXColor.ink)
             }
@@ -412,7 +416,7 @@ struct TodayOfflinePanel: View {
                     .fixedSize(horizontal: false, vertical: true)
                 if let savedCopy {
                     Text(savedCopy)
-                        .font(ACXFont.mono(13))
+                        .font(ACXFont.body(15))
                         .foregroundStyle(ACXColor.muted)
                 }
             } else {
@@ -421,7 +425,7 @@ struct TodayOfflinePanel: View {
                     .foregroundStyle(ACXColor.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button("TRY AGAIN", action: onRetry)
+            Button("Try again", action: onRetry)
                 .buttonStyle(GhostButtonStyle())
         }
         .todayCard()

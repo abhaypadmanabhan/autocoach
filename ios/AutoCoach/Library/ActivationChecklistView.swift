@@ -10,13 +10,13 @@ struct ActivationChecklistView: View {
 
     private var items: [(label: String, hint: String, done: Bool)] {
         [
-            ("ADD YOUR FIRST DOCUMENT",
+            ("Add your first document",
              "Tap + and pick a PDF or PPTX.",
              checklist.hasDocument),
-            ("FINISH A QUIZ",
+            ("Finish a quiz",
              "Open a ready document and answer a few questions.",
              checklist.hasFinishedQuiz),
-            ("COME BACK TOMORROW",
+            ("Come back tomorrow",
              "Spaced practice is where the mastery numbers come from.",
              checklist.hasReturned),
         ]
@@ -25,7 +25,7 @@ struct ActivationChecklistView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
-                Kicker("GET SET UP")
+                SectionLabel("Get set up")
                 Spacer(minLength: 8)
                 Text("\(checklist.doneCount)/\(ActivationChecklist.total)")
                     .font(ACXFont.monoBold(13))
@@ -83,13 +83,13 @@ struct QuotaNotice: View {
     var compact: Bool = false
 
     private var limitLine: String {
-        limit > 0 ? "\(limit) QUIZZES / DAY" : "DAILY LIMIT REACHED"
+        limit > 0 ? "\(limit) QUIZZES / DAY" : "Daily limit reached"
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Kicker("OUT OF CREDITS")
+                SectionLabel("Out of credits")
                 Spacer(minLength: 8)
                 Text(limitLine)
                     .font(ACXFont.monoBold(13))

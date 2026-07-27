@@ -171,7 +171,7 @@ struct OnboardingStepBody<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Kicker(kicker)
+            SectionLabel(kicker)
             Hairline().padding(.top, 10)
 
             Text(title)

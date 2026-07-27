@@ -41,7 +41,7 @@ struct UploadSheet: View {
 
             if let doc = confirmDelete {
                 ACXConfirmDialog(
-                    title: "DELETE DOCUMENT",
+                    title: "Delete document",
                     message: "Remove “\(doc.displayTitle)” so you can upload a new one? This cannot be undone.",
                     confirmLabel: "DELETE",
                     onConfirm: {
@@ -88,7 +88,7 @@ struct UploadSheet: View {
     private var header: some View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 6) {
-                Kicker("01 / UPLOAD")
+                SectionLabel("Upload")
                 Text("Add a document")
                     .font(ACXFont.display(26))
                     .foregroundStyle(ACXColor.ink)
@@ -97,8 +97,8 @@ struct UploadSheet: View {
             Button {
                 dismiss()
             } label: {
-                Text("CLOSE")
-                    .font(ACXFont.monoBold(12))
+                Text("Close")
+                    .font(ACXFont.bodySemibold(15))
                     .foregroundStyle(ACXColor.ink)
                     .frame(minWidth: 44, minHeight: 44)
             }
@@ -117,21 +117,21 @@ struct UploadSheet: View {
             pickingBody
         case .uploading:
             progressBody(
-                status: StatusPill("UPLOADING", state: .processing),
+                status: StatusPill("Uploading", state: .processing),
                 caption: controller.pickedFilename ?? "Uploading…",
                 progress: controller.uploadProgress,
                 indeterminate: false
             )
         case .registering:
             progressBody(
-                status: StatusPill("REGISTERING", state: .processing),
+                status: StatusPill("Registering", state: .processing),
                 caption: "Registering with AutoCoach…",
                 progress: nil,
                 indeterminate: true
             )
         case .processing:
             progressBody(
-                status: StatusPill("PROCESSING", state: .processing),
+                status: StatusPill("Processing", state: .processing),
                 caption: "Reading your document. This takes about a minute.",
                 progress: nil,
                 indeterminate: true
@@ -146,12 +146,12 @@ struct UploadSheet: View {
     private var pickingBody: some View {
         VStack(alignment: .leading, spacing: 20) {
             EmptyState(
-                kicker: "FROM FILES",
+                kicker: "From files",
                 message: "Choose a PDF or PPTX from your device. AutoCoach will extract the concepts and make them quizzable.",
                 showsCrosshair: true
             )
 
-            Button("CHOOSE FILE") {
+            Button("Choose file") {
                 showImporter = true
             }
             .buttonStyle(PrimaryButtonStyle())
@@ -195,12 +195,12 @@ struct UploadSheet: View {
 
     private var readyBody: some View {
         VStack(alignment: .leading, spacing: 16) {
-            StatusPill("READY", state: .ready)
+            StatusPill("Ready", state: .ready)
             Text(controller.pickedFilename ?? "Document ready")
                 .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.ink)
 
-            Button("DONE") {
+            Button("Done") {
                 dismiss()
             }
             .buttonStyle(PrimaryButtonStyle())
@@ -213,8 +213,8 @@ struct UploadSheet: View {
     private var failedBody: some View {
         let failure = controller.failure ?? .generic
         VStack(alignment: .leading, spacing: 16) {
-            StatusPill("FAILED", state: .failed)
-            Kicker(failure.title)
+            StatusPill("Failed", state: .failed)
+            SectionLabel(failure.title)
             Text(failure.message)
                 .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.ink)
@@ -232,13 +232,13 @@ struct UploadSheet: View {
                 quotaList
             }
 
-            Button("TRY AGAIN") {
+            Button("Try again") {
                 controller.retry()
             }
             .buttonStyle(PrimaryButtonStyle())
             .accessibilityLabel("Try again")
 
-            Button("CLOSE") {
+            Button("Close") {
                 dismiss()
             }
             .buttonStyle(GhostButtonStyle())
@@ -249,7 +249,7 @@ struct UploadSheet: View {
 
     private var quotaList: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Kicker("YOUR DOCUMENTS")
+            SectionLabel("Your documents")
                 .padding(.bottom, 10)
             Hairline()
             if controller.existingDocuments.isEmpty {

@@ -52,6 +52,7 @@
 		B2DE64D9F1310FE29B91046D /* AuthValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B12A3E023B8C002C371A30 /* AuthValidation.swift */; };
 		C06BF0B4CE0B9F218490CC2E /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = E786F48ABAB5E0900161F915 /* Supabase */; };
 		C1D3F3690CF791F957F78CE3 /* UploadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5396246A4514C773DC74746 /* UploadSheet.swift */; };
+		C4D2D0F39AED3651A1E14C42 /* DesignHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAFD2DA1F998256F97FB1228 /* DesignHarness.swift */; };
 		C57C41D7BA4577A085C7AA5F /* CreditsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC9DE2BE0AD5BD3B879FFDC8 /* CreditsSheet.swift */; };
 		CB780F82D630203BF11BBDFA /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7A8D8E4F98FA5BDDFDF9DA /* ForgotPasswordView.swift */; };
 		CE57A8690A4756E69765A87E /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF6879D641866A675BDD132 /* AppRoot.swift */; };
@@ -126,13 +127,14 @@
 		E5E31B09C612678734BF84EF /* OnboardingComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingComponents.swift; sourceTree = "<group>"; };
 		E6C6CA79BCA1BE3797512659 /* TodayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayModel.swift; sourceTree = "<group>"; };
 		EA06D2D63D90A6F516EA571F /* OnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowView.swift; sourceTree = "<group>"; };
+		EAFD2DA1F998256F97FB1228 /* DesignHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignHarness.swift; sourceTree = "<group>"; };
 		EFBD299DDB80AF6C8412F64F /* QuizEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizEngine.swift; sourceTree = "<group>"; };
 		F21116A62E5F1ED4D24072B2 /* SpaceMono-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-Regular.ttf"; sourceTree = "<group>"; };
 		F2EF62063A417D58B4862185 /* ACXControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACXControls.swift; sourceTree = "<group>"; };
 		F4251C9CFABE24532762CACB /* ACX.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACX.swift; sourceTree = "<group>"; };
 		F4C04D7751CF4CE2F9EC9275 /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		FD20C58B38D1DC3927C970AC /* AutoCoach.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoCoach.entitlements; sourceTree = "<group>"; };
-		"TEMP_0C509B5C-039B-4116-90F8-713F1E8A019E" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_43894ED6-4AD8-451B-897D-15298EF47CED" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -265,6 +267,7 @@
 			children = (
 				3316EC4AB5AFD27CF4D51B85 /* AppConfig.swift */,
 				AFF6879D641866A675BDD132 /* AppRoot.swift */,
+				EAFD2DA1F998256F97FB1228 /* DesignHarness.swift */,
 				7D27F21A455DCDB9772CA137 /* MainTabView.swift */,
 			);
 			path = App;
@@ -327,10 +330,10 @@
 			path = Fonts;
 			sourceTree = "<group>";
 		};
-		"TEMP_35545843-BCA6-4D3F-94BB-10339166A15F" /* ios */ = {
+		"TEMP_F5A65DF5-E9B0-46F7-AD75-A170828BAE34" /* ios */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_0C509B5C-039B-4116-90F8-713F1E8A019E" /* Config.xcconfig */,
+				"TEMP_43894ED6-4AD8-451B-897D-15298EF47CED" /* Config.xcconfig */,
 			);
 			path = ios;
 			sourceTree = "<group>";
@@ -438,6 +441,7 @@
 				C57C41D7BA4577A085C7AA5F /* CreditsSheet.swift in Sources */,
 				657DA6483C067F9716510616 /* CreditsStore.swift in Sources */,
 				5F8773F02F036402EDCA5039 /* DashboardView.swift in Sources */,
+				C4D2D0F39AED3651A1E14C42 /* DesignHarness.swift in Sources */,
 				A28B37F9C6A1976281812456 /* DocumentDetailModel.swift in Sources */,
 				9ABA789B0F05C92E567F6ED4 /* DocumentDetailView.swift in Sources */,
 				0DB802E132A41CB6846EF26C /* DocumentUploadController.swift in Sources */,
@@ -477,7 +481,7 @@
 /* Begin XCBuildConfiguration section */
 		4E1D2010D662D65FE717F20E /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_0C509B5C-039B-4116-90F8-713F1E8A019E" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_43894ED6-4AD8-451B-897D-15298EF47CED" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoCoach/AutoCoach.entitlements;
@@ -621,7 +625,7 @@
 		};
 		B7A38C4FDEAED7CF2D47B30A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_0C509B5C-039B-4116-90F8-713F1E8A019E" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_43894ED6-4AD8-451B-897D-15298EF47CED" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoCoach/AutoCoach.entitlements;

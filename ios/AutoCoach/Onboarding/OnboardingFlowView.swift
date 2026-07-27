@@ -93,8 +93,8 @@ struct OnboardingFlowView: View {
                 // A designed state, not a system alert — the user keeps every
                 // answer and retries in place.
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("COULDN'T SAVE")
-                        .font(ACXFont.monoBold(13))
+                    Text("COULDN'T save")
+                        .font(ACXFont.bodySemibold(15))
                         .foregroundStyle(ACXColor.error)
                     Text(error)
                         .font(ACXFont.body(15))
@@ -120,7 +120,7 @@ struct OnboardingFlowView: View {
 
     @ViewBuilder
     private var continueButton: some View {
-        let label = store.isSubmitting ? "SAVING…" : "CONTINUE"
+        let label = store.isSubmitting ? "Saving…" : "Continue"
         if store.hasSelection {
             Button(label) { Task { await advance() } }
                 .buttonStyle(PrimaryButtonStyle())
@@ -139,7 +139,7 @@ struct OnboardingFlowView: View {
         Button {
             Task { await skip() }
         } label: {
-            Text(store.page == .notificationPrime ? "MAYBE LATER" : "SKIP THIS QUESTION")
+            Text(store.page == .notificationPrime ? "Maybe later" : "Skip this question")
                 .font(ACXFont.monoBold(13))
                 .kerning(0.6)
                 .foregroundStyle(ACXColor.muted)
@@ -174,7 +174,7 @@ struct OnboardingFlowView: View {
     // No live client in a preview; the flow is driven entirely by local state
     // until the final POST, so the steps render without one.
     Text("OnboardingFlowView requires a live APIClient")
-        .font(ACXFont.mono(13))
+        .font(ACXFont.body(15))
         .foregroundStyle(ACXColor.muted)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(GroundBackground())

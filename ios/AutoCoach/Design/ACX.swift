@@ -257,7 +257,7 @@ struct StatusPill: View {
 
     /// Maps a raw `DocumentResponse.status` string onto the semantic states.
     init(documentStatus: String) {
-        self.text = documentStatus.uppercased()
+        self.text = documentStatus.prefix(1).uppercased() + documentStatus.dropFirst().lowercased()
         switch documentStatus.lowercased() {
         case "pending":    self.kind = .pending
         case "processing": self.kind = .processing
@@ -271,8 +271,8 @@ struct StatusPill: View {
         HStack(spacing: 6) {
             StatusMark(kind)
             Text(text)
-                .font(ACXFont.mono(13))
-                .foregroundStyle(kind == .failed ? ACXColor.error : ACXColor.ink)
+                .font(ACXFont.body(15))
+                .foregroundStyle(kind == .failed ? ACXColor.error : ACXColor.muted)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)
@@ -303,9 +303,9 @@ struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(ACXFont.monoBold(15))
-            .kerning(0.4)
-            .textCase(.uppercase)
+            // Body face, sentence case. Mono + forced uppercase made every
+            // button shout and read as a terminal, not a product.
+            .font(ACXFont.bodySemibold(17))
             .foregroundStyle(ACXColor.ground)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
@@ -321,9 +321,7 @@ struct PrimaryButtonStyle: ButtonStyle {
 struct GhostButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(ACXFont.monoBold(14))
-            .kerning(0.4)
-            .textCase(.uppercase)
+            .font(ACXFont.bodySemibold(17))
             .foregroundStyle(ACXColor.ink)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
@@ -337,5 +335,109 @@ struct GhostButtonStyle: ButtonStyle {
 struct GroundBackground: View {
     var body: some View {
         ACXColor.ground.ignoresSafeArea()
+    }
+}
+
+// MARK: - Titles and section labels
+
+/// Screen title. One per screen, in the display face.
+///
+/// Replaces the numbered mono kicker (`01 / TODAY`). Those read as generated —
+/// no shipping product labels its screens like chapters — and they were also
+/// redundant with the navigation title, so "Settings" appeared three times on
+/// one screen. A screen gets a title or it gets nothing.
+struct ScreenTitle: View {
+    let text: String
+    var subtitle: String?
+    init(_ text: String, subtitle: String? = nil) {
+        self.text = text
+        self.subtitle = subtitle
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(text)
+                .font(ACXFont.display(30, relativeTo: .largeTitle))
+                .foregroundStyle(ACXColor.ink)
+            if let subtitle {
+                Text(subtitle)
+                    .font(ACXFont.body(15))
+                    .foregroundStyle(ACXColor.muted)
+            }
+        }
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// Quiet group caption above a set of rows — sentence case, body face, muted.
+///
+/// Deliberately *not* uppercase mono: mono is for data, and shouting a label in
+/// tracked uppercase is the same tell as the numbered kicker. Use only when a
+/// group genuinely needs naming; most groups do not.
+struct SectionLabel: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text)
+            .font(ACXFont.bodyMedium(15))
+            .foregroundStyle(ACXColor.muted)
+            .accessibilityAddTraits(.isHeader)
+    }
+}
+
+/// A settings-style row: label on the left, value or control on the right,
+/// separated by hairlines rather than boxed in a border.
+///
+/// The previous screens rendered every control as a full-width bordered block,
+/// which reads as a brutalised web form rather than an iOS screen.
+struct ACXRow<Trailing: View>: View {
+    let label: String
+    var detail: String?
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(ACXFont.body(17))
+                    .foregroundStyle(ACXColor.ink)
+                if let detail {
+                    Text(detail)
+                        .font(ACXFont.body(15))
+                        .foregroundStyle(ACXColor.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 8)
+            trailing
+        }
+        .frame(minHeight: 44)   // platform hit-target floor
+    }
+}
+
+extension ACXRow where Trailing == EmptyView {
+    init(label: String, detail: String? = nil) {
+        self.label = label
+        self.detail = detail
+        self.trailing = EmptyView()
+    }
+}
+
+/// Compact credits indicator — pips plus `used / total`, sized to sit inline in a
+/// header row rather than owning a full-width block of its own.
+struct CreditsInline: View {
+    let used: Int
+    let total: Int
+    private var remaining: Int { max(0, total - used) }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            CreditPips(used: used, total: total, cell: 7, spacing: 3)
+            Text("\(remaining)")
+                .font(ACXFont.monoBold(13))
+                .foregroundStyle(remaining == 0 ? ACXColor.error : ACXColor.ink)
+                .monospacedDigit()
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(remaining) of \(total) quiz credits left")
     }
 }

@@ -47,7 +47,7 @@ struct ForgotPasswordView: View {
                    subtitle: "We'll email you a link to set a new one.")
                 .padding(.bottom, 40)
 
-            ACXField(label: "EMAIL", text: $email, placeholder: "you@example.com",
+            ACXField(label: "Email", text: $email, placeholder: "you@example.com",
                      keyboardType: .emailAddress, textContentType: .emailAddress,
                      isSecure: false, problem: emailProblem)
                 .focused($focused)
@@ -58,15 +58,15 @@ struct ForgotPasswordView: View {
                 }
 
             if throttled {
-                Text("TOO MANY REQUESTS — WAIT A MINUTE, THEN TRY AGAIN.")
-                    .font(ACXFont.mono(13))
+                Text("Too many requests — wait a minute, then try again.")
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.ink)
                     .padding(.top, 16)
             }
 
             if let failure {
                 Text(failure)
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.error)
                     .padding(.top, 16)
                     .accessibilityLabel("Error: \(failure)")
@@ -75,7 +75,7 @@ struct ForgotPasswordView: View {
             Button {
                 Task { await submit() }
             } label: {
-                Text(sending ? "SENDING…" : "SEND RESET LINK")
+                Text(sending ? "Sending…" : "Send reset link")
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(sending || !isValid)
@@ -84,7 +84,7 @@ struct ForgotPasswordView: View {
 
             Button(action: onBackToSignIn) {
                 Text("← BACK TO SIGN IN")
-                    .font(ACXFont.monoBold(13))
+                    .font(ACXFont.bodySemibold(15))
                     .kerning(1.0)
                     .foregroundStyle(ACXColor.ink)
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -124,7 +124,7 @@ struct ForgotPasswordView: View {
 
     private func header(kicker: String, title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker(kicker)
+            SectionLabel(kicker)
             Hairline()
             Text(title)
                 .font(ACXFont.display(30))

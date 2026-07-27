@@ -18,9 +18,9 @@ enum ExperienceLevel: String, CaseIterable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .newToThis:      return "NEW TO THIS"
-        case .someBackground: return "SOME BACKGROUND"
-        case .revising:       return "REVISING"
+        case .newToThis:      return "New to this"
+        case .someBackground: return "Some background"
+        case .revising:       return "Revising"
         }
     }
 
@@ -39,10 +39,10 @@ enum GoalKind: String, CaseIterable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .exam:      return "AN EXAM"
-        case .course:    return "A COURSE"
-        case .work:      return "WORK"
-        case .curiosity: return "CURIOSITY"
+        case .exam:      return "An exam"
+        case .course:    return "A course"
+        case .work:      return "Work"
+        case .curiosity: return "Curiosity"
         }
     }
 
@@ -65,9 +65,9 @@ enum StudyTime: String, CaseIterable, Codable, Sendable {
 
     var title: String {
         switch self {
-        case .morning: return "MORNING"
-        case .midday:  return "MIDDAY"
-        case .evening: return "EVENING"
+        case .morning: return "Morning"
+        case .midday:  return "Midday"
+        case .evening: return "Evening"
         }
     }
 

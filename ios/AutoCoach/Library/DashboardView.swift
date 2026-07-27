@@ -60,7 +60,7 @@ struct DashboardView: View {
         .background(GroundBackground())
         .environment(\.defaultMinListRowHeight, 0)
         .refreshable { await model.load() }
-        .navigationTitle("Library")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(ACXColor.ground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -78,9 +78,9 @@ struct DashboardView: View {
         .overlay {
             if let doc = pendingDelete {
                 ACXConfirmDialog(
-                    title: "DELETE DOCUMENT",
+                    title: "Delete document",
                     message: "This removes “\(doc.displayTitle)”, its concepts and every quiz session built from it. This cannot be undone.",
-                    confirmLabel: model.isDeleting ? "DELETING…" : "DELETE",
+                    confirmLabel: model.isDeleting ? "Deleting…" : "DELETE",
                     onConfirm: {
                         pendingDelete = nil
                         Task { await model.delete(doc) }
@@ -108,7 +108,7 @@ struct DashboardView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker("02 / LIBRARY")
+            ScreenTitle("Library")
             Hairline()
             Text("Your documents")
                 .font(ACXFont.display(28))
@@ -141,7 +141,7 @@ struct DashboardView: View {
 
     private var emptyState: some View {
         EmptyState(
-            kicker: "NO DOCUMENTS YET",
+            kicker: "No documents yet",
             message: "Add a PDF or PPTX with the + button above. AutoCoach reads it, pulls out the concepts, and builds quizzes from what it finds.",
             showsCrosshair: true
         )
@@ -150,9 +150,9 @@ struct DashboardView: View {
 
     private func offlineState(_ detail: String) -> some View {
         EmptyState(
-            kicker: "OFFLINE",
+            kicker: "Offline",
             message: "Your documents live on the server and this device can't reach it right now. \(detail)",
-            actionLabel: "TRY AGAIN",
+            actionLabel: "Try again",
             action: { Task { await model.load(initial: true) } }
         )
         .padding(.top, 8)
@@ -160,9 +160,9 @@ struct DashboardView: View {
 
     private func failedState(_ detail: String) -> some View {
         EmptyState(
-            kicker: "COULDN'T LOAD",
+            kicker: "COULDN'T load",
             message: detail,
-            actionLabel: "TRY AGAIN",
+            actionLabel: "Try again",
             action: { Task { await model.load(initial: true) } }
         )
         .padding(.top, 8)
@@ -214,7 +214,7 @@ struct DashboardView: View {
             }
 
             if doc.status == "ready" {
-                MasteryBar(percent: mastery ?? 0, label: "MASTERY")
+                MasteryBar(percent: mastery ?? 0, label: "Mastery")
             } else if doc.status == "failed" {
                 Text("Processing failed. Delete it and try uploading again.")
                     .font(ACXFont.body(15))

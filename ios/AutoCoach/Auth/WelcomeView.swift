@@ -18,12 +18,12 @@ struct WelcomeView: View {
     @State private var appleError: String?
     @State private var appleWorking = false
 
-    private static let bullets = ["YOUR DOCUMENTS", "ADAPTIVE QUESTIONS", "SPACED REVIEW"]
+    private static let bullets = ["Your documents", "Adaptive questions", "Spaced review"]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                Kicker("00 / AUTOCOACH")
+                SectionLabel("Autocoach")
                 Hairline()
                     .padding(.top, 10)
 
@@ -40,7 +40,7 @@ struct WelcomeView: View {
                                 .fill(ACXColor.accent)
                                 .frame(width: 2, height: 16)
                             Text(bullet)
-                                .font(ACXFont.mono(13))
+                                .font(ACXFont.body(15))
                                 .kerning(1.0)
                                 .foregroundStyle(ACXColor.ink)
                         }
@@ -74,7 +74,7 @@ struct WelcomeView: View {
 
             if let appleError {
                 Text(appleError)
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.error)
                     .accessibilityLabel("Error: \(appleError)")
             }
@@ -84,7 +84,7 @@ struct WelcomeView: View {
 
             Button(action: onSignIn) {
                 Text("ALREADY HAVE AN ACCOUNT? → SIGN IN")
-                    .font(ACXFont.monoBold(13))
+                    .font(ACXFont.bodySemibold(15))
                     .kerning(1.0)
                     .foregroundStyle(ACXColor.ink)
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -93,7 +93,7 @@ struct WelcomeView: View {
             Hairline()
 
             Text("BY CONTINUING YOU AGREE TO OUR TERMS / PRIVACY")
-                .font(ACXFont.mono(13))
+                .font(ACXFont.body(15))
                 .kerning(0.6)
                 .foregroundStyle(ACXColor.muted)
                 .fixedSize(horizontal: false, vertical: true)

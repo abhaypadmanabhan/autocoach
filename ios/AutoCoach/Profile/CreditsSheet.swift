@@ -42,8 +42,6 @@ struct CreditsSheet: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 28) {
                         creditsBlock
-                        resetBlock
-                        xpBlock
                         reviewBlock
                         stateFootnote
                     }
@@ -73,8 +71,7 @@ struct CreditsSheet: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
-                Kicker("CREDITS")
-                Text("Quiz credits")
+                                Text("Quiz credits")
                     .font(ACXFont.displayMedium(24))
                     .foregroundStyle(ACXColor.ink)
             }
@@ -82,8 +79,8 @@ struct CreditsSheet: View {
             Button {
                 dismiss()
             } label: {
-                Text("CLOSE")
-                    .font(ACXFont.monoBold(13))
+                Text("Close")
+                    .font(ACXFont.bodySemibold(15))
                     .foregroundStyle(ACXColor.ink)
                     .frame(minWidth: 44, minHeight: 44)
             }
@@ -95,89 +92,57 @@ struct CreditsSheet: View {
         .padding(.bottom, 14)
     }
 
+    /// Credits, reset clock and XP as one continuous block.
+    ///
+    /// This was four numbered sections — `01 / TODAY`, `02 / RESET`, `03 / XP`,
+    /// `04 / FREE PATH` — for what is four lines of information. Chapter markers
+    /// on a sheet this small are pure ceremony.
     private var creditsBlock: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Kicker("01 / TODAY")
-            Hairline()
+        VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("CREDITS")
-                    .font(ACXFont.monoBold(13))
-                    .foregroundStyle(ACXColor.muted)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(remaining) of \(allowance) left")
+                        .font(ACXFont.display(24))
+                        .foregroundStyle(ACXColor.ink)
+                    Text(resetLabel)
+                        .font(ACXFont.body(15))
+                        .foregroundStyle(ACXColor.muted)
+                }
                 Spacer(minLength: 0)
-                Text("\(used) / \(allowance)")
-                    .font(ACXFont.monoBold(20))
-                    .foregroundStyle(ACXColor.ink)
-                    .accessibilityLabel("\(used) of \(allowance) credits used")
+                CreditPips(used: pipUsed, total: pipTotal, cell: 12, spacing: 5)
             }
-            CreditPips(used: pipUsed, total: pipTotal)
-                .padding(.top, 4)
+            .accessibilityElement(children: .combine)
 
-            if phase == .quotaExhausted || remaining <= 0 {
-                Text("Next quiz when the clock flips — or redeem XP below.")
-                    .font(ACXFont.body(15))
-                    .foregroundStyle(ACXColor.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 4)
-            }
-        }
-    }
-
-    private var resetBlock: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Kicker("02 / RESET")
             Hairline()
-            Text(resetLabel)
-                .font(ACXFont.monoBold(18))
-                .foregroundStyle(ACXColor.ink)
-                .accessibilityLabel(resetLabel.lowercased())
-            Text("Counted client-side from midnight UTC. No server clock required.")
-                .font(ACXFont.body(15))
-                .foregroundStyle(ACXColor.muted)
-        }
-    }
 
-    private var xpBlock: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Kicker("03 / XP")
-            Hairline()
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text("XP")
-                    .font(ACXFont.monoBold(13))
-                    .foregroundStyle(ACXColor.muted)
-                Spacer(minLength: 0)
+            ACXRow(label: "XP balance", detail: xp < 100 ? "Need \(100 - xp) more to redeem" : "Enough for one extra quiz") {
                 Text("\(xp)")
-                    .font(ACXFont.monoBold(28))
+                    .font(ACXFont.monoBold(20))
+                    .monospacedDigit()
                     .foregroundStyle(ACXColor.ink)
-                    .accessibilityLabel("\(xp) experience points")
             }
 
             Button {
                 Task { await redeem() }
             } label: {
-                Text(redeeming ? "REDEEMING…" : "REDEEM 100 XP → +1 QUIZ")
+                Text(redeeming ? "Redeeming…" : "Redeem 100 XP for a quiz")
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(!canRedeem)
             .opacity(canRedeem ? 1 : 0.45)
             .accessibilityHint(xp < 100 ? "Need 100 XP to redeem" : "Spend 100 XP for one extra quiz credit")
-
-            if xp < 100 {
-                Text("Need \(100 - xp) more XP before you can redeem.")
-                    .font(ACXFont.mono(13))
-                    .foregroundStyle(ACXColor.muted)
-            }
         }
     }
 
     private var reviewBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker("04 / FREE PATH")
+            SectionLabel("Free path")
             Hairline()
             Text("Review sessions don't use credits.")
                 .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.ink)
             if let onStartReview {
-                Button("START A REVIEW") {
+                Button("Start a review") {
                     dismiss()
                     onStartReview()
                 }
@@ -185,7 +150,7 @@ struct CreditsSheet: View {
                 .accessibilityHint("Opens today's review queue without spending a credit")
             } else {
                 Text("Open Today and tap Start review — still free.")
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.muted)
             }
         }
@@ -196,14 +161,14 @@ struct CreditsSheet: View {
         switch phase {
         case .offline(let message):
             EmptyState(
-                kicker: "OFFLINE",
+                kicker: "Offline",
                 message: message,
-                actionLabel: "DISMISS",
+                actionLabel: "Dismiss",
                 action: { phase = .ready }
             )
         case .quotaExhausted:
             EmptyState(
-                kicker: "QUOTA USED",
+                kicker: "Quota used",
                 message: "You've spent today's quizzes. The reset clock above is the next free slot — or redeem XP for one more now."
             )
         case .ready:

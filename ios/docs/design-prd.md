@@ -75,34 +75,46 @@ native client sends the same fixed payload every time.
 
 ## 2.5 Design authority — read before writing any UI
 
-Two design documents govern this app and they **conflict**. This section is the resolution.
-Follow it literally; do not re-derive it.
+**The house UI-UX rules win.** `/Users/abhayp/Documents/Obsidian Vault/UI-UX`, especially
+`AI Design Tells.md`, is the authority. An earlier draft of this PRD deferred to the project
+`CLAUDE.md`'s Padzy OS on the points where they conflicted; that was overruled on review
+2026-07-27. A project design system can be stale — if something reads as AI-generated, it goes.
 
-1. **Padzy OS / "Quiet Brutalism"** — defined in the repo's `CLAUDE.md`. Mandates numbered mono
-   kickers (`01 / TODAY`), Space Mono for all data, zero radii, hard offset shadow on the primary
-   CTA only, status as mono text + mark.
-2. **The house UI-UX rules** — `/Users/abhayp/Documents/Obsidian Vault/UI-UX`, especially
-   `AI Design Tells.md`. Bans mono kickers, mono as a UI font, coloured status dots, and 11–13px type.
+### Banned outright
 
-**Padzy OS wins on identity.** It is the documented, shipped design system for this product across
-web and iOS, and the global rules state project instructions override on conflict. Mono kickers,
-mono numerals, zero radii and the hard shadow stay exactly as specified.
+1. **Numbered mono kickers** (`01 / TODAY`, `02 / LIBRARY`). Called out by name as AI slop. No
+   shipping product labels screens like book chapters. A screen gets a `ScreenTitle` in the
+   display face, or no label. Group captions use `SectionLabel` — sentence case, body face, and
+   only where a group genuinely needs naming.
+2. **Mono as a UI font.** Space Mono is for **data only** — counts, percentages, scores, IDs,
+   timers. Labels, buttons, body copy and row titles are Inter. Buttons are sentence case, never
+   `.textCase(.uppercase)`.
+3. **Coloured status dots.** `StatusMark` carries state by *form*; colour is spent only on a
+   genuine failure.
+4. **Hairline progress bars.** `ProgressHairline` is 8pt. 1–2px is unreadable as data; hairlines
+   are for dividers.
+5. **The same section in two places.** Credits appeared on Today *and* in Settings. One owner.
+6. **A secondary mechanic owning a full-width block.** Quota/usage is ambient status: `CreditsInline`
+   in a header, not a card of its own.
+7. **Type below the floors** — clamped in `ACXFont` (mono ≥13pt, body ≥15pt, display ≥20pt).
 
-**The UI-UX rules win on craft**, because those items are legibility and signal quality, not brand:
+### Kept from Padzy OS
 
-| Rule adopted | What changed | Where |
-|---|---|---|
-| Type floors — "nothing under 15px, mono never under 13.5px" | `ACXFont` **clamps at the source**: mono ≥ 13pt, body ≥ 15pt, display ≥ 20pt. Adapted from web px to iOS points (13pt = system `.footnote`) rather than copied blindly. A lane physically cannot ship an 11pt label. | `Design/ACX.swift` |
-| "Form carries the state, colour carries the urgency" | The coloured status dot is gone. `StatusMark` gives each state a distinguishable **shape** — hollow ring (pending), level bars (processing), hairline check (ready), dashed ring (unknown) — and spends colour only on `failed`, the one state that needs a human. | `Design/ACX.swift` |
-| Same, applied to metadata | Difficulty and question-type labels were wearing status dots. They are descriptors, not states, so they use the new `TagPill` and leave the mark vocabulary meaning something. | `Design/ACX.swift` |
-| Six-states discipline; permissions deferred to the moment of need; 44pt targets; thumb-zone primary actions | Already required throughout §5 — every screen must design loading / empty / error / quota / offline. | all lanes |
+Zero radii (the only round elements are the `StatusMark` ring and a system toggle), the warm cream
+ground, ink and the single emerald accent, the hard offset shadow on **one** primary CTA per
+screen, and Space Grotesk / Inter / Space Mono as the three faces.
 
-**Consequences for every lane:**
-- Never write `Circle().fill(someColor)` to indicate state. Use `StatusMark`.
-- Never pass a font size below the floors — and do not bypass `ACXFont` to get around the clamp.
-- The **only** coloured mark permitted in a view is a genuine failure state. Everything else is ink.
-- `.fontWeight()` does **not** drive the weight axis on our variable custom fonts. Use the explicit
-  helpers (`ACXFont.monoBold`, `.bodySemibold`, `.displayMedium`) instead.
+### Verification is visual, not a build log
+
+**Screenshot every screen before calling UI work done.** `BUILD SUCCEEDED` says nothing about
+layout — two defects shipped in Phase 1/2 that had passed their lane's own acceptance criteria.
+`ios/AutoCoach/App/DesignHarness.swift` (DEBUG-only) renders the real views against fixed data so
+any screen can be captured without credentials or token spend:
+
+```bash
+SIMCTL_CHILD_HARNESS_SCREEN=1 xcrun simctl launch <device> com.padzy.autocoach -designHarness
+xcrun simctl io <device> screenshot out.png
+```
 
 ### Build gotcha every lane will hit
 
@@ -359,10 +371,7 @@ review session in one tap. Quota is never consumed by this path. All five states
 **Two ingest entries, presented as equal-weight buttons** (the competitor pattern is a *menu*, not a
 single Upload button):
 - **Files** — `.fileImporter`, UTTypes `pdf` + `presentationml.presentation`.
-- **Scan** — `VNDocumentCameraViewController` → multi-page → PDF (issue #68).
-  ⚠️ **Spike required before committing:** if VisionKit yields an image-only PDF, backend text
-  extraction returns zero chunks and the document silently fails. Time-box 20 minutes; if OCR is
-  needed, this drops to §9 and Files ships alone.
+- **Scan** — **cut.** See §12.1. Files is the only ingest path in this milestone.
 
 **States:** picking → uploading (determinate `ProgressHairline` from the Storage upload callback) →
 registering → processing (indeterminate, with honest copy: "Reading your document. This takes about
@@ -573,7 +582,7 @@ brand-new user, which it is not today.
 - Lane F: ProfileView + SettingsView + CreditsSheet + Legal (§5.12, §5.11) — issue #66
 
 **Phase 3 — Polish (parallel).** SessionConfigSheet, Quiz/Results extensions, haptics, resume,
-VisionKit scan if the spike passes (#68).
+session resume. (Camera scan #68 is cut — see §12.1.)
 
 **Phase 4 — Native surfaces (§6).** Widget, notifications, Live Activity, Share Extension, App Intents.
 
@@ -605,8 +614,7 @@ reports instead of editing.
 
 ## 10. Known risks
 
-- **VisionKit → image-only PDF ⇒ zero chunks.** Spike before committing #68. May become a backend
-  (OCR) item.
+- ~~VisionKit → image-only PDF~~ — moot, camera scan is cut (§12.1).
 - **`APIClient.send` force-casts `URLResponse as! HTTPURLResponse`** — crash on a non-HTTP response.
   Fix in Phase 0.
 - **`APIClient` collapses all `perform` errors into `.network`**, swallowing `configMissing`.
@@ -655,30 +663,20 @@ gradients, no blurred shadows, single emerald accent).
    persisted to the App Group container (not `UserDefaults`, so the widget can read it). Settings
    carries one honest mono line: `STREAK IS STORED ON THIS DEVICE`. Swap to a durable source when
    the backend can record per-day activity (§9.2).
-3. **Scan (#68): settled without a spike — see below.** Build it in Phase 3 with on-device OCR.
+3. **Scan (#68): cut.** Not a scanner product — see §12.1.
 4. **Deployment target stays iOS 18** (M1 decision, unchanged).
 5. **Build depth: through Phase 2, then human review.** Foundation + fresh-account unblock +
    Today/Library/DocumentDetail/Profile. Each lane verified with a simulator build, merged to one
    integration branch, QA checklist handed over. Nothing lands on `dev` without review.
 
-### 12.1 Camera scan — resolved, and it is client-only
+### 12.1 Camera scan (#68) — CUT
 
-The risk in §10 was that VisionKit yields an image-only PDF, backend extraction finds no text, and
-the document silently ingests as zero chunks. That is **correct and certain, not a maybe**:
-`VNDocumentCameraViewController` hands back `UIImage` pages, and a PDF assembled from them has no
-text layer by construction. A naive scan → PDF → `/documents/register` would fail every time.
+**Not building it.** AutoCoach ingests documents the user already has; it is not a scanner. This
+was pulled in from the competitive research (Gizmo, Coconote and Gauth all scan) and that was the
+wrong reason to add it — research lists what competitors do, it does not decide our roadmap. A
+user with a PDF or a slide deck reaches it through Files, or later through the share sheet.
 
-It does **not** need a backend OCR change. The fix is on-device and free:
-
-1. Run `VNRecognizeTextRequest` (Vision, `.accurate`, on-device, no network, no cost) over each
-   scanned page.
-2. Assemble the PDF with the recognized text drawn as an **invisible text layer**
-   (`kCGTextInvisible`) positioned over each page image — a standard searchable-PDF construction.
-3. Register as normal. The backend's existing PDF text extraction reads the text layer and chunks it
-   exactly like any other PDF. No API change, no new endpoint.
-
-**Acceptance gate for Phase 3:** after registering a scanned document, `GET /documents/{id}` must
-report `chunk_count > 0`. If it reports 0, the OCR layer is not landing and scan does not ship — do
-not paper over it with a UI message. Add a pre-flight client-side guard: if Vision recognizes fewer
-than ~20 characters across all pages, block the upload with "We couldn't read any text on this page"
-rather than burning the user's 2-document quota on a dead file.
+Recorded for the archive: a raw VisionKit scan yields an image-only PDF, so backend text
+extraction would find no text and the document would silently ingest as zero chunks. Shipping it
+would have required an on-device `VNRecognizeTextRequest` pass embedding an invisible text layer
+before register. Not happening. **Close #68 as won't-do.**

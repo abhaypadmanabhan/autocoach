@@ -20,7 +20,7 @@ struct ResultsView: View {
                     questionsBlock(status)
                 } else if let errorMessage {
                     Text(errorMessage)
-                        .font(ACXFont.mono(13))
+                        .font(ACXFont.body(15))
                         .foregroundStyle(ACXColor.error)
                         .padding(.top, 24)
                 }
@@ -31,14 +31,14 @@ struct ResultsView: View {
         }
         .scrollContentBackground(.hidden)
         .background(GroundBackground())
-        .navigationTitle("Results")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
     }
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker("03 / RESULTS")
+            ScreenTitle("Results")
             Hairline()
             Text("Session complete")
                 .font(ACXFont.display(28))
@@ -51,7 +51,7 @@ struct ResultsView: View {
 
     private var loadingBlock: some View {
         Text("Loading results…")
-            .font(ACXFont.mono(13))
+            .font(ACXFont.body(15))
             .foregroundStyle(ACXColor.muted)
             .padding(.top, 24)
     }
@@ -63,7 +63,7 @@ struct ResultsView: View {
                     .font(ACXFont.display(56))
                     .foregroundStyle(ACXColor.ink)
                 Text("%")
-                    .font(ACXFont.monoBold(20))
+                    .font(ACXFont.bodySemibold(20))
                     .foregroundStyle(ACXColor.muted)
             }
             Text("\(s.correct_answers) / \(s.answered_questions) correct · \(s.answered_questions) of \(s.total_questions) answered")
@@ -77,7 +77,7 @@ struct ResultsView: View {
 
     private func questionsBlock(_ s: SessionStatus) -> some View {
         VStack(alignment: .leading, spacing: 24) {
-            Kicker("QUESTION BREAKDOWN")
+            SectionLabel("Question breakdown")
             ForEach(s.questions) { q in
                 questionRow(q)
             }
@@ -99,7 +99,7 @@ struct ResultsView: View {
             if let userAnswer = q.user_answer, !userAnswer.isEmpty {
                 answerLine(label: "YOU", text: userAnswer, color: q.is_correct == true ? ACXColor.accent : ACXColor.error)
             }
-            answerLine(label: "ANSWER", text: q.correct_answer, color: ACXColor.ink)
+            answerLine(label: "Answer", text: q.correct_answer, color: ACXColor.ink)
             if let explanation = q.explanation, !explanation.isEmpty {
                 Text(explanation)
                     .font(ACXFont.body(13))
@@ -114,11 +114,11 @@ struct ResultsView: View {
     private func verdictLabel(_ q: SessionQuestionDetail) -> some View {
         switch q.is_correct {
         case true:
-            return StatusPill("CORRECT", state: .ready)
+            return StatusPill("Correct", state: .ready)
         case false:
-            return StatusPill("INCORRECT", state: .failed)
+            return StatusPill("Incorrect", state: .failed)
         case nil:
-            return StatusPill("NOT GRADED", state: .pending)
+            return StatusPill("Not graded", state: .pending)
         }
     }
 

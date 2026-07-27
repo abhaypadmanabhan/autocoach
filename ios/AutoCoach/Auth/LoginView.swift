@@ -30,14 +30,14 @@ struct LoginView: View {
                     .padding(.bottom, 40)
 
                 VStack(alignment: .leading, spacing: 20) {
-                    ACXField(label: "EMAIL", text: $email, placeholder: "you@example.com",
+                    ACXField(label: "Email", text: $email, placeholder: "you@example.com",
                              keyboardType: .emailAddress, textContentType: .emailAddress,
                              isSecure: false, problem: emailProblem)
                         .focused($focused, equals: .email)
                         .submitLabel(.next)
                         .onSubmit { focused = .password }
 
-                    ACXField(label: "PASSWORD", text: $password, placeholder: "••••••••",
+                    ACXField(label: "Password", text: $password, placeholder: "••••••••",
                              keyboardType: .default, textContentType: .password,
                              isSecure: true, revealToggle: true)
                         .focused($focused, equals: .password)
@@ -50,7 +50,7 @@ struct LoginView: View {
 
                 if let err = auth.signInErrorMessage {
                     Text(err)
-                        .font(ACXFont.mono(13))
+                        .font(ACXFont.body(15))
                         .foregroundStyle(ACXColor.error)
                         .padding(.top, 16)
                         .accessibilityLabel("Error: \(err)")
@@ -59,14 +59,14 @@ struct LoginView: View {
                 Button {
                     Task { await submit() }
                 } label: {
-                    Text(signingIn ? "SIGNING IN…" : "SIGN IN")
+                    Text(signingIn ? "Signing in…" : "Sign in")
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(signingIn || !isValid)
                 .opacity(isValid ? 1 : 0.45)
                 .padding(.top, 28)
 
-                Button("FORGOT YOUR PASSWORD?", action: onForgotPassword)
+                Button("Forgot your password?", action: onForgotPassword)
                     .font(ACXFont.monoBold(13))
                     .kerning(1.0)
                     .foregroundStyle(ACXColor.ink)
@@ -78,7 +78,7 @@ struct LoginView: View {
                 Hairline()
                 Button(action: onSignUp) {
                     Text("NO ACCOUNT YET? → CREATE ONE")
-                        .font(ACXFont.monoBold(13))
+                        .font(ACXFont.bodySemibold(15))
                         .kerning(1.0)
                         .foregroundStyle(ACXColor.ink)
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
@@ -95,7 +95,7 @@ struct LoginView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker("01 / SIGN IN")
+            SectionLabel("Sign in")
             Hairline()
             Text("AutoCoach")
                 .font(ACXFont.display(34))
@@ -149,7 +149,7 @@ struct ACXField: View {
                     .foregroundStyle(ACXColor.muted)
                 if isSecure && revealToggle {
                     Spacer(minLength: 12)
-                    Button(revealed ? "HIDE" : "SHOW") { revealed.toggle() }
+                    Button(revealed ? "Hide" : "Show") { revealed.toggle() }
                         .font(ACXFont.monoBold(11))
                         .kerning(1.2)
                         .foregroundStyle(ACXColor.ink)
@@ -172,7 +172,7 @@ struct ACXField: View {
 
             if let problem {
                 Text(problem)
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.error)
                     .accessibilityLabel("\(label) error: \(problem)")
             }

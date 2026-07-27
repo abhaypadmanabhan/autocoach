@@ -12,11 +12,11 @@ struct TopicsStep: View {
     /// Broad enough to cover what people actually upload, short enough to fit on
     /// one screen without a scroll on the smallest supported device.
     private static let presets = [
-        "COMPUTER SCIENCE", "ENGINEERING",
-        "MEDICINE", "LAW",
-        "BUSINESS", "LANGUAGES",
-        "MATHEMATICS", "HISTORY",
-        "SCIENCE", "DESIGN",
+        "Computer science", "Engineering",
+        "Medicine", "LAW",
+        "Business", "Languages",
+        "Mathematics", "History",
+        "Science", "Design",
     ]
 
     private var columns: [GridItem] {
@@ -44,8 +44,8 @@ struct TopicsStep: View {
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("SOMETHING ELSE")
-                        .kickerStyle()
+                    Text("Something else")
+                        .font(ACXFont.body(15)).foregroundStyle(ACXColor.muted)
                     TextField(
                         "Type a subject",
                         text: Binding(
@@ -135,8 +135,8 @@ struct GoalStep: View {
 
     private var datePicker: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("TARGET DATE — OPTIONAL")
-                .kickerStyle()
+            Text("Target date — optional")
+                .font(ACXFont.body(15)).foregroundStyle(ACXColor.muted)
 
             if let date = store.draft.goalDate {
                 HStack(spacing: 12) {
@@ -154,7 +154,7 @@ struct GoalStep: View {
 
                     Spacer(minLength: 0)
 
-                    Button("CLEAR") { store.setGoalDate(nil) }
+                    Button("Clear") { store.setGoalDate(nil) }
                         .font(ACXFont.monoBold(13))
                         .foregroundStyle(ACXColor.muted)
                         .frame(minWidth: 44, minHeight: 44)
@@ -167,8 +167,8 @@ struct GoalStep: View {
                         Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
                     )
                 } label: {
-                    Text("ADD A DATE")
-                        .font(ACXFont.monoBold(13))
+                    Text("Add a date")
+                        .font(ACXFont.bodySemibold(15))
                         .kerning(0.4)
                         .foregroundStyle(ACXColor.ink)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -206,8 +206,8 @@ struct CadenceStep: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("DAYS PER WEEK")
-                        .kickerStyle()
+                    Text("Days per week")
+                        .font(ACXFont.body(15)).foregroundStyle(ACXColor.muted)
                     OnboardingStepper(
                         value: store.draft.daysPerWeek,
                         range: 1...7,
@@ -246,8 +246,8 @@ struct NotificationPrimeStep: View {
         ) {
             VStack(alignment: .leading, spacing: 20) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("YOUR SLOT")
-                        .kickerStyle()
+                    Text("Your slot")
+                        .font(ACXFont.body(15)).foregroundStyle(ACXColor.muted)
                     Text(summaryLine)
                         .font(ACXFont.monoBold(20, relativeTo: .title3))
                         .foregroundStyle(ACXColor.ink)
@@ -262,8 +262,8 @@ struct NotificationPrimeStep: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if case .denied = store.notificationOutcome {
-                    Text("NOTIFICATIONS ARE OFF — YOU CAN TURN THEM ON IN SETTINGS")
-                        .font(ACXFont.mono(13))
+                    Text("Notifications are off — you can turn them on in settings")
+                        .font(ACXFont.body(15))
                         .foregroundStyle(ACXColor.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -271,7 +271,7 @@ struct NotificationPrimeStep: View {
                 Button {
                     Task { await requestAndSchedule() }
                 } label: {
-                    Text(isRequesting ? "ASKING…" : "TURN ON REMINDERS")
+                    Text(isRequesting ? "Asking…" : "Turn on reminders")
                 }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(isRequesting)

@@ -46,9 +46,9 @@ struct SettingsView: View {
 
             if confirmSignOut {
                 ACXConfirmDialog(
-                    title: "SIGN OUT",
+                    title: "Sign out",
                     message: "You'll need your email and password (or Apple) to get back in. Local streak stays on this device.",
-                    confirmLabel: "SIGN OUT",
+                    confirmLabel: "Sign out",
                     onConfirm: {
                         confirmSignOut = false
                         Task { await auth.signOut() }
@@ -57,7 +57,7 @@ struct SettingsView: View {
                 )
             }
         }
-        .navigationTitle("Settings")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(ACXColor.ground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -66,92 +66,62 @@ struct SettingsView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Kicker("04 / SETTINGS")
-            Hairline()
-            Text("Settings")
-                .font(ACXFont.display(28))
-                .foregroundStyle(ACXColor.ink)
-                .padding(.top, 6)
-            Text("STREAK IS STORED ON THIS DEVICE")
-                .font(ACXFont.mono(13))
-                .foregroundStyle(ACXColor.muted)
-        }
-        .padding(.top, 16)
+        ScreenTitle("Settings")
+            .padding(.top, 8)
     }
 
     private var reminderBlock: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Kicker("01 / STUDY REMINDER")
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel("Study reminder")
+
+            ACXRow(label: "Daily reminder", detail: "One local notification a day.") {
+                Toggle("", isOn: $reminderEnabled)
+                    .labelsHidden()
+                    .tint(ACXColor.accent)
+                    .onChange(of: reminderEnabled) { _, enabled in
+                        ProfileSettingsStore.reminderEnabled = enabled
+                        Task { await applyReminder() }
+                    }
+                    .accessibilityLabel("Daily reminder")
+            }
             Hairline()
-            Text("One local notification a day. No APNs, no server.")
-                .font(ACXFont.body(15))
-                .foregroundStyle(ACXColor.muted)
 
-            Toggle(isOn: $reminderEnabled) {
-                Text("ENABLED")
-                    .font(ACXFont.monoBold(13))
-                    .foregroundStyle(ACXColor.ink)
-            }
-            .tint(ACXColor.accent)
-            .frame(minHeight: 44)
-            .onChange(of: reminderEnabled) { _, enabled in
-                ProfileSettingsStore.reminderEnabled = enabled
-                Task { await applyReminder() }
-            }
-            .accessibilityLabel("Study reminder enabled")
-
-            Text("TIME")
-                .font(ACXFont.mono(13))
-                .foregroundStyle(ACXColor.muted)
-            SegmentedControl(
-                segments: StudyTime.allCases.map { .init($0, $0.title) },
-                selection: $studyTime,
-                accessibilityTitle: "Reminder time"
-            )
-            .onChange(of: studyTime) { _, value in
-                ProfileSettingsStore.studyTime = value
-                Task { await applyReminder() }
-            }
-
-            HStack {
-                Text("DAYS / WEEK")
-                    .font(ACXFont.mono(13))
-                    .foregroundStyle(ACXColor.muted)
-                Spacer()
-                Text("\(daysPerWeek)")
-                    .font(ACXFont.monoBold(18))
-                    .foregroundStyle(ACXColor.ink)
-                    .frame(minWidth: 32, alignment: .trailing)
-            }
-            .frame(minHeight: 44)
-
-            HStack(spacing: 10) {
-                Button {
-                    daysPerWeek = max(1, daysPerWeek - 1)
-                    ProfileSettingsStore.daysPerWeek = daysPerWeek
-                    Task { await applyReminder() }
-                } label: {
-                    Text("−")
-                        .font(ACXFont.monoBold(20))
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 44)
+            if reminderEnabled {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Time of day")
+                        .font(ACXFont.body(17))
+                        .foregroundStyle(ACXColor.ink)
+                    SegmentedControl(
+                        segments: StudyTime.allCases.map { .init($0, $0.title) },
+                        selection: $studyTime,
+                        accessibilityTitle: "Reminder time"
+                    )
+                    .onChange(of: studyTime) { _, value in
+                        ProfileSettingsStore.studyTime = value
+                        Task { await applyReminder() }
+                    }
                 }
-                .buttonStyle(GhostButtonStyle())
-                .accessibilityLabel("Fewer days")
+                .padding(.vertical, 4)
+                Hairline()
 
-                Button {
-                    daysPerWeek = min(7, daysPerWeek + 1)
-                    ProfileSettingsStore.daysPerWeek = daysPerWeek
-                    Task { await applyReminder() }
-                } label: {
-                    Text("+")
-                        .font(ACXFont.monoBold(20))
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 44)
+                // A native Stepper instead of two full-width +/- buttons, which
+                // spent a third of the screen on a number between 1 and 7.
+                ACXRow(label: "Days per week") {
+                    HStack(spacing: 10) {
+                        Text("\(daysPerWeek)")
+                            .font(ACXFont.bodySemibold(17))
+                            .monospacedDigit()
+                            .foregroundStyle(ACXColor.ink)
+                        Stepper("", value: $daysPerWeek, in: 1...7)
+                            .labelsHidden()
+                            .onChange(of: daysPerWeek) { _, value in
+                                ProfileSettingsStore.daysPerWeek = value
+                                Task { await applyReminder() }
+                            }
+                            .accessibilityLabel("Days per week")
+                    }
                 }
-                .buttonStyle(GhostButtonStyle())
-                .accessibilityLabel("More days")
+                Hairline()
             }
 
             if permissionDenied {
@@ -162,7 +132,7 @@ struct SettingsView: View {
             }
             if let reminderStatusLine {
                 Text(reminderStatusLine)
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.muted)
             }
         }
@@ -170,7 +140,7 @@ struct SettingsView: View {
 
     private var securityBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker("02 / SECURITY")
+            SectionLabel("Security")
             Hairline()
             Text(auth.email ?? "No email on this account")
                 .font(ACXFont.body(15))
@@ -179,7 +149,7 @@ struct SettingsView: View {
             Button {
                 Task { await sendPasswordReset() }
             } label: {
-                Text(passwordBusy ? "SENDING…" : "CHANGE PASSWORD")
+                Text(passwordBusy ? "Sending…" : "Change password")
             }
             .buttonStyle(GhostButtonStyle())
             .disabled(passwordBusy || auth.email == nil)
@@ -187,7 +157,7 @@ struct SettingsView: View {
 
             if let passwordLine {
                 Text(passwordLine)
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.muted)
             }
         }
@@ -195,7 +165,7 @@ struct SettingsView: View {
 
     private var analyticsBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker("03 / ANALYTICS")
+            SectionLabel("Analytics")
             Hairline()
             Toggle(isOn: Binding(
                 get: { !analyticsOptedOut },
@@ -206,8 +176,8 @@ struct SettingsView: View {
                 }
             )) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("PRODUCT ANALYTICS")
-                        .font(ACXFont.monoBold(13))
+                    Text("Product analytics")
+                        .font(ACXFont.bodySemibold(15))
                         .foregroundStyle(ACXColor.ink)
                     Text("Opt out stops local analytics flags. No PostHog ship on iOS yet.")
                         .font(ACXFont.body(15))
@@ -221,7 +191,7 @@ struct SettingsView: View {
 
     private var legalBlock: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Kicker("04 / LEGAL")
+            SectionLabel("Legal")
             Hairline()
                 .padding(.top, 10)
                 .padding(.bottom, 8)
@@ -229,14 +199,14 @@ struct SettingsView: View {
             NavigationLink {
                 TermsView()
             } label: {
-                settingsRow("TERMS OF SERVICE")
+                settingsRow("Terms of service")
             }
             .buttonStyle(.plain)
 
             NavigationLink {
                 PrivacyView()
             } label: {
-                settingsRow("PRIVACY POLICY")
+                settingsRow("Privacy policy")
             }
             .buttonStyle(.plain)
         }
@@ -244,14 +214,14 @@ struct SettingsView: View {
 
     private var accountBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Kicker("05 / ACCOUNT")
+            SectionLabel("Account")
             Hairline()
 
             Button {
                 confirmSignOut = true
             } label: {
-                Text("SIGN OUT")
-                    .font(ACXFont.monoBold(14))
+                Text("Sign out")
+                    .font(ACXFont.bodySemibold(15))
                     .kerning(0.4)
                     .foregroundStyle(ACXColor.error)
                     .frame(maxWidth: .infinity)
@@ -268,7 +238,7 @@ struct SettingsView: View {
                 }
             } label: {
                 Text("DELETE ACCOUNT ON WEB →")
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(minHeight: 44)
@@ -280,7 +250,7 @@ struct SettingsView: View {
 
     private var footer: some View {
         Text(buildFooter)
-            .font(ACXFont.mono(13))
+            .font(ACXFont.body(15))
             .foregroundStyle(ACXColor.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
@@ -290,11 +260,11 @@ struct SettingsView: View {
     private func settingsRow(_ title: String) -> some View {
         HStack {
             Text(title)
-                .font(ACXFont.monoBold(13))
+                .font(ACXFont.bodySemibold(17))
                 .foregroundStyle(ACXColor.ink)
             Spacer()
             Text("→")
-                .font(ACXFont.mono(13))
+                .font(ACXFont.body(15))
                 .foregroundStyle(ACXColor.muted)
         }
         .frame(minHeight: 44)

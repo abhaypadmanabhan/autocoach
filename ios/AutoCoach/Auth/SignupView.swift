@@ -65,14 +65,14 @@ struct SignupView: View {
                 .padding(.bottom, 40)
 
             VStack(alignment: .leading, spacing: 20) {
-                ACXField(label: "EMAIL", text: $email, placeholder: "you@example.com",
+                ACXField(label: "Email", text: $email, placeholder: "you@example.com",
                          keyboardType: .emailAddress, textContentType: .emailAddress,
                          isSecure: false, problem: emailProblem)
                     .focused($focused, equals: .email)
                     .submitLabel(.next)
                     .onSubmit { focused = .password }
 
-                ACXField(label: "PASSWORD", text: $password, placeholder: "AT LEAST 8 CHARACTERS",
+                ACXField(label: "Password", text: $password, placeholder: "AT LEAST 8 CHARACTERS",
                          keyboardType: .default, textContentType: .newPassword,
                          isSecure: true, revealToggle: true, problem: passwordProblem)
                     .focused($focused, equals: .password)
@@ -93,7 +93,7 @@ struct SignupView: View {
 
             if let failure {
                 Text(failure)
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.error)
                     .padding(.top, 16)
                     .accessibilityLabel("Error: \(failure)")
@@ -102,7 +102,7 @@ struct SignupView: View {
             Button {
                 Task { await submit() }
             } label: {
-                Text(submitting ? "CREATING…" : "CREATE ACCOUNT")
+                Text(submitting ? "Creating…" : "Create account")
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(submitting || !isValid)
@@ -111,7 +111,7 @@ struct SignupView: View {
 
             Button(action: onSignIn) {
                 Text("ALREADY HAVE AN ACCOUNT? → SIGN IN")
-                    .font(ACXFont.monoBold(13))
+                    .font(ACXFont.bodySemibold(15))
                     .kerning(1.0)
                     .foregroundStyle(ACXColor.ink)
                     .frame(maxWidth: .infinity, minHeight: 44)
@@ -123,8 +123,8 @@ struct SignupView: View {
     /// Duplicate account — a route, not an error string.
     private var duplicateBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("THAT EMAIL ALREADY HAS AN ACCOUNT.")
-                .font(ACXFont.monoBold(13))
+            Text("That email already has an account.")
+                .font(ACXFont.bodySemibold(15))
                 .kerning(0.8)
                 .foregroundStyle(ACXColor.ink)
             Button("Sign in instead", action: onSignIn)
@@ -177,7 +177,7 @@ struct SignupView: View {
 
                 Button(action: onSignIn) {
                     Text("← BACK TO SIGN IN")
-                        .font(ACXFont.monoBold(13))
+                        .font(ACXFont.bodySemibold(15))
                         .kerning(1.0)
                         .foregroundStyle(ACXColor.ink)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -199,16 +199,16 @@ struct SignupView: View {
             case .idle, .sending:
                 EmptyView()
             case .sent:
-                Text("SENT — CHECK YOUR INBOX AND SPAM FOLDER.")
-                    .font(ACXFont.mono(13))
+                Text("Sent — check your inbox and spam folder.")
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.ink)
             case .throttled:
-                Text("TOO MANY REQUESTS — WAIT A MINUTE, THEN TRY AGAIN.")
-                    .font(ACXFont.mono(13))
+                Text("Too many requests — wait a minute, then try again.")
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.ink)
             case .failed(let message):
                 Text(message)
-                    .font(ACXFont.mono(13))
+                    .font(ACXFont.body(15))
                     .foregroundStyle(ACXColor.error)
                     .accessibilityLabel("Error: \(message)")
             }
@@ -217,7 +217,7 @@ struct SignupView: View {
 
     private func header(kicker: String, title: String, subtitle: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker(kicker)
+            SectionLabel(kicker)
             Hairline()
             Text(title)
                 .font(ACXFont.display(30))

@@ -69,7 +69,7 @@ struct TabPlaceholder: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Kicker(kicker)
+            SectionLabel(kicker)
             Hairline()
             Text(line)
                 .font(ACXFont.body(14))

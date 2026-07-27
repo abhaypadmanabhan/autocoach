@@ -40,12 +40,12 @@ enum UploadFailure: Equatable, Sendable {
 
     var title: String {
         switch self {
-        case .oversized: return "FILE TOO LARGE"
-        case .documentQuota: return "DOCUMENT CREDITS"
-        case .registerRejected: return "COULD NOT REGISTER"
-        case .processingFailed: return "PROCESSING FAILED"
-        case .interrupted: return "UPLOAD INTERRUPTED"
-        case .generic: return "UPLOAD FAILED"
+        case .oversized: return "File too large"
+        case .documentQuota: return "Document credits"
+        case .registerRejected: return "Could not register"
+        case .processingFailed: return "Processing failed"
+        case .interrupted: return "Upload interrupted"
+        case .generic: return "Upload failed"
         }
     }
 
