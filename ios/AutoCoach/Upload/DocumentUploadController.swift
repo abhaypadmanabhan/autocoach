@@ -98,8 +98,10 @@ final class DocumentUploadController {
         var types: [UTType] = [.pdf]
         if let pptx = UTType(filenameExtension: "pptx") {
             types.append(pptx)
-        } else if let pptx = UTType(importedAs: "org.openxmlformats.presentationml.presentation") {
-            types.append(pptx)
+        } else {
+            // `importedAs:` is non-optional — it declares the type if the system
+            // does not already know it — so this branch cannot use `if let`.
+            types.append(UTType(importedAs: "org.openxmlformats.presentationml.presentation"))
         }
         return types
     }()
