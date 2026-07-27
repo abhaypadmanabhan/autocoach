@@ -39,7 +39,7 @@ struct SettingsView: View {
                     footer
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 8)
+                .padding(.top, 4)
                 .padding(.bottom, 40)
             }
             .scrollContentBackground(.hidden)
@@ -59,6 +59,7 @@ struct SettingsView: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         .toolbarBackground(ACXColor.ground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
         .acxToast($toast)
@@ -67,7 +68,6 @@ struct SettingsView: View {
 
     private var header: some View {
         ScreenTitle("Settings")
-            .padding(.top, 8)
     }
 
     private var reminderBlock: some View {

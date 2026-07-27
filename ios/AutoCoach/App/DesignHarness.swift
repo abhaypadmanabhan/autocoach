@@ -20,28 +20,26 @@ struct DesignHarness: View {
     ) ?? 0
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Screen", selection: $screen) {
-                Text("Today").tag(0)
-                Text("Settings").tag(1)
-                Text("Credits").tag(2)
-                Text("Library").tag(3)
+        // A real TabView with SF Symbols — the same shell the app ships — so a
+        // harness screenshot is representative rather than a segmented control
+        // standing in for one.
+        TabView(selection: $screen) {
+            Tab("Today", systemImage: "house", value: 0) {
+                NavigationStack { TodayHarness() }
             }
-            .pickerStyle(.segmented)
-            .padding(8)
-            .background(ACXColor.surface)
-
-            Divider()
-
-            Group {
-                switch screen {
-                case 0: NavigationStack { TodayHarness() }
-                case 1: NavigationStack { SettingsView(auth: auth) }
-                case 2: CreditsSheet(api: api)
-                default: NavigationStack { DashboardView(auth: auth, api: api) }
-                }
+            Tab("Library", systemImage: "books.vertical", value: 3) {
+                NavigationStack { DashboardView(auth: auth, api: api) }
+            }
+            Tab("Credits", systemImage: "bolt", value: 2) {
+                CreditsSheet(api: api)
+            }
+            Tab("Profile", systemImage: "person.crop.circle", value: 1) {
+                NavigationStack { SettingsView(auth: auth) }
             }
         }
+        .tint(ACXColor.accent)
+        .toolbarBackground(ACXColor.ground, for: .tabBar)
+        .toolbarBackgroundVisibility(.visible, for: .tabBar)
     }
 }
 

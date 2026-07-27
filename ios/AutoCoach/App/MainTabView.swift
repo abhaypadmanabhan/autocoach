@@ -19,12 +19,12 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("Today", systemImage: "square.grid.2x2", value: 0) {
+            Tab("Today", systemImage: "house", value: 0) {
                 NavigationStack {
                     TodayView(auth: auth, api: api) { selection = 1 }
                 }
             }
-            Tab("Library", systemImage: "tray.full", value: 1) {
+            Tab("Library", systemImage: "books.vertical", value: 1) {
                 NavigationStack {
                     DashboardView(auth: auth, api: api)
                         .toolbar {
@@ -49,7 +49,7 @@ struct MainTabView: View {
                     }
                 }
             }
-            Tab("Profile", systemImage: "person", value: 2) {
+            Tab("Profile", systemImage: "person.crop.circle", value: 2) {
                 NavigationStack {
                     ProfileView(auth: auth, api: api)
                 }

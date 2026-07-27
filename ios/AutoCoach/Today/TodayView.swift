@@ -89,6 +89,7 @@ private struct TodayContent: View {
         }
         .scrollContentBackground(.hidden)
         .background(GroundBackground())
+        .toolbar(.hidden, for: .navigationBar)
         .refreshable { await model.load() }
         .acxToast($model.toast)
         .fullScreenCover(isPresented: $model.showQuiz) {

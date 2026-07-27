@@ -61,6 +61,7 @@ struct DashboardView: View {
         .environment(\.defaultMinListRowHeight, 0)
         .refreshable { await model.load() }
         .navigationTitle("")
+        .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(ACXColor.ground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
