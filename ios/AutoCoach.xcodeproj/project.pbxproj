@@ -38,8 +38,10 @@
 		83DEE4950219D2DFBE5FF0E8 /* OFL-SpaceMono.txt in Resources */ = {isa = PBXBuildFile; fileRef = 86EE97DCA64F552AB1904CF0 /* OFL-SpaceMono.txt */; };
 		868AB6988D270DDCF975C7F8 /* ACXConcept.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23CCE8CCA334EE61CBB38401 /* ACXConcept.swift */; };
 		8D0A18C042B01F72A192FF52 /* StreakStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D567CDC6BD25B888026A97B /* StreakStore.swift */; };
+		9ABA789B0F05C92E567F6ED4 /* DocumentDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76E8BC7A31E817C753CC1C64 /* DocumentDetailView.swift */; };
 		9BE82A189D4BEBF73EFEE108 /* OnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA06D2D63D90A6F516EA571F /* OnboardingFlowView.swift */; };
 		9DF6CFCA65B76CC6A9A3953C /* OFL-Inter.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3D03E63E84A7E7F7FFC3DB59 /* OFL-Inter.txt */; };
+		A28B37F9C6A1976281812456 /* DocumentDetailModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C29002BD3C4BE6BD0268772 /* DocumentDetailModel.swift */; };
 		A7B962307419A3AD5CD880B4 /* AnswerInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5574C6EBD92D50710C45F3C2 /* AnswerInput.swift */; };
 		A87824E7936984AC6D20C5A9 /* OnboardingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EADAC7B91F0179AD6E85F86 /* OnboardingModel.swift */; };
 		AB9193E83E8AA611732CF6A8 /* SpaceMono-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 056A9A343087E8729185A23C /* SpaceMono-Bold.ttf */; };
@@ -49,6 +51,7 @@
 		C1D3F3690CF791F957F78CE3 /* UploadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5396246A4514C773DC74746 /* UploadSheet.swift */; };
 		CB780F82D630203BF11BBDFA /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7A8D8E4F98FA5BDDFDF9DA /* ForgotPasswordView.swift */; };
 		CE57A8690A4756E69765A87E /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF6879D641866A675BDD132 /* AppRoot.swift */; };
+		D1C4794DF33D4951E3DCEC77 /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A040310F067BAFA3B2FE510D /* LibraryModel.swift */; };
 		D78546836A77052962A91712 /* OnboardingComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E31B09C612678734BF84EF /* OnboardingComponents.swift */; };
 		D82C3164E04337E840DB107F /* AutoCoachApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5C3F9D33FC762A6BD2F7442 /* AutoCoachApp.swift */; };
 		DE7DA802D876BDE39F80278F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D23F5AD4A9F71A97F07845 /* Models.swift */; };
@@ -58,6 +61,7 @@
 		F1BBDAFD5B602A013C22428E /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8266837857C0645EFE02272 /* WelcomeView.swift */; };
 		F450DDE019E9F4BF6E4DF004 /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C04D7751CF4CE2F9EC9275 /* AuthStore.swift */; };
 		F4C647718A83F417F9A79BEB /* StorageProgressUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EBBE50CC7B6C3A7CA8DA38E /* StorageProgressUploader.swift */; };
+		F7B21E84CF4ADB485D7CC32A /* ActivationChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 948279662F99CBC1AE17E8BE /* ActivationChecklistView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -78,14 +82,18 @@
 		62E16E7EAA4DD09D2681E029 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		63F105F4E334D3E09AC487E5 /* ACXProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACXProgress.swift; sourceTree = "<group>"; };
 		63FE16361212534ED3D1FB0F /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		76E8BC7A31E817C753CC1C64 /* DocumentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentDetailView.swift; sourceTree = "<group>"; };
+		7C29002BD3C4BE6BD0268772 /* DocumentDetailModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentDetailModel.swift; sourceTree = "<group>"; };
 		7D27F21A455DCDB9772CA137 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		85EA1F0D090A877A34A7323D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		86EE97DCA64F552AB1904CF0 /* OFL-SpaceMono.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-SpaceMono.txt"; sourceTree = "<group>"; };
 		8AF611EFB5E0C33ACB936210 /* CreditsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditsStore.swift; sourceTree = "<group>"; };
 		8BCA6BE02B711F3B1788F63B /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
 		8D567CDC6BD25B888026A97B /* StreakStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreakStore.swift; sourceTree = "<group>"; };
+		948279662F99CBC1AE17E8BE /* ActivationChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivationChecklistView.swift; sourceTree = "<group>"; };
 		A01027ED86C19ED6199C15AD /* ACXOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACXOverlay.swift; sourceTree = "<group>"; };
 		A023C9A0FDDF99EA04D4F276 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		A040310F067BAFA3B2FE510D /* LibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModel.swift; sourceTree = "<group>"; };
 		A0D23F5AD4A9F71A97F07845 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A116A298B8DA8AEB52052C49 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		AA4B0DAAFF900F7BD3C56CA7 /* AppGroupStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroupStore.swift; sourceTree = "<group>"; };
@@ -114,7 +122,7 @@
 		F4251C9CFABE24532762CACB /* ACX.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACX.swift; sourceTree = "<group>"; };
 		F4C04D7751CF4CE2F9EC9275 /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		FD20C58B38D1DC3927C970AC /* AutoCoach.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoCoach.entitlements; sourceTree = "<group>"; };
-		"TEMP_9C29F746-6144-4BDF-AB00-2AB38348BF58" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_7E5603A5-74AC-4FEA-A7A6-83129D9CE6C9" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -258,7 +266,11 @@
 		DB90AF5F15BA9847F27C2698 /* Library */ = {
 			isa = PBXGroup;
 			children = (
+				948279662F99CBC1AE17E8BE /* ActivationChecklistView.swift */,
 				63FE16361212534ED3D1FB0F /* DashboardView.swift */,
+				7C29002BD3C4BE6BD0268772 /* DocumentDetailModel.swift */,
+				76E8BC7A31E817C753CC1C64 /* DocumentDetailView.swift */,
+				A040310F067BAFA3B2FE510D /* LibraryModel.swift */,
 			);
 			path = Library;
 			sourceTree = "<group>";
@@ -292,10 +304,10 @@
 			path = Fonts;
 			sourceTree = "<group>";
 		};
-		"TEMP_5E4DFB91-7B3B-44EB-A669-69AF7B99FA96" /* ios */ = {
+		"TEMP_6D6987F8-E1FA-4020-A38B-92C4241A931C" /* ios */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_9C29F746-6144-4BDF-AB00-2AB38348BF58" /* Config.xcconfig */,
+				"TEMP_7E5603A5-74AC-4FEA-A7A6-83129D9CE6C9" /* Config.xcconfig */,
 			);
 			path = ios;
 			sourceTree = "<group>";
@@ -390,6 +402,7 @@
 				E7208E54CDA323C5E4661CC2 /* ACXProgress.swift in Sources */,
 				4BF82FE13EEE509847A92093 /* APIClient.swift in Sources */,
 				5BDF17F4CB709F8A996C5956 /* APIError.swift in Sources */,
+				F7B21E84CF4ADB485D7CC32A /* ActivationChecklistView.swift in Sources */,
 				A7B962307419A3AD5CD880B4 /* AnswerInput.swift in Sources */,
 				8033B6A47FADE7CF8D375512 /* AppConfig.swift in Sources */,
 				3E642BF44C9AAFE00AA4E929 /* AppGroupStore.swift in Sources */,
@@ -401,8 +414,11 @@
 				D82C3164E04337E840DB107F /* AutoCoachApp.swift in Sources */,
 				657DA6483C067F9716510616 /* CreditsStore.swift in Sources */,
 				5F8773F02F036402EDCA5039 /* DashboardView.swift in Sources */,
+				A28B37F9C6A1976281812456 /* DocumentDetailModel.swift in Sources */,
+				9ABA789B0F05C92E567F6ED4 /* DocumentDetailView.swift in Sources */,
 				0DB802E132A41CB6846EF26C /* DocumentUploadController.swift in Sources */,
 				CB780F82D630203BF11BBDFA /* ForgotPasswordView.swift in Sources */,
+				D1C4794DF33D4951E3DCEC77 /* LibraryModel.swift in Sources */,
 				82594DDFC89A21F53524E7FC /* LoginView.swift in Sources */,
 				631E07338E73858C85FA8584 /* MainTabView.swift in Sources */,
 				DE7DA802D876BDE39F80278F /* Models.swift in Sources */,
@@ -433,7 +449,7 @@
 /* Begin XCBuildConfiguration section */
 		4E1D2010D662D65FE717F20E /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_9C29F746-6144-4BDF-AB00-2AB38348BF58" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_7E5603A5-74AC-4FEA-A7A6-83129D9CE6C9" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoCoach/AutoCoach.entitlements;
@@ -577,7 +593,7 @@
 		};
 		B7A38C4FDEAED7CF2D47B30A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_9C29F746-6144-4BDF-AB00-2AB38348BF58" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_7E5603A5-74AC-4FEA-A7A6-83129D9CE6C9" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoCoach/AutoCoach.entitlements;
