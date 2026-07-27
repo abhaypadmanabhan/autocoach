@@ -168,7 +168,7 @@ final class DocumentUploadController {
         isDeleting = true
         defer { isDeleting = false }
         do {
-            try await deleteDocumentHTTP(id: id)
+            try await api.delete("documents/\(id)")
             existingDocuments.removeAll { $0.id == id }
         } catch {
             // Keep quota UI up; surface a soft failure without raw detail.
@@ -354,36 +354,6 @@ final class DocumentUploadController {
             existingDocuments = list.documents
         } catch {
             existingDocuments = []
-        }
-    }
-
-    /// DELETE /documents/{id} — 204 No Content. Implemented locally because
-    /// `APIClient` rejects empty success bodies (Networking/ is frozen for this lane).
-    private func deleteDocumentHTTP(id: String) async throws {
-        let session = try await supabase.auth.session
-        let base = AppConfig.backendBaseURL
-        let url = base.appending(path: "documents/\(id)")
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
-        request.timeoutInterval = 15
-
-        let (_, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw APIError.network("Non-HTTP response on delete.")
-        }
-        if http.statusCode == 401 {
-            try? await supabase.auth.refreshSession()
-            let refreshed = try await supabase.auth.session
-            request.setValue("Bearer \(refreshed.accessToken)", forHTTPHeaderField: "Authorization")
-            let (_, retryResponse) = try await URLSession.shared.data(for: request)
-            guard let retryHTTP = retryResponse as? HTTPURLResponse, retryHTTP.statusCode == 204 else {
-                throw APIError.http(status: (retryResponse as? HTTPURLResponse)?.statusCode ?? 500, detail: "Delete failed.")
-            }
-            return
-        }
-        guard http.statusCode == 204 else {
-            throw APIErrorDecoder.decode(status: http.statusCode, body: Data())
         }
     }
 
