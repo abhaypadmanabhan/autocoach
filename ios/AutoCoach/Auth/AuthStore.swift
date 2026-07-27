@@ -8,6 +8,28 @@ enum AuthState: Equatable, Sendable {
     case signedIn
 }
 
+/// Outcome of an email signup (PRD §5.2). Every branch is a *designed* screen
+/// state; none of them is a raw error string in an alert.
+enum SignUpOutcome: Equatable, Sendable {
+    /// Project has email confirmation off — we already hold a session.
+    case signedIn
+    /// Supabase sent a confirmation link. The user is stranded unless we render
+    /// the check-your-inbox state, which is the whole point of this case existing.
+    case confirmationRequired
+    /// This address already has an account — offer "Sign in instead".
+    case duplicateAccount
+    case failed(String)
+}
+
+/// Outcome of a transactional-email request (confirmation resend, password reset).
+enum AuthEmailOutcome: Equatable, Sendable {
+    case sent
+    /// Supabase's per-address send throttle. A designed "wait a moment" line,
+    /// not an error — same framing rule as the quiz quota.
+    case rateLimited
+    case failed(String)
+}
+
 /// `@Observable` wrapper over `supabase-swift` auth (research §2).
 ///
 /// Email + password only (M2). Session persistence is the SDK's default
@@ -74,6 +96,101 @@ final class AuthStore {
             state = .signedIn
         } catch {
             signInErrorMessage = friendlyMessage(error)
+        }
+    }
+
+    /// Email + password signup (PRD §5.2).
+    ///
+    /// Returns rather than throwing so `SignupView` can switch straight onto a
+    /// designed state. Errors are **not** written to ``signInErrorMessage`` here —
+    /// that property belongs to the login form and reusing it leaks a stale signup
+    /// error onto the sign-in screen.
+    func signUp(email: String, password: String) async -> SignUpOutcome {
+        let trimmedEmail = AuthValidation.normalized(email)
+        do {
+            let response = try await supabase.auth.signUp(email: trimmedEmail, password: password)
+            switch response {
+            case .session:
+                state = .signedIn
+                return .signedIn
+            case .user(let user):
+                // Supabase deliberately obfuscates "this email is taken": rather
+                // than erroring, it returns a synthetic user with an EMPTY
+                // `identities` array. That empty array is the only signal, and
+                // missing it is what makes ports show "check your inbox" for an
+                // email that will never arrive.
+                if user.identities?.isEmpty == true { return .duplicateAccount }
+                return .confirmationRequired
+            }
+        } catch let error as AuthError {
+            switch error.errorCode {
+            case .userAlreadyExists, .emailExists:
+                return .duplicateAccount
+            case .weakPassword:
+                return .failed("That password is too weak. Try a longer one.")
+            default:
+                return .failed(friendlyMessage(error))
+            }
+        } catch {
+            return .failed(friendlyMessage(error))
+        }
+    }
+
+    /// Re-sends the signup confirmation link (PRD §5.2, Resend button).
+    func resendConfirmation(email: String) async -> AuthEmailOutcome {
+        await sendEmail {
+            try await self.supabase.auth.resend(
+                email: AuthValidation.normalized(email),
+                type: .signup
+            )
+        }
+    }
+
+    /// Password-reset email (PRD §5.3).
+    func sendPasswordReset(email: String) async -> AuthEmailOutcome {
+        await sendEmail {
+            try await self.supabase.auth.resetPasswordForEmail(AuthValidation.normalized(email))
+        }
+    }
+
+    private func sendEmail(_ operation: () async throws -> Void) async -> AuthEmailOutcome {
+        do {
+            try await operation()
+            return .sent
+        } catch let error as AuthError {
+            if error.errorCode == .overEmailSendRateLimit || error.errorCode == .overRequestRateLimit {
+                return .rateLimited
+            }
+            return .failed(friendlyMessage(error))
+        } catch {
+            return .failed(friendlyMessage(error))
+        }
+    }
+
+    /// Exchanges an Apple identity token for a Supabase session.
+    ///
+    /// - Parameter rawNonce: the **unhashed** nonce. The `ASAuthorizationAppleIDRequest`
+    ///   carried its SHA-256 hash; Supabase hashes this value itself and compares.
+    ///   Passing the hash here fails the exchange.
+    /// - Returns: `nil` on success, otherwise a message to render inline.
+    func signInWithApple(_ identity: AppleIdentity, rawNonce: String) async -> String? {
+        do {
+            _ = try await supabase.auth.signInWithIdToken(
+                credentials: .init(provider: .apple, idToken: identity.idToken, nonce: rawNonce)
+            )
+            state = .signedIn
+
+            // Apple hands over the display name exactly once, on the first ever
+            // authorization for this Apple ID. If we don't persist it here it is
+            // unrecoverable — there is no API to ask for it again.
+            if let fullName = identity.fullName {
+                try? await supabase.auth.update(
+                    user: UserAttributes(data: ["full_name": .string(fullName)])
+                )
+            }
+            return nil
+        } catch {
+            return friendlyMessage(error)
         }
     }
 

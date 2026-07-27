@@ -30,6 +30,11 @@ targets:
         # session the app stores, instead of each one owning its own login.
         keychain-access-groups:
           - $(AppIdentifierPrefix)com.padzy.autocoach
+        # Sign in with Apple (design PRD §5.1). Required for the Welcome screen's
+        # primary CTA; the token is exchanged with Supabase client-side, so no
+        # backend change rides along with this.
+        com.apple.developer.applesignin:
+          - Default
     dependencies:
       - package: supabase-swift
         product: Supabase

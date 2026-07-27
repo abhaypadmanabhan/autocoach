@@ -8,11 +8,13 @@
 
 /* Begin PBXBuildFile section */
 		046BA172D6DAAE8F89B4522C /* ACX.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4251C9CFABE24532762CACB /* ACX.swift */; };
+		0B3F8D1AD03CD15A4F68F5EF /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8BCA6BE02B711F3B1788F63B /* SignupView.swift */; };
 		0DB802E132A41CB6846EF26C /* DocumentUploadController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC6CE3C34CA1C20CD1898A39 /* DocumentUploadController.swift */; };
 		0E037A8588CD663D6CCF5758 /* SpaceMono-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = F21116A62E5F1ED4D24072B2 /* SpaceMono-Regular.ttf */; };
 		106B0ECB91F8A3387010E9E0 /* OFL-SpaceGrotesk.txt in Resources */ = {isa = PBXBuildFile; fileRef = D34B3684BB9A73D21877CBEE /* OFL-SpaceGrotesk.txt */; };
 		1789B6417CEBE3BC0564BE7D /* ACXOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01027ED86C19ED6199C15AD /* ACXOverlay.swift */; };
 		1810253D8B3146F0BABA6EE1 /* ACXControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2EF62063A417D58B4862185 /* ACXControls.swift */; };
+		1C98B94D1D048BE533024485 /* AppleSignIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 343B27E56F252B6D3DFFAE8D /* AppleSignIn.swift */; };
 		2BB9A0527DFEC51DBAD7F939 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 62E16E7EAA4DD09D2681E029 /* Assets.xcassets */; };
 		2EBA1537E7174F3FCA3C0CF5 /* QuizEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBD299DDB80AF6C8412F64F /* QuizEngine.swift */; };
 		2F7A64635A75334D0A106256 /* SpaceGrotesk-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = AFCB7817635927AC40C9F688 /* SpaceGrotesk-Variable.ttf */; };
@@ -20,6 +22,7 @@
 		3D73B3841A2BDA6110C0D713 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = D28FB7823409F953E92F98B4 /* Inter-Variable.ttf */; };
 		49187559B7661A6D04E5D9EC /* OnboardingSteps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0975AE6B5B61CB540B30CD7B /* OnboardingSteps.swift */; };
 		4BF82FE13EEE509847A92093 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A023C9A0FDDF99EA04D4F276 /* APIClient.swift */; };
+		56A04E62359A283AFCB217CC /* AuthFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13BD95B1EA64BE82D52D0868 /* AuthFlowView.swift */; };
 		5BDF17F4CB709F8A996C5956 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8D32E69FA9039293F919074 /* APIError.swift */; };
 		5F8773F02F036402EDCA5039 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63FE16361212534ED3D1FB0F /* DashboardView.swift */; };
 		631E07338E73858C85FA8584 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D27F21A455DCDB9772CA137 /* MainTabView.swift */; };
@@ -35,13 +38,16 @@
 		A87824E7936984AC6D20C5A9 /* OnboardingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EADAC7B91F0179AD6E85F86 /* OnboardingModel.swift */; };
 		AB9193E83E8AA611732CF6A8 /* SpaceMono-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 056A9A343087E8729185A23C /* SpaceMono-Bold.ttf */; };
 		ADB2E747CEED2EE8C0ADE7FE /* ResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC00C16AAD37177FCB03697F /* ResultsView.swift */; };
+		B2DE64D9F1310FE29B91046D /* AuthValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3B12A3E023B8C002C371A30 /* AuthValidation.swift */; };
 		C06BF0B4CE0B9F218490CC2E /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = E786F48ABAB5E0900161F915 /* Supabase */; };
 		C1D3F3690CF791F957F78CE3 /* UploadSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5396246A4514C773DC74746 /* UploadSheet.swift */; };
+		CB780F82D630203BF11BBDFA /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7A8D8E4F98FA5BDDFDF9DA /* ForgotPasswordView.swift */; };
 		CE57A8690A4756E69765A87E /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFF6879D641866A675BDD132 /* AppRoot.swift */; };
 		D78546836A77052962A91712 /* OnboardingComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E31B09C612678734BF84EF /* OnboardingComponents.swift */; };
 		D82C3164E04337E840DB107F /* AutoCoachApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5C3F9D33FC762A6BD2F7442 /* AutoCoachApp.swift */; };
 		DE7DA802D876BDE39F80278F /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D23F5AD4A9F71A97F07845 /* Models.swift */; };
 		E7208E54CDA323C5E4661CC2 /* ACXProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63F105F4E334D3E09AC487E5 /* ACXProgress.swift */; };
+		F1BBDAFD5B602A013C22428E /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8266837857C0645EFE02272 /* WelcomeView.swift */; };
 		F450DDE019E9F4BF6E4DF004 /* AuthStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C04D7751CF4CE2F9EC9275 /* AuthStore.swift */; };
 		F4C647718A83F417F9A79BEB /* StorageProgressUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EBBE50CC7B6C3A7CA8DA38E /* StorageProgressUploader.swift */; };
 /* End PBXBuildFile section */
@@ -49,9 +55,11 @@
 /* Begin PBXFileReference section */
 		056A9A343087E8729185A23C /* SpaceMono-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceMono-Bold.ttf"; sourceTree = "<group>"; };
 		0975AE6B5B61CB540B30CD7B /* OnboardingSteps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSteps.swift; sourceTree = "<group>"; };
+		13BD95B1EA64BE82D52D0868 /* AuthFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthFlowView.swift; sourceTree = "<group>"; };
 		23CCE8CCA334EE61CBB38401 /* ACXConcept.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACXConcept.swift; sourceTree = "<group>"; };
 		32431E6E9C637A05C788938D /* AutoCoach.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AutoCoach.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3316EC4AB5AFD27CF4D51B85 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		343B27E56F252B6D3DFFAE8D /* AppleSignIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignIn.swift; sourceTree = "<group>"; };
 		3D03E63E84A7E7F7FFC3DB59 /* OFL-Inter.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-Inter.txt"; sourceTree = "<group>"; };
 		4EBBE50CC7B6C3A7CA8DA38E /* StorageProgressUploader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageProgressUploader.swift; sourceTree = "<group>"; };
 		5574C6EBD92D50710C45F3C2 /* AnswerInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnswerInput.swift; sourceTree = "<group>"; };
@@ -62,6 +70,7 @@
 		7D27F21A455DCDB9772CA137 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		85EA1F0D090A877A34A7323D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		86EE97DCA64F552AB1904CF0 /* OFL-SpaceMono.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "OFL-SpaceMono.txt"; sourceTree = "<group>"; };
+		8BCA6BE02B711F3B1788F63B /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
 		A01027ED86C19ED6199C15AD /* ACXOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACXOverlay.swift; sourceTree = "<group>"; };
 		A023C9A0FDDF99EA04D4F276 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A0D23F5AD4A9F71A97F07845 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -69,8 +78,11 @@
 		AE2C67FA1A75828ACF46DBC6 /* StudyReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyReminderScheduler.swift; sourceTree = "<group>"; };
 		AFCB7817635927AC40C9F688 /* SpaceGrotesk-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "SpaceGrotesk-Variable.ttf"; sourceTree = "<group>"; };
 		AFF6879D641866A675BDD132 /* AppRoot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRoot.swift; sourceTree = "<group>"; };
+		B3B12A3E023B8C002C371A30 /* AuthValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthValidation.swift; sourceTree = "<group>"; };
 		B3B25C4177B2E31336755F7C /* QuizSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizSessionView.swift; sourceTree = "<group>"; };
+		BA7A8D8E4F98FA5BDDFDF9DA /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
 		C5396246A4514C773DC74746 /* UploadSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UploadSheet.swift; sourceTree = "<group>"; };
+		C8266837857C0645EFE02272 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		CC00C16AAD37177FCB03697F /* ResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ResultsView.swift; sourceTree = "<group>"; };
 		CC6CE3C34CA1C20CD1898A39 /* DocumentUploadController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentUploadController.swift; sourceTree = "<group>"; };
 		D28FB7823409F953E92F98B4 /* Inter-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Inter-Variable.ttf"; sourceTree = "<group>"; };
@@ -86,7 +98,7 @@
 		F4251C9CFABE24532762CACB /* ACX.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACX.swift; sourceTree = "<group>"; };
 		F4C04D7751CF4CE2F9EC9275 /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		FD20C58B38D1DC3927C970AC /* AutoCoach.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoCoach.entitlements; sourceTree = "<group>"; };
-		"TEMP_B3A6E2CE-F5DB-4180-8C6E-9DA33910BB87" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_3CF84DF5-8AA1-41AD-A271-25C5F6B4573F" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -222,8 +234,14 @@
 		F12B76E59199994C9D326773 /* Auth */ = {
 			isa = PBXGroup;
 			children = (
+				343B27E56F252B6D3DFFAE8D /* AppleSignIn.swift */,
+				13BD95B1EA64BE82D52D0868 /* AuthFlowView.swift */,
 				F4C04D7751CF4CE2F9EC9275 /* AuthStore.swift */,
+				B3B12A3E023B8C002C371A30 /* AuthValidation.swift */,
+				BA7A8D8E4F98FA5BDDFDF9DA /* ForgotPasswordView.swift */,
 				A116A298B8DA8AEB52052C49 /* LoginView.swift */,
+				8BCA6BE02B711F3B1788F63B /* SignupView.swift */,
+				C8266837857C0645EFE02272 /* WelcomeView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -242,10 +260,10 @@
 			path = Fonts;
 			sourceTree = "<group>";
 		};
-		"TEMP_3C3ADE1D-F03D-43A6-871F-FD2E39B84DA7" /* ios */ = {
+		"TEMP_D5BC45C2-BB3A-4BC4-98AB-6CEB7A4679BA" /* ios */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_B3A6E2CE-F5DB-4180-8C6E-9DA33910BB87" /* Config.xcconfig */,
+				"TEMP_3CF84DF5-8AA1-41AD-A271-25C5F6B4573F" /* Config.xcconfig */,
 			);
 			path = ios;
 			sourceTree = "<group>";
@@ -343,10 +361,14 @@
 				A7B962307419A3AD5CD880B4 /* AnswerInput.swift in Sources */,
 				8033B6A47FADE7CF8D375512 /* AppConfig.swift in Sources */,
 				CE57A8690A4756E69765A87E /* AppRoot.swift in Sources */,
+				1C98B94D1D048BE533024485 /* AppleSignIn.swift in Sources */,
+				56A04E62359A283AFCB217CC /* AuthFlowView.swift in Sources */,
 				F450DDE019E9F4BF6E4DF004 /* AuthStore.swift in Sources */,
+				B2DE64D9F1310FE29B91046D /* AuthValidation.swift in Sources */,
 				D82C3164E04337E840DB107F /* AutoCoachApp.swift in Sources */,
 				5F8773F02F036402EDCA5039 /* DashboardView.swift in Sources */,
 				0DB802E132A41CB6846EF26C /* DocumentUploadController.swift in Sources */,
+				CB780F82D630203BF11BBDFA /* ForgotPasswordView.swift in Sources */,
 				82594DDFC89A21F53524E7FC /* LoginView.swift in Sources */,
 				631E07338E73858C85FA8584 /* MainTabView.swift in Sources */,
 				DE7DA802D876BDE39F80278F /* Models.swift in Sources */,
@@ -357,10 +379,12 @@
 				2EBA1537E7174F3FCA3C0CF5 /* QuizEngine.swift in Sources */,
 				337A9A601435375D89B52033 /* QuizSessionView.swift in Sources */,
 				ADB2E747CEED2EE8C0ADE7FE /* ResultsView.swift in Sources */,
+				0B3F8D1AD03CD15A4F68F5EF /* SignupView.swift in Sources */,
 				7CB1CDA745A9449278F1ABA9 /* SpeechRecognizer.swift in Sources */,
 				F4C647718A83F417F9A79BEB /* StorageProgressUploader.swift in Sources */,
 				6BF6884014DF415C563D4B6F /* StudyReminderScheduler.swift in Sources */,
 				C1D3F3690CF791F957F78CE3 /* UploadSheet.swift in Sources */,
+				F1BBDAFD5B602A013C22428E /* WelcomeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -369,7 +393,7 @@
 /* Begin XCBuildConfiguration section */
 		4E1D2010D662D65FE717F20E /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_B3A6E2CE-F5DB-4180-8C6E-9DA33910BB87" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_3CF84DF5-8AA1-41AD-A271-25C5F6B4573F" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoCoach/AutoCoach.entitlements;
@@ -513,7 +537,7 @@
 		};
 		B7A38C4FDEAED7CF2D47B30A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_B3A6E2CE-F5DB-4180-8C6E-9DA33910BB87" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_3CF84DF5-8AA1-41AD-A271-25C5F6B4573F" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoCoach/AutoCoach.entitlements;
