@@ -60,7 +60,7 @@ struct RootView: View {
         case .loading:
             BootView()
         case .signedOut:
-            LoginView(auth: auth)
+            AuthFlowView(auth: auth)
                 // Re-arm the probe so the *next* sign-in re-checks rather than
                 // inheriting the previous account's answer.
                 .onAppear { gate = .probing }
@@ -76,7 +76,7 @@ struct RootView: View {
             BootView()
                 .task { await probeOnboarding() }
         case .needsOnboarding:
-            OnboardingPlaceholder { gate = .ready }
+            OnboardingFlowView(api: api) { gate = .ready }
         case .ready:
             MainTabView(auth: auth, api: api)
         }

@@ -13,6 +13,8 @@ struct MainTabView: View {
     let auth: AuthStore
     let api: APIClient
 
+    @State private var showUpload = false
+
     var body: some View {
         TabView {
             Tab("Today", systemImage: "square.grid.2x2") {
@@ -23,6 +25,26 @@ struct MainTabView: View {
             Tab("Library", systemImage: "tray.full") {
                 NavigationStack {
                     DashboardView(auth: auth, api: api)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button {
+                                    showUpload = true
+                                } label: {
+                                    Image(systemName: "plus")
+                                        .foregroundStyle(ACXColor.ink)
+                                }
+                                .accessibilityLabel("Add a document")
+                            }
+                        }
+                }
+                .sheet(isPresented: $showUpload) {
+                    // `AuthStore` already owns the configured client, so the sheet
+                    // does not need a second one threaded down from `AppRoot`.
+                    UploadSheet(api: api, supabase: auth.supabase) { _ in
+                        showUpload = false
+                        // The library reloads on appear, so a newly-ready document
+                        // shows up without a manual refresh.
+                    }
                 }
             }
             Tab("Profile", systemImage: "person") {
@@ -58,41 +80,6 @@ struct TabPlaceholder: View {
     }
 }
 
-/// Stand-in for the real `OnboardingFlow` (design PRD §5.4), which Phase 1
-/// lane B owns. Routing to it is live now so the four-way `RootView` switch is
-/// exercised; only the body is a placeholder.
-///
-/// `onSkip` lets the user through to the app so a routing bug here can never
-/// hard-lock an account out of the product.
-struct OnboardingPlaceholder: View {
-    var onSkip: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Kicker("ONBOARDING")
-            Hairline()
-            Text("Onboarding")
-                .font(ACXFont.display(26))
-                .foregroundStyle(ACXColor.ink)
-                .padding(.top, 6)
-            Text("The four-step onboarding flow is built in a later lane. Continue for now.")
-                .font(ACXFont.body(14))
-                .foregroundStyle(ACXColor.muted)
-
-            Button("CONTINUE", action: onSkip)
-                .buttonStyle(PrimaryButtonStyle())
-                .padding(.top, 16)
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(GroundBackground())
-    }
-}
-
 #Preview("TabPlaceholder") {
     TabPlaceholder(kicker: "01 / TODAY", line: "Today's review queue lands here.")
-}
-
-#Preview("OnboardingPlaceholder") {
-    OnboardingPlaceholder(onSkip: {})
 }
