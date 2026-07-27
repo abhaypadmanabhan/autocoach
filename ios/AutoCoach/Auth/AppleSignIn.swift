@@ -64,12 +64,44 @@ enum AppleNonce {
     }
 }
 
-/// "Continue with Apple" — the system button, squared off to zero radius.
+/// The system Apple button, at zero corner radius.
 ///
-/// Apple's guidelines forbid recolouring or redrawing the button, so this is the
-/// one surface in the app that is Apple-black rather than ink. The rounded fill it
-/// draws is covered by a square black rectangle behind it, which lands the Quiet
-/// Brutalism zero-radius rule without touching the button's own artwork.
+/// SwiftUI's `SignInWithAppleButton` gives no way to change the corner radius, and
+/// painting a square rectangle *behind* it does not work — the button draws its own
+/// rounded fill on top, so the rounding stays visible. `ASAuthorizationAppleIDButton`
+/// does expose `cornerRadius`, so we use the UIKit button directly and set it to 0.
+///
+/// This keeps Apple's own artwork and typography untouched (their guidelines forbid
+/// redrawing it) while satisfying the zero-radius rule. It is still the one surface in
+/// the app that is Apple-black rather than ink, which Apple requires.
+private struct AppleIDButtonRepresentable: UIViewRepresentable {
+    let onTap: () -> Void
+
+    func makeUIView(context: Context) -> ASAuthorizationAppleIDButton {
+        let button = ASAuthorizationAppleIDButton(authorizationButtonType: .continue,
+                                                  authorizationButtonStyle: .black)
+        button.cornerRadius = 0
+        button.addTarget(context.coordinator,
+                         action: #selector(Coordinator.tapped),
+                         for: .touchUpInside)
+        return button
+    }
+
+    func updateUIView(_ view: ASAuthorizationAppleIDButton, context: Context) {
+        context.coordinator.onTap = onTap
+        view.cornerRadius = 0
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(onTap: onTap) }
+
+    final class Coordinator: NSObject {
+        var onTap: () -> Void
+        init(onTap: @escaping () -> Void) { self.onTap = onTap }
+        @objc func tapped() { onTap() }
+    }
+}
+
+/// "Continue with Apple" — the system button, squared off to zero radius.
 struct AppleSignInButton: View {
     let auth: AuthStore
     /// Surfaced inline by the parent — never a raw alert.
@@ -78,24 +110,37 @@ struct AppleSignInButton: View {
     var onFinish: () -> Void = {}
 
     @State private var rawNonce: String = ""
+    @State private var delegate: AppleAuthDelegate?
 
     var body: some View {
-        SignInWithAppleButton(.continue) { request in
-            let nonce = AppleNonce.random()
-            rawNonce = nonce
-            request.requestedScopes = [.fullName, .email]
-            request.nonce = AppleNonce.sha256(nonce)   // hashed on the request…
-        } onCompletion: { result in
-            // `onCompletion` is delivered on the main thread; asserting that lets us
-            // read the non-Sendable `ASAuthorization` without hopping actors.
+        AppleIDButtonRepresentable { start() }
+            .frame(height: 52)
+            .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 2))
+            .acxHardShadow()
+            .accessibilityLabel("Continue with Apple")
+    }
+
+    /// Drives `ASAuthorizationController` by hand, because we no longer get the
+    /// request/completion closures `SignInWithAppleButton` provided.
+    @MainActor
+    private func start() {
+        let nonce = AppleNonce.random()
+        rawNonce = nonce
+
+        let request = ASAuthorizationAppleIDProvider().createRequest()
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = AppleNonce.sha256(nonce)   // hashed on the request…
+
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        let d = AppleAuthDelegate { result in
             MainActor.assumeIsolated { handle(result) }
         }
-        .signInWithAppleButtonStyle(.black)
-        .frame(height: 52)
-        .background(Rectangle().fill(Color.black))
-        .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 2))
-        .acxHardShadow()
-        .accessibilityLabel("Continue with Apple")
+        // Held in @State so ARC does not release the delegate while the sheet is up —
+        // ASAuthorizationController holds its delegate weakly.
+        delegate = d
+        controller.delegate = d
+        controller.presentationContextProvider = d
+        controller.performRequests()
     }
 
     @MainActor
@@ -121,5 +166,35 @@ struct AppleSignInButton: View {
             }
             errorMessage = "Apple sign-in didn't complete. Try again."
         }
+    }
+}
+
+/// Delegate + presentation anchor for the hand-driven `ASAuthorizationController`.
+///
+/// `ASAuthorizationController` keeps `delegate` and `presentationContextProvider`
+/// **weak**, so the caller must retain this for the lifetime of the sheet.
+final class AppleAuthDelegate: NSObject, ASAuthorizationControllerDelegate,
+                               ASAuthorizationControllerPresentationContextProviding {
+    private let completion: (Result<ASAuthorization, any Error>) -> Void
+
+    init(completion: @escaping (Result<ASAuthorization, any Error>) -> Void) {
+        self.completion = completion
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithAuthorization authorization: ASAuthorization) {
+        completion(.success(authorization))
+    }
+
+    func authorizationController(controller: ASAuthorizationController,
+                                 didCompleteWithError error: any Error) {
+        completion(.failure(error))
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+        return scene?.keyWindow ?? ASPresentationAnchor()
     }
 }
