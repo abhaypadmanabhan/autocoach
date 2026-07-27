@@ -122,7 +122,7 @@ struct QuizSessionView: View {
             TrueFalseView(selection: $tfSelection)
         case .freeText:
             FreeTextAnswerView(text: $freeText, usedVoice: $usedVoice, speech: speech)
-        case .rendered:
+        case .rendered, .unknown:
             Text("Unsupported question type.")
                 .font(ACXFont.mono(12)).foregroundStyle(ACXColor.muted)
         }
@@ -237,7 +237,7 @@ struct QuizSessionView: View {
         case .mcq: return mcqSelection != nil
         case .tf: return tfSelection != nil
         case .freeText: return !freeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .rendered: return false
+        case .rendered, .unknown: return false
         }
     }
 
@@ -259,7 +259,7 @@ struct QuizSessionView: View {
             let trimmed = freeText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
             return (trimmed, usedVoice ? .voice : .typed)
-        case .rendered:
+        case .rendered, .unknown:
             return nil
         }
     }

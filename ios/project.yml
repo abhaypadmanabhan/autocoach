@@ -19,6 +19,17 @@ targets:
     platform: iOS
     sources:
       - AutoCoach
+    entitlements:
+      path: AutoCoach/AutoCoach.entitlements
+      properties:
+        # App Group — shared container for the Phase 4 widget + share extension
+        # (design PRD §6.1 / §6.4). Declared now so those targets are unblocked.
+        com.apple.security.application-groups:
+          - group.com.padzy.autocoach
+        # Keychain access group — lets the future extensions read the Supabase
+        # session the app stores, instead of each one owning its own login.
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)com.padzy.autocoach
     dependencies:
       - package: supabase-swift
         product: Supabase
@@ -34,6 +45,13 @@ targets:
         UIUserInterfaceStyle: Light
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # Bundled Padzy OS faces (OFL) — see AutoCoach/Resources/Fonts/.
+        # Must live here rather than in INFOPLIST_KEY_*, which has no array form.
+        UIAppFonts:
+          - SpaceGrotesk-Variable.ttf
+          - Inter-Variable.ttf
+          - SpaceMono-Regular.ttf
+          - SpaceMono-Bold.ttf
         # Voice dictation for free-text answers (M2).
         NSMicrophoneUsageDescription: "AutoCoach uses the microphone to dictate your free-text quiz answers."
         NSSpeechRecognitionUsageDescription: "AutoCoach uses speech recognition to transcribe your dictated quiz answers."

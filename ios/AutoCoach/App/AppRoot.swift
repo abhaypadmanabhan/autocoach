@@ -31,10 +31,29 @@ struct AppRoot: View {
     }
 }
 
-/// Root switch on `AuthStore.state` (driven by `authStateChanges`).
+/// Root switch on `AuthStore.state` (driven by `authStateChanges`), plus the
+/// onboarding gate.
+///
+/// Four destinations: loading / signedOut / signedIn-needs-onboarding /
+/// signedIn. The onboarding branch is resolved by `GET /onboarding`, which is
+/// probed once per signed-in session.
+///
+/// **Failure policy:** a failed probe routes to the app, not to onboarding. A
+/// transient network blip must never trap a returning user in a signup flow they
+/// already finished. The cost of the opposite default is a user who silently
+/// never gets onboarded.
 struct RootView: View {
     let auth: AuthStore
     let api: APIClient
+
+    /// Resolution state of the `GET /onboarding` probe.
+    private enum Gate: Equatable {
+        case probing
+        case needsOnboarding
+        case ready
+    }
+
+    @State private var gate: Gate = .probing
 
     var body: some View {
         switch auth.state {
@@ -42,8 +61,34 @@ struct RootView: View {
             BootView()
         case .signedOut:
             LoginView(auth: auth)
+                // Re-arm the probe so the *next* sign-in re-checks rather than
+                // inheriting the previous account's answer.
+                .onAppear { gate = .probing }
         case .signedIn:
-            DashboardView(auth: auth, api: api)
+            signedInBody
+        }
+    }
+
+    @ViewBuilder
+    private var signedInBody: some View {
+        switch gate {
+        case .probing:
+            BootView()
+                .task { await probeOnboarding() }
+        case .needsOnboarding:
+            OnboardingPlaceholder { gate = .ready }
+        case .ready:
+            MainTabView(auth: auth, api: api)
+        }
+    }
+
+    private func probeOnboarding() async {
+        do {
+            let status: OnboardingResponse = try await api.get("/onboarding")
+            gate = status.has_completed ? .ready : .needsOnboarding
+        } catch {
+            // Fail open — see the failure policy above.
+            gate = .ready
         }
     }
 }

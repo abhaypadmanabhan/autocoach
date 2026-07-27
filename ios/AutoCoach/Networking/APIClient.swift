@@ -62,12 +62,22 @@ actor APIClient {
             let (data, response): (Data, URLResponse)
             do {
                 (data, response) = try await perform(path: path, method: method, query: query, body: body)
+            } catch let err as APIError {
+                // `perform` raises typed errors of its own (e.g. `.configMissing`
+                // for an unbuildable URL). Blanket-wrapping them in `.network`
+                // told the user "check your connection" for a config bug.
+                throw err
             } catch let err as URLError {
                 throw APIError.network(err.localizedDescription)
             } catch {
                 throw APIError.network(error.localizedDescription)
             }
-            let http = response as! HTTPURLResponse
+
+            // A non-HTTP `URLResponse` is reachable (custom URL protocols, some
+            // proxy failures). Force-casting crashed the app; report it instead.
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.network("Server returned a non-HTTP response.")
+            }
 
             if http.statusCode == 401 {
                 if !refreshed {

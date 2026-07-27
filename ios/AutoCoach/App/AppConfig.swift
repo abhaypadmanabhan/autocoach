@@ -16,8 +16,10 @@ enum AppConfig {
     static let supabaseKey: String? = resolvedString(forKey: "SUPABASE_PUBLISHABLE_KEY")
 
     static let backendBaseURL: URL = {
-        let raw = resolvedString(forKey: "BACKEND_BASE_URL")
-        if let raw, let url = URL(string: raw), url.scheme?.hasPrefix("http") == true {
+        // Same host requirement as `resolvedURL` — a hostless `https:` would
+        // otherwise become the base URL and every request would build a
+        // malformed URL.
+        if let url = resolvedURL(forKey: "BACKEND_BASE_URL") {
             return url
         }
         return URL(string: "https://autocoach-production.up.railway.app")!
@@ -33,10 +35,20 @@ enum AppConfig {
         return trimmed
     }
 
-    /// Reads an Info.plist string that must be an http(s) URL.
+    /// Reads an Info.plist string that must be an http(s) URL **with a host**.
+    ///
+    /// The host check is load-bearing: xcconfig treats `//` as a comment, so a
+    /// value written `https://host` truncates to `https:` — which is a perfectly
+    /// valid `URL` with an `https` scheme and no host. That slipped through the
+    /// scheme-only check, reported `isConfigured == true`, and crashed inside
+    /// `SupabaseClient` ("supabaseURL must have a valid host") instead of showing
+    /// the config-missing screen this type exists to guarantee.
     private static func resolvedURL(forKey key: String) -> URL? {
         guard let raw = resolvedString(forKey: key) else { return nil }
-        guard let url = URL(string: raw), url.scheme?.hasPrefix("http") == true else { return nil }
+        guard let url = URL(string: raw),
+              url.scheme?.hasPrefix("http") == true,
+              let host = url.host(), !host.isEmpty
+        else { return nil }
         return url
     }
 }

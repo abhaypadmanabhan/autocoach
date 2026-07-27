@@ -1,11 +1,10 @@
 import SwiftUI
+import UIKit
 
 /// Padzy OS / "Quiet Brutalism" design tokens → SwiftUI (research §5).
 ///
-/// M2 typography uses the **system font with `.monospaced` design** as the
-/// Space-Mono fallback (per the M2 brief: "System-mono fallback OK for data
-/// text"). Bundling the Space Grotesk / Inter / Space Mono TTFs is deferred —
-/// noted in the brief progress log.
+/// Typography is the **bundled** Space Grotesk / Inter / Space Mono (OFL), not a
+/// system fallback — see `ACXFont.Face` for the verified PostScript names.
 ///
 /// Hard rules enforced across the slice:
 /// - Zero radii everywhere (only the status-pill *dot* `Circle` is rounded).
@@ -22,20 +21,69 @@ enum ACXColor {
 }
 
 enum ACXFont {
-    /// Space-Mono fallback for ALL data text (numbers, IDs, kickers, scores).
+    /// Verified PostScript names for the TTFs in `Resources/Fonts/`.
+    ///
+    /// Space Grotesk and Inter ship from Google Fonts as **variable** faces, and
+    /// their named instances carry the default instance as a prefix — the bold
+    /// Space Grotesk instance really is called `SpaceGrotesk-Light_Bold`. These
+    /// strings were read back out of the actual files via
+    /// `CTFontManagerCreateFontDescriptorsFromURL`; do not "tidy" them, a wrong
+    /// name silently resolves to a system face with no build error.
+    enum Face {
+        static let displayRegular = "SpaceGrotesk-Light_Regular"
+        static let displayMedium = "SpaceGrotesk-Light_Medium"
+        static let displayBold = "SpaceGrotesk-Light_Bold"
+        static let bodyRegular = "Inter-Regular"
+        static let bodyMedium = "Inter-Regular_Medium"
+        static let bodySemibold = "Inter-Regular_SemiBold"
+        static let monoRegular = "SpaceMono-Regular"
+        static let monoBold = "SpaceMono-Bold"
+    }
+
+    /// Space Mono for ALL data text (numbers, IDs, kickers, scores).
     static func mono(_ size: CGFloat, relativeTo: Font.TextStyle = .footnote) -> Font {
-        .system(size: size, weight: .regular, design: .monospaced)
+        .custom(Face.monoRegular, size: size, relativeTo: relativeTo)
     }
     static func monoBold(_ size: CGFloat, relativeTo: Font.TextStyle = .footnote) -> Font {
-        .system(size: size, weight: .semibold, design: .monospaced)
+        .custom(Face.monoBold, size: size, relativeTo: relativeTo)
     }
-    /// Inter fallback for body copy.
+    /// Inter for body copy.
     static func body(_ size: CGFloat = 17, relativeTo: Font.TextStyle = .body) -> Font {
-        .system(size: size, weight: .regular, design: .default)
+        .custom(Face.bodyRegular, size: size, relativeTo: relativeTo)
     }
-    /// Space Grotesk fallback for display/headings.
+    static func bodyMedium(_ size: CGFloat = 17, relativeTo: Font.TextStyle = .body) -> Font {
+        .custom(Face.bodyMedium, size: size, relativeTo: relativeTo)
+    }
+    static func bodySemibold(_ size: CGFloat = 17, relativeTo: Font.TextStyle = .body) -> Font {
+        .custom(Face.bodySemibold, size: size, relativeTo: relativeTo)
+    }
+    /// Space Grotesk for display/headings.
     static func display(_ size: CGFloat, relativeTo: Font.TextStyle = .largeTitle) -> Font {
-        .system(size: size, weight: .bold, design: .default)
+        .custom(Face.displayBold, size: size, relativeTo: relativeTo)
+    }
+    static func displayMedium(_ size: CGFloat, relativeTo: Font.TextStyle = .largeTitle) -> Font {
+        .custom(Face.displayMedium, size: size, relativeTo: relativeTo)
+    }
+
+    /// Debug-only guard: proves the bundled faces actually registered rather than
+    /// silently falling back to San Francisco. Called once from `AutoCoachApp`.
+    static func assertBundledFacesResolve() {
+        #if DEBUG
+        let all = [
+            Face.displayRegular, Face.displayMedium, Face.displayBold,
+            Face.bodyRegular, Face.bodyMedium, Face.bodySemibold,
+            Face.monoRegular, Face.monoBold,
+        ]
+        for name in all {
+            guard let font = UIFont(name: name, size: 12) else {
+                assertionFailure("ACXFont: bundled face '\(name)' did not register — check UIAppFonts in project.yml")
+                continue
+            }
+            // `UIFont(name:)` returns a font even for a near-miss family match, so
+            // compare the resolved PostScript name rather than just non-nil.
+            print("[ACXFont] \(name) -> \(font.fontName)\(font.fontName == name ? "" : "  ⚠️ MISMATCH")")
+        }
+        #endif
     }
 }
 
