@@ -26,49 +26,36 @@ struct LocalStreakSnapshot: Equatable, Sendable {
 
     static let zero = LocalStreakSnapshot(count: 0, activeDays: [], freezeAvailable: false)
 
-    /// Candidate keys Lane D may write. First hit wins per field.
-    private enum Key {
-        static let count = ["autocoach.streak.count", "streak.currentCount", "streak.count"]
-        static let activeDays = ["autocoach.streak.activeDays", "streak.activeDays", "streak.weekDays"]
-        static let freeze = ["autocoach.streak.freezeAvailable", "streak.freezeAvailable", "streak.freeze"]
-    }
+    /// Reads the streak from `StreakStore`, which is the single writer.
+    ///
+    /// This deliberately does **not** guess at UserDefaults keys. The Today lane
+    /// persists a `StreakState` as JSON in the App Group container, not as discrete
+    /// defaults keys, so a key-probing reader would have silently reported a zero
+    /// streak forever — the failure would have looked like "the user hasn't studied"
+    /// rather than like a bug.
+    @MainActor
+    static func read(store: StreakStore = StreakStore(), now: Date = Date()) -> LocalStreakSnapshot {
+        let snap = store.snapshot(asOf: now)
 
-    static func read(from defaults: UserDefaults = ProfileAppGroup.defaults) -> LocalStreakSnapshot {
-        let resolvedCount: Int = {
-            for key in Key.count {
-                if defaults.object(forKey: key) != nil {
-                    return max(0, defaults.integer(forKey: key))
-                }
-            }
-            return 0
-        }()
-
+        // Map this week's recorded study days onto Monday-first indices for WeekStrip.
+        var calendar = Calendar.autoupdatingCurrent
+        calendar.firstWeekday = 2   // Monday
         let active: Set<Int> = {
-            for key in Key.activeDays {
-                if let arr = defaults.array(forKey: key) as? [Int] {
-                    return Set(arr.filter { (0..<7).contains($0) })
-                }
-                if let data = defaults.data(forKey: key),
-                   let decoded = try? JSONDecoder().decode([Int].self, from: data) {
-                    return Set(decoded.filter { (0..<7).contains($0) })
-                }
+            guard let week = calendar.dateInterval(of: .weekOfYear, for: now) else { return [] }
+            var out: Set<Int> = []
+            for key in store.state.studyDays {
+                guard let date = StudyDay.noon(key), week.contains(date) else { continue }
+                // weekday is 1=Sun…7=Sat; shift so Monday == 0.
+                let weekday = calendar.component(.weekday, from: date)
+                out.insert((weekday + 5) % 7)
             }
-            return []
-        }()
-
-        let freeze: Bool = {
-            for key in Key.freeze {
-                if defaults.object(forKey: key) != nil {
-                    return defaults.bool(forKey: key)
-                }
-            }
-            return false
+            return out
         }()
 
         return LocalStreakSnapshot(
-            count: resolvedCount,
+            count: snap.days,
             activeDays: active,
-            freezeAvailable: freeze
+            freezeAvailable: snap.freezesRemaining > 0
         )
     }
 }

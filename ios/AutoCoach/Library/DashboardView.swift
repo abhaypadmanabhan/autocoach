@@ -64,15 +64,9 @@ struct DashboardView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(ACXColor.ground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { Task { await auth.signOut() } } label: {
-                    Image(systemName: "rectangle.portrait.and.arrow.right")
-                }
-                .tint(ACXColor.ink)
-                .accessibilityLabel("Sign out")
-            }
-        }
+        // Sign-out lives in Profile now (design PRD §5.12). The lane kept a copy
+        // here as a safety net in case Profile slipped; it shipped, so this is gone
+        // rather than left as a second, divergent exit.
         .navigationDestination(for: DocumentRoute.self) { route in
             DocumentDetailView(route: route, api: api)
         }

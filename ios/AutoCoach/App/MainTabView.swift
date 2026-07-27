@@ -14,15 +14,17 @@ struct MainTabView: View {
     let api: APIClient
 
     @State private var showUpload = false
+    /// Owned here so Today's "study anyway" route can switch tabs.
+    @State private var selection: Int = 0
 
     var body: some View {
-        TabView {
-            Tab("Today", systemImage: "square.grid.2x2") {
+        TabView(selection: $selection) {
+            Tab("Today", systemImage: "square.grid.2x2", value: 0) {
                 NavigationStack {
-                    TabPlaceholder(kicker: "01 / TODAY", line: "Today's review queue lands here.")
+                    TodayView(auth: auth, api: api) { selection = 1 }
                 }
             }
-            Tab("Library", systemImage: "tray.full") {
+            Tab("Library", systemImage: "tray.full", value: 1) {
                 NavigationStack {
                     DashboardView(auth: auth, api: api)
                         .toolbar {
@@ -47,9 +49,9 @@ struct MainTabView: View {
                     }
                 }
             }
-            Tab("Profile", systemImage: "person") {
+            Tab("Profile", systemImage: "person", value: 2) {
                 NavigationStack {
-                    TabPlaceholder(kicker: "03 / PROFILE", line: "Profile, settings and credits land here.")
+                    ProfileView(auth: auth, api: api)
                 }
             }
         }
