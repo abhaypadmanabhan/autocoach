@@ -31,18 +31,17 @@ struct ACXToast: Equatable, Identifiable, Sendable {
 struct ACXToastView: View {
     let toast: ACXToast
 
-    private var dot: StatusPill.Dot {
+    private var mark: StatusMark.Kind {
         switch toast.kind {
-        case .info: .ink
-        case .success: .accent
-        case .error: .error
+        case .info: .pending
+        case .success: .ready
+        case .error: .failed
         }
     }
 
     var body: some View {
         HStack(spacing: 10) {
-            StatusPill(text: "", dot: dot)
-                .fixedSize()
+            StatusMark(mark)
             Text(toast.message)
                 .font(ACXFont.body(14))
                 .foregroundStyle(ACXColor.ink)

@@ -89,9 +89,9 @@ struct QuizSessionView: View {
         VStack(alignment: .leading, spacing: 16) {
             if let q = engine.currentQuestion {
                 HStack(spacing: 8) {
-                    StatusPill(text: q.difficulty.uppercased(), dot: .ink)
+                    TagPill(q.difficulty.uppercased())
                     if q.kind == .freeText {
-                        StatusPill(text: "FREE TEXT", dot: .muted)
+                        TagPill("FREE TEXT")
                     }
                     Spacer()
                 }

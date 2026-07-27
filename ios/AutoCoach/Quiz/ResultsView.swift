@@ -114,11 +114,11 @@ struct ResultsView: View {
     private func verdictLabel(_ q: SessionQuestionDetail) -> some View {
         switch q.is_correct {
         case true:
-            return StatusPill(text: "CORRECT", dot: .accent)
+            return StatusPill("CORRECT", state: .ready)
         case false:
-            return StatusPill(text: "INCORRECT", dot: .error)
+            return StatusPill("INCORRECT", state: .failed)
         case nil:
-            return StatusPill(text: "NOT GRADED", dot: .muted)
+            return StatusPill("NOT GRADED", state: .pending)
         }
     }
 

@@ -40,29 +40,48 @@ enum ACXFont {
         static let monoBold = "SpaceMono-Bold"
     }
 
+    // MARK: - Legibility floors
+    //
+    // Every size below is clamped. The house UI-UX rules ban "type at 11-13px across
+    // the whole page" as the single most-cited legibility complaint in review, with
+    // floors of 18px body / 15px minimum / 13.5px mono. Those numbers are written for
+    // web CSS pixels; on iOS the layout unit is points and the platform's own body
+    // default is 17pt, so they are adapted rather than copied:
+    //
+    //   mono    >= 13pt  (== the system .footnote size; 13.5 rounded to the platform step)
+    //   body    >= 15pt
+    //   display >= 20pt
+    //
+    // Clamping here rather than documenting it means a feature lane physically cannot
+    // ship an 11pt label. Dynamic Type still scales everything up from these floors
+    // via `relativeTo:`.
+    static let monoFloor: CGFloat = 13
+    static let bodyFloor: CGFloat = 15
+    static let displayFloor: CGFloat = 20
+
     /// Space Mono for ALL data text (numbers, IDs, kickers, scores).
     static func mono(_ size: CGFloat, relativeTo: Font.TextStyle = .footnote) -> Font {
-        .custom(Face.monoRegular, size: size, relativeTo: relativeTo)
+        .custom(Face.monoRegular, size: max(size, monoFloor), relativeTo: relativeTo)
     }
     static func monoBold(_ size: CGFloat, relativeTo: Font.TextStyle = .footnote) -> Font {
-        .custom(Face.monoBold, size: size, relativeTo: relativeTo)
+        .custom(Face.monoBold, size: max(size, monoFloor), relativeTo: relativeTo)
     }
     /// Inter for body copy.
     static func body(_ size: CGFloat = 17, relativeTo: Font.TextStyle = .body) -> Font {
-        .custom(Face.bodyRegular, size: size, relativeTo: relativeTo)
+        .custom(Face.bodyRegular, size: max(size, bodyFloor), relativeTo: relativeTo)
     }
     static func bodyMedium(_ size: CGFloat = 17, relativeTo: Font.TextStyle = .body) -> Font {
-        .custom(Face.bodyMedium, size: size, relativeTo: relativeTo)
+        .custom(Face.bodyMedium, size: max(size, bodyFloor), relativeTo: relativeTo)
     }
     static func bodySemibold(_ size: CGFloat = 17, relativeTo: Font.TextStyle = .body) -> Font {
-        .custom(Face.bodySemibold, size: size, relativeTo: relativeTo)
+        .custom(Face.bodySemibold, size: max(size, bodyFloor), relativeTo: relativeTo)
     }
     /// Space Grotesk for display/headings.
     static func display(_ size: CGFloat, relativeTo: Font.TextStyle = .largeTitle) -> Font {
-        .custom(Face.displayBold, size: size, relativeTo: relativeTo)
+        .custom(Face.displayBold, size: max(size, displayFloor), relativeTo: relativeTo)
     }
     static func displayMedium(_ size: CGFloat, relativeTo: Font.TextStyle = .largeTitle) -> Font {
-        .custom(Face.displayMedium, size: size, relativeTo: relativeTo)
+        .custom(Face.displayMedium, size: max(size, displayFloor), relativeTo: relativeTo)
     }
 
     /// Debug-only guard: proves the bundled faces actually registered rather than
@@ -143,19 +162,138 @@ struct Hairline: View {
     }
 }
 
-/// StatusPill — mono label + status dot (the single rounded exception).
-struct StatusPill: View {
-    enum Dot { case accent, ink, muted, error }
-    let text: String
-    let dot: Dot
-    private var color: Color {
-        switch dot { case .accent: ACXColor.accent; case .ink: ACXColor.ink; case .muted: ACXColor.muted; case .error: ACXColor.error }
+/// A status mark whose **form** carries the state and whose **colour** carries urgency.
+///
+/// House UI-UX rules name "a row of coloured status dots" as the single most-recognisable
+/// AI-generated tell: nothing about green *means* finished, so the colour is decoration
+/// wearing a semantic costume. The counter-move is that each state gets a distinguishable
+/// shape, and exactly one state — the one that needs a human — is allowed to be coloured.
+///
+/// Padzy OS still gets its "mono text + mark" pill; only the mark's vocabulary widened.
+/// This also makes the pill legible to colour-blind users and in a greyscale screenshot.
+struct StatusMark: View {
+    /// Named `Kind`, not `State` — a nested type called `State` shadows SwiftUI's
+    /// `@State` property wrapper inside the same type and fails to compile.
+    enum Kind: Equatable {
+        case pending      // present, not started      -> hollow ring
+        case processing   // actively doing something  -> level bars
+        case ready        // finished                  -> hairline check
+        case failed       // needs a human             -> the ONLY coloured mark
+        case unknown      // could not be identified   -> dashed ring
     }
+
+    let kind: Kind
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var animating = false
+
+    init(_ kind: Kind) { self.kind = kind }
+
+    private static let side: CGFloat = 8
+
     var body: some View {
-        HStack(spacing: 5) {
-            Circle().fill(color).frame(width: 6, height: 6)
-            Text(text).font(ACXFont.mono(11)).foregroundStyle(ACXColor.ink)
+        Group {
+            switch kind {
+            case .pending:
+                Circle().strokeBorder(ACXColor.muted, lineWidth: 1)
+            case .processing:
+                HStack(spacing: 1.5) {
+                    ForEach(0..<3, id: \.self) { i in
+                        Rectangle()
+                            .fill(ACXColor.ink)
+                            .frame(width: 1.5, height: barHeight(i))
+                    }
+                }
+                .frame(width: Self.side, height: Self.side)
+            case .ready:
+                Check().stroke(ACXColor.ink, lineWidth: 1.25)
+            case .failed:
+                // Deliberately the one coloured mark in the whole app.
+                Rectangle().fill(ACXColor.error)
+            case .unknown:
+                Circle().strokeBorder(
+                    ACXColor.muted,
+                    style: StrokeStyle(lineWidth: 1, dash: [1.5, 1.5])
+                )
+            }
         }
+        .frame(width: Self.side, height: Self.side)
+        .onAppear { if kind == .processing && !reduceMotion { animating = true } }
+        .animation(
+            reduceMotion ? nil : .easeInOut(duration: 0.6).repeatForever(autoreverses: true),
+            value: animating
+        )
+        .accessibilityHidden(true)   // the adjacent label already says it
+    }
+
+    /// Static staggered heights when Reduce Motion is on, so the shape still differs
+    /// from every other state without moving.
+    private func barHeight(_ i: Int) -> CGFloat {
+        let base: [CGFloat] = [4, 8, 6]
+        guard animating && !reduceMotion else { return base[i] }
+        return [8, 4, 7][i]
+    }
+
+    private struct Check: Shape {
+        func path(in r: CGRect) -> Path {
+            var p = Path()
+            p.move(to: CGPoint(x: r.minX, y: r.midY))
+            p.addLine(to: CGPoint(x: r.minX + r.width * 0.35, y: r.maxY))
+            p.addLine(to: CGPoint(x: r.maxX, y: r.minY))
+            return p
+        }
+    }
+}
+
+/// StatusPill — mono label + status mark.
+struct StatusPill: View {
+    let text: String
+    let kind: StatusMark.Kind
+
+    /// Semantic initialiser — prefer this.
+    init(_ text: String, state kind: StatusMark.Kind) {
+        self.text = text
+        self.kind = kind
+    }
+
+    /// Maps a raw `DocumentResponse.status` string onto the semantic states.
+    init(documentStatus: String) {
+        self.text = documentStatus.uppercased()
+        switch documentStatus.lowercased() {
+        case "pending":    self.kind = .pending
+        case "processing": self.kind = .processing
+        case "ready":      self.kind = .ready
+        case "failed":     self.kind = .failed
+        default:           self.kind = .unknown
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            StatusMark(kind)
+            Text(text)
+                .font(ACXFont.mono(13))
+                .foregroundStyle(kind == .failed ? ACXColor.error : ACXColor.ink)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+    }
+}
+
+/// TagPill — mono metadata label with **no** status mark.
+///
+/// Difficulty, question type and similar descriptors are metadata, not state. Giving them
+/// a status mark is exactly the "colour wearing a semantic costume" failure, so they get
+/// a bordered label instead and leave the mark vocabulary meaning something.
+struct TagPill: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text)
+            .font(ACXFont.mono(13))
+            .foregroundStyle(ACXColor.muted)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .overlay(Rectangle().stroke(ACXColor.surface, lineWidth: 1))
     }
 }
 

@@ -105,7 +105,7 @@ struct DashboardView: View {
                     Text(doc.displayTitle)
                         .font(ACXFont.body(16)).foregroundStyle(ACXColor.ink).lineLimit(2)
                     HStack(spacing: 10) {
-                        StatusPill(text: doc.status.uppercased(), dot: statusDot(doc.status))
+                        StatusPill(documentStatus: doc.status)
                         Text(doc.file_type.uppercased())
                             .font(ACXFont.mono(11)).foregroundStyle(ACXColor.muted)
                     }
@@ -132,15 +132,6 @@ struct DashboardView: View {
         .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 2))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(doc.displayTitle), \(doc.status)")
-    }
-
-    private func statusDot(_ status: String) -> StatusPill.Dot {
-        switch status {
-        case "ready": return .accent
-        case "processing", "pending": return .ink
-        case "failed": return .error
-        default: return .muted
-        }
     }
 
     // MARK: - Data
