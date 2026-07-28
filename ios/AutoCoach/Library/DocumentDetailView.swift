@@ -1,0 +1,419 @@
+import SwiftUI
+
+/// Document detail (PRD §5.8) — the mastery surface, and the screen where
+/// AutoCoach stops looking like a quiz app.
+///
+/// Renders `GET /documents/{id}` + `/concepts` + `/progress`, lets the user
+/// focus up to three concepts, and starts the session itself. The Phase 3
+/// session-config sheet is not built yet, so `onOpenSessionConfig` is exposed
+/// for whoever mounts this screen; when it is `nil` the ghost button says so
+/// honestly rather than pretending to be disabled.
+struct DocumentDetailView: View {
+    @State private var model: DocumentDetailModel
+    @State private var presentedEngine: QuizEngine?
+    @State private var showQuiz = false
+
+    private let api: APIClient
+    private let onOpenSessionConfig: ((SessionConfigRequest) -> Void)?
+
+    init(
+        route: DocumentRoute,
+        api: APIClient,
+        onOpenSessionConfig: ((SessionConfigRequest) -> Void)? = nil
+    ) {
+        self.api = api
+        self.onOpenSessionConfig = onOpenSessionConfig
+        _model = State(initialValue: DocumentDetailModel(
+            documentID: route.documentID,
+            fallbackTitle: route.fallbackTitle,
+            api: api
+        ))
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                header
+
+                switch model.phase {
+                case .loading:
+                    loadingState
+                case .processing:
+                    processingState
+                case .noConcepts:
+                    noConceptsState
+                case .offline(let detail):
+                    offlineState(detail)
+                case .failed(let detail):
+                    failedState(detail)
+                case .loaded:
+                    if model.quotaExhausted {
+                        QuotaNotice(limit: model.quotaLimit ?? 0)
+                    }
+                    masteryBlock
+                    conceptTable
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 32)
+        }
+        .scrollContentBackground(.hidden)
+        .background(GroundBackground())
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(ACXColor.ground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
+        .safeAreaInset(edge: .bottom) {
+            if model.phase == .loaded { footer }
+        }
+        .task { await model.load(initial: true) }
+        .onDisappear { model.stopPolling() }
+        .acxToast($model.toast)
+        .fullScreenCover(isPresented: $showQuiz) {
+            if let engine = presentedEngine {
+                QuizSessionView(
+                    engine: engine,
+                    api: api,
+                    documentTitle: model.title,
+                    onClose: { showQuiz = false }
+                )
+            }
+        }
+        .onChange(of: showQuiz) { _, presented in
+            if !presented {
+                presentedEngine = nil
+                // Mastery moved while the user was answering; re-read it rather
+                // than leaving a stale table behind the dismissed cover.
+                Task { await model.reloadAfterSession() }
+            }
+        }
+    }
+
+    // MARK: - Header
+
+    /// The document's own title *is* the screen title. The previous version put a
+    /// generic `ScreenTitle("Document")` above it, which named the route rather
+    /// than the thing, and pushed the real title into a second display line.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ScreenTitle(model.title, subtitle: model.document.map(Self.metaLine))
+            Hairline()
+        }
+        .padding(.top, 4)
+    }
+
+    /// `PDF · 8.5 MB · 2026-07-21` — provenance, not state, so no pill.
+    static func metaLine(_ doc: Document) -> String {
+        [doc.file_type.uppercased(), sizeLabel(doc.file_size), dateLabel(doc.created_at)]
+            .joined(separator: " · ")
+    }
+
+    // MARK: - Mastery block
+
+    /// The one bordered element on this screen. Everything below it is a
+    /// hairline-separated table, so the border reads as "this is the headline"
+    /// rather than as the page's default box.
+    private var masteryBlock: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text("\(model.progress?.mastery_percent ?? 0)")
+                    .font(ACXFont.monoBold(48, relativeTo: .largeTitle))
+                    .monospacedDigit()
+                    .foregroundStyle(ACXColor.ink)
+                Text("%")
+                    .font(ACXFont.mono(20))
+                    .foregroundStyle(ACXColor.muted)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Mastery")
+                        .font(ACXFont.body(15))
+                        .foregroundStyle(ACXColor.muted)
+                }
+                .padding(.leading, 2)
+                Spacer(minLength: 0)
+                if let milestone = model.progress?.milestone {
+                    MilestoneBadge(level: MilestoneBadge.Level(apiValue: milestone))
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Mastery")
+            .accessibilityValue("\(model.progress?.mastery_percent ?? 0) percent")
+
+            MasteryBar(percent: model.progress?.mastery_percent ?? 0, showsLabel: false)
+
+            statRow
+        }
+        .padding(16)
+        .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 2))
+    }
+
+    /// Four counts as a numeric row: value in mono, caption in sentence-case Inter.
+    /// Replaces `CONCEPTS 24 · PRACTISED 15 · WEAK 6 · MASTERED 7`, which shouted
+    /// four labels in a face reserved for data.
+    private var statRow: some View {
+        let p = model.progress
+        let total = p?.concepts_total ?? model.concepts.count
+        let practised = p?.concepts_practiced ?? model.concepts.filter(\.hasBeenTested).count
+        let weak = p?.weak_concepts_count ?? 0
+        let mastered = p?.mastered_concepts_count ?? 0
+        return HStack(alignment: .top, spacing: 8) {
+            stat(total, "Concepts")
+            stat(practised, "Practised")
+            stat(weak, "Weak")
+            stat(mastered, "Mastered")
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(total) concepts, \(practised) practised, \(weak) weak, \(mastered) mastered")
+    }
+
+    private func stat(_ value: Int, _ caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(value)")
+                .font(ACXFont.monoBold(17))
+                .monospacedDigit()
+                .foregroundStyle(ACXColor.ink)
+            Text(caption)
+                .font(ACXFont.body(15))
+                .foregroundStyle(ACXColor.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    // MARK: - Concept table
+
+    private var conceptTable: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                SectionLabel("Concepts — weakest first")
+                Spacer(minLength: 8)
+                Text("\(model.selection.count)/\(DocumentDetailModel.maxFocusConcepts)")
+                    .font(ACXFont.monoBold(13))
+                    .monospacedDigit()
+                    .foregroundStyle(ACXColor.ink)
+            }
+            .padding(.bottom, 8)
+
+            Text("Pick up to \(DocumentDetailModel.maxFocusConcepts) to focus the next session on.")
+                .font(ACXFont.body(15))
+                .foregroundStyle(ACXColor.muted)
+                .padding(.bottom, 12)
+
+            Hairline()
+
+            ForEach(model.sortedConcepts) { concept in
+                conceptRow(concept)
+                Hairline()
+            }
+        }
+    }
+
+    private func conceptRow(_ concept: Concept) -> some View {
+        let selected = model.isSelected(concept)
+        return Button {
+            model.toggle(concept)
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                // Selection is a square that fills with ink — not a coloured dot,
+                // and not the accent, which this screen spends on mastery bars.
+                Rectangle()
+                    .fill(selected ? ACXColor.ink : Color.clear)
+                    .frame(width: 14, height: 14)
+                    .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 1.5))
+                    .padding(.top, 3)
+
+                // Two lines: what it is, then how it is going. Mastery is the
+                // trailing number and *only* the trailing number — the earlier
+                // shape put a full-width bar under every row, and a later one
+                // paired the number with a 56pt bar that said the same thing
+                // twice and rendered as a 4pt sliver at the low percentages this
+                // weakest-first table exists to show.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(concept.concept_name)
+                            .font(ACXFont.bodyMedium(17))
+                            .foregroundStyle(ACXColor.ink)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if concept.is_core { CoreBadge() }
+                        Spacer(minLength: 8)
+                        Text("\(Self.masteryPercent(concept.mastery_score))%")
+                            .font(ACXFont.monoBold(17))
+                            .monospacedDigit()
+                            .foregroundStyle(ACXColor.ink)
+                    }
+
+                    HStack(spacing: 12) {
+                        ImportanceDots(score: concept.importance_score)
+                        Text(concept.hasBeenTested
+                             ? "\(concept.times_correct)/\(concept.times_tested) correct"
+                             : "Not tested")
+                            .font(ACXFont.body(15))
+                            .monospacedDigit()
+                            .foregroundStyle(ACXColor.muted)
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .padding(.vertical, 14)
+            .frame(minHeight: 44, alignment: .top)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Self.conceptAccessibilityLabel(concept))
+        .accessibilityValue(selected ? "Selected" : "Not selected")
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint("Focuses the next session on this concept")
+    }
+
+    // MARK: - Footer
+
+    /// Thumb-zone primary action. The hard shadow is spent here and nowhere else
+    /// on this screen, per the one-CTA rule.
+    private var footer: some View {
+        VStack(spacing: 10) {
+            Hairline()
+            HStack(spacing: 12) {
+                Button {
+                    Task { await start() }
+                } label: {
+                    Text(startLabel)
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(model.isStarting || !model.isReady || model.quotaExhausted)
+                .opacity(model.isReady && !model.quotaExhausted ? 1 : 0.5)
+                .frame(maxWidth: .infinity)
+
+                Button {
+                    if let onOpenSessionConfig {
+                        onOpenSessionConfig(model.configRequest)
+                    } else {
+                        model.toast = .info("Session options arrive in the next release.")
+                    }
+                } label: {
+                    Text("Options")
+                }
+                .buttonStyle(GhostButtonStyle())
+                .frame(width: 120)
+                .accessibilityHint("Length, difficulty and question types")
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 4)
+            // The hard shadow needs room below the CTA or it clips on the inset.
+            .padding(.bottom, 10)
+        }
+        .background(ACXColor.ground)
+    }
+
+    private var startLabel: String {
+        if model.isStarting { return "Starting…" }
+        if model.quotaExhausted { return "No credits" }
+        switch model.selection.count {
+        case 0: return "Start quiz"
+        case 1: return "Start · 1 concept"
+        default: return "Start · \(model.selection.count) concepts"
+        }
+    }
+
+    private func start() async {
+        guard let created = await model.startSession() else { return }
+        presentedEngine = QuizEngine(api: api, created: created)
+        showQuiz = true
+    }
+
+    // MARK: - Five states
+
+    private var loadingState: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Rectangle().fill(ACXColor.surface).frame(height: 44).frame(maxWidth: 160)
+            ProgressHairline()
+            ForEach(0..<4, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 8) {
+                    Rectangle().fill(ACXColor.surface).frame(height: 14).frame(maxWidth: 240)
+                    Rectangle().fill(ACXColor.surface).frame(height: 8)
+                }
+                .padding(.vertical, 6)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading this document")
+    }
+
+    private var processingState: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            EmptyState(
+                kicker: "Still reading",
+                message: "AutoCoach is pulling the concepts out of this document. It takes about a minute, and this screen updates on its own."
+            )
+            ProgressHairline()
+                .padding(.horizontal, 20)
+        }
+    }
+
+    private var noConceptsState: some View {
+        EmptyState(
+            kicker: "No concepts found",
+            message: "This document processed, but no concepts came out of it — usually a scanned PDF with no text layer. Try a text-based PDF or PPTX.",
+            actionLabel: "Check again",
+            action: { Task { await model.load(initial: true) } }
+        )
+    }
+
+    private func offlineState(_ detail: String) -> some View {
+        EmptyState(
+            kicker: "Offline",
+            message: "This device can't reach the server right now. \(detail)",
+            actionLabel: "Try again",
+            action: { Task { await model.load(initial: true) } }
+        )
+    }
+
+    private func failedState(_ detail: String) -> some View {
+        EmptyState(
+            kicker: "Couldn't load",
+            message: detail,
+            actionLabel: "Try again",
+            action: { Task { await model.load(initial: true) } }
+        )
+    }
+
+    // MARK: - Formatting
+
+    /// `mastery_score` is the raw 0…1 float on a concept; the 0…100 int the
+    /// backend hands back on *progress* is already normalized. Do not mix them.
+    static func masteryPercent(_ score: Double) -> Int {
+        Int((min(1, max(0, score)) * 100).rounded())
+    }
+
+    static func sizeLabel(_ bytes: Int) -> String {
+        let mb = Double(bytes) / 1_048_576
+        if mb >= 1 { return String(format: "%.1f MB", mb) }
+        return "\(max(1, bytes / 1024)) KB"
+    }
+
+    /// `created_at` is ISO-8601 from Postgres, with or without fractional
+    /// seconds depending on the row — try both before giving up.
+    static func dateLabel(_ iso: String) -> String {
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let plain = ISO8601DateFormatter()
+        guard let date = withFraction.date(from: iso) ?? plain.date(from: iso) else {
+            return String(iso.prefix(10))
+        }
+        let c = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
+    static func conceptAccessibilityLabel(_ concept: Concept) -> String {
+        var parts = [concept.concept_name]
+        if concept.is_core { parts.append("core concept") }
+        parts.append("\(masteryPercent(concept.mastery_score)) percent mastery")
+        parts.append(concept.hasBeenTested
+                     ? "\(concept.times_correct) correct of \(concept.times_tested)"
+                     : "not tested yet")
+        return parts.joined(separator: ", ")
+    }
+}

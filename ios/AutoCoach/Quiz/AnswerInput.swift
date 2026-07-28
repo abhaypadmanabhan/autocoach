@@ -67,8 +67,8 @@ struct TrueFalseView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            tfButton("TRUE", value: "true")
-            tfButton("FALSE", value: "false")
+            tfButton("True", value: "true")
+            tfButton("False", value: "false")
         }
     }
 
@@ -136,7 +136,7 @@ struct FreeTextAnswerView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: speech.state == .listening ? "stop.circle.fill" : "mic.fill")
-                    Text(speech.state == .listening ? "STOP DICTATION" : "DICTATE")
+                    Text(speech.state == .listening ? "Stop dictation" : "Dictate")
                 }
                 .font(ACXFont.monoBold(13))
                 .kerning(0.4)

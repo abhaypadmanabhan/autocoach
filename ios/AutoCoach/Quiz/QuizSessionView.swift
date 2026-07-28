@@ -68,7 +68,7 @@ struct QuizSessionView: View {
     private var progressHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Kicker("02 / QUIZ")
+                SectionLabel("Quiz")
                 Spacer()
                 Text("SCORE \(engine.scoreSoFar)")
                     .font(ACXFont.monoBold(12))
@@ -89,9 +89,9 @@ struct QuizSessionView: View {
         VStack(alignment: .leading, spacing: 16) {
             if let q = engine.currentQuestion {
                 HStack(spacing: 8) {
-                    StatusPill(text: q.difficulty.uppercased(), dot: .ink)
+                    TagPill(q.difficulty.uppercased())
                     if q.kind == .freeText {
-                        StatusPill(text: "FREE TEXT", dot: .muted)
+                        TagPill("Free text")
                     }
                     Spacer()
                 }
@@ -122,7 +122,7 @@ struct QuizSessionView: View {
             TrueFalseView(selection: $tfSelection)
         case .freeText:
             FreeTextAnswerView(text: $freeText, usedVoice: $usedVoice, speech: speech)
-        case .rendered:
+        case .rendered, .unknown:
             Text("Unsupported question type.")
                 .font(ACXFont.mono(12)).foregroundStyle(ACXColor.muted)
         }
@@ -132,7 +132,7 @@ struct QuizSessionView: View {
     private var phasePanel: some View {
         switch engine.phase {
         case .answering:
-            Button { submit() } label: { Text("SUBMIT ANSWER") }
+            Button { submit() } label: { Text("Submit answer") }
                 .buttonStyle(PrimaryButtonStyle())
                 .disabled(!canSubmit)
 
@@ -141,8 +141,8 @@ struct QuizSessionView: View {
 
         case .grading(let attempt):
             VStack(alignment: .leading, spacing: 8) {
-                Text("GRADING YOUR ANSWER")
-                    .font(ACXFont.monoBold(13)).kerning(0.6).foregroundStyle(ACXColor.ink)
+                Text("Grading your answer")
+                    .font(ACXFont.bodySemibold(15)).kerning(0.6).foregroundStyle(ACXColor.ink)
                 Text("Free-text answers are evaluated off-request. Attempt \(attempt)/6.")
                     .font(ACXFont.mono(11)).foregroundStyle(ACXColor.muted)
             }
@@ -150,8 +150,8 @@ struct QuizSessionView: View {
 
         case .gradingTimedOut:
             VStack(alignment: .leading, spacing: 10) {
-                Text("STILL GRADING")
-                    .font(ACXFont.monoBold(13)).kerning(0.6).foregroundStyle(ACXColor.ink)
+                Text("Still grading")
+                    .font(ACXFont.bodySemibold(15)).kerning(0.6).foregroundStyle(ACXColor.ink)
                 Text("The verdict hasn't landed yet. Your answer is saved — re-check below.")
                     .font(ACXFont.mono(11)).foregroundStyle(ACXColor.muted)
                 Button { Task { await engine.recheckVerdict() } } label: { Text("RE-CHECK") }
@@ -164,8 +164,8 @@ struct QuizSessionView: View {
 
         case .awaitingNext(let attempt):
             VStack(alignment: .leading, spacing: 6) {
-                Text("PREPARING THE NEXT QUESTION")
-                    .font(ACXFont.monoBold(13)).kerning(0.6).foregroundStyle(ACXColor.ink)
+                Text("Preparing the next question")
+                    .font(ACXFont.bodySemibold(15)).kerning(0.6).foregroundStyle(ACXColor.ink)
                 Text("Adapting to your performance. Attempt \(attempt)/4.")
                     .font(ACXFont.mono(11)).foregroundStyle(ACXColor.muted)
             }
@@ -174,7 +174,7 @@ struct QuizSessionView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Something went wrong").font(ACXFont.body(15)).foregroundStyle(ACXColor.error)
                 Text(message).font(ACXFont.mono(11)).foregroundStyle(ACXColor.muted)
-                Button { Task { await engine.retryAdvance() } } label: { Text("RETRY") }
+                Button { Task { await engine.retryAdvance() } } label: { Text("Retry") }
                     .buttonStyle(GhostButtonStyle())
             }
 
@@ -189,7 +189,7 @@ struct QuizSessionView: View {
             verdictHeadline
             if let r = engine.lastResult {
                 if let correct = r.correct_answer, !correct.isEmpty {
-                    answerLine(label: "CORRECT ANSWER", text: displayCorrectAnswer(correct), color: ACXColor.ink)
+                    answerLine(label: "Correct answer", text: displayCorrectAnswer(correct), color: ACXColor.ink)
                 }
                 if let explanation = r.explanation, !explanation.isEmpty {
                     Text(explanation).font(ACXFont.body(13)).foregroundStyle(ACXColor.muted)
@@ -198,7 +198,7 @@ struct QuizSessionView: View {
                 }
             }
             Button { Task { await engine.advanceToNext() } } label: {
-                Text(engine.sessionComplete ? "SEE RESULTS" : "NEXT QUESTION")
+                Text(engine.sessionComplete ? "See results" : "Next question")
             }
             .buttonStyle(PrimaryButtonStyle())
         }
@@ -209,10 +209,10 @@ struct QuizSessionView: View {
     private var verdictHeadline: some View {
         if let isCorrect = engine.lastResult?.is_correct {
             if isCorrect {
-                Text("CORRECT").font(ACXFont.display(30)).foregroundStyle(ACXColor.accent)
+                Text("Correct").font(ACXFont.display(30)).foregroundStyle(ACXColor.accent)
                     .accessibilityLabel("Correct answer.")
             } else {
-                Text("INCORRECT").font(ACXFont.display(30)).foregroundStyle(ACXColor.error)
+                Text("Incorrect").font(ACXFont.display(30)).foregroundStyle(ACXColor.error)
                     .accessibilityLabel("Incorrect answer.")
             }
         }
@@ -226,7 +226,7 @@ struct QuizSessionView: View {
     }
 
     private func statusLine(_ text: String) -> some View {
-        Text(text).font(ACXFont.mono(13)).foregroundStyle(ACXColor.muted).accessibilityLabel(text)
+        Text(text).font(ACXFont.body(15)).foregroundStyle(ACXColor.muted).accessibilityLabel(text)
     }
 
     // MARK: - Submit helpers
@@ -237,7 +237,7 @@ struct QuizSessionView: View {
         case .mcq: return mcqSelection != nil
         case .tf: return tfSelection != nil
         case .freeText: return !freeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        case .rendered: return false
+        case .rendered, .unknown: return false
         }
     }
 
@@ -259,7 +259,7 @@ struct QuizSessionView: View {
             let trimmed = freeText.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return nil }
             return (trimmed, usedVoice ? .voice : .typed)
-        case .rendered:
+        case .rendered, .unknown:
             return nil
         }
     }
