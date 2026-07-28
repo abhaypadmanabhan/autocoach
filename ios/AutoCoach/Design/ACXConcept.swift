@@ -34,15 +34,18 @@ struct ImportanceDots: View {
 
 // MARK: - CoreBadge
 
-/// Mono `CORE` tag for concepts the backend flags `is_core`.
+/// Tag for concepts the backend flags `is_core`.
+///
+/// Sentence case in the body face: this is a label, not data, and 9pt tracked
+/// uppercase mono was both below the type floor and the exact micro-label tell
+/// the design rules ban.
 struct CoreBadge: View {
-    var text: String = "CORE"
+    var text: String = "Core"
 
     var body: some View {
         Text(text)
-            .font(ACXFont.monoBold(9))
-            .kerning(1.0)
-            .foregroundStyle(ACXColor.ink)
+            .font(ACXFont.bodyMedium(13))
+            .foregroundStyle(ACXColor.muted)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
             .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 1))
