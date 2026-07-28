@@ -10,3 +10,28 @@
 
 
 
+
+## 2026-07-27 — Design corrections (AutoCoach iOS M3)
+
+- **Numbered mono kickers (`01 / TODAY`, `02 / LIBRARY`) are AI slop. Never again.** No shipping
+  product uses them. Screens get a real title in the display face, or nothing. I had this exact
+  rule in the UI-UX vault's `AI Design Tells.md` and overrode it because the project CLAUDE.md
+  mandated kickers — wrong call. When the house design rules and a project design system
+  disagree on something that *looks* generated, the house rules win; a project design system can
+  be stale.
+- **Don't let a secondary mechanic own a whole block.** The credits row was a full-width section
+  in second position on the home screen. Usage/quota is ambient status: compact it inline, put it
+  top or in Settings, and never render it twice in the app.
+- **Never ship the same section in two places.** Credits appeared on Today *and* in Settings.
+  Pick the owner.
+- **Hairline progress bars are unreadable.** 1–2px bars fail as UI. A progress bar has to be
+  visible at arm's length; "hairline" is for dividers, not for data.
+- **Don't add features the product doesn't need.** Camera scan was pulled in because competitors
+  have it — AutoCoach uploads documents, it is not a scanner. Competitive research lists what
+  others do; it does not decide what we build.
+- **Delegating visual work without looking at the result is the root cause.** Agents marked
+  visual criteria "met" from a clean compile. Screenshot every screen before reporting done.
+- **Use the available design tooling** (Mobbin MCP, image generation, Stitch) to explore layout
+  *before* coding, not as a citation added afterwards.
+- **Spawn agents as sibling panes in the current tab** (`herdr pane split --current`), not via
+  `herd spawn`'s worktree mode, which creates a new workspace per agent.
