@@ -83,5 +83,5 @@ struct TabPlaceholder: View {
 }
 
 #Preview("TabPlaceholder") {
-    TabPlaceholder(kicker: "01 / TODAY", line: "Today's review queue lands here.")
+    TabPlaceholder(kicker: "Today", line: "Today's review queue lands here.")
 }

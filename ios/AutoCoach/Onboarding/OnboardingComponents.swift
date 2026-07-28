@@ -121,8 +121,6 @@ struct OnboardingStepper: View {
                     .font(ACXFont.monoBold(20, relativeTo: .title2))
                 Text(unitLabel)
                     .font(ACXFont.mono(11))
-                    .kerning(1.0)
-                    .textCase(.uppercase)
                     .foregroundStyle(ACXColor.muted)
             }
             .frame(maxWidth: .infinity, minHeight: 56)

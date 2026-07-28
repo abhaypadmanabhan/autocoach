@@ -70,8 +70,6 @@ struct WhyInset: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
                     .font(ACXFont.monoBold(10))
-                    .kerning(1.2)
-                    .textCase(.uppercase)
                     .foregroundStyle(ACXColor.muted)
                 Text(text)
                     .font(ACXFont.body(14))

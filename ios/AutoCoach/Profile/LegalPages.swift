@@ -4,7 +4,7 @@ import SwiftUI
 struct TermsView: View {
     var body: some View {
         LegalDocumentView(
-            kicker: "LEGAL / TERMS",
+            kicker: "Legal / terms",
             title: "Terms of Service",
             lastUpdated: "June 11, 2026",
             intro: "These terms govern your use of AutoCoach. By creating an account or using the service you agree to them. If you do not agree, do not use AutoCoach.",
@@ -17,7 +17,7 @@ struct TermsView: View {
 struct PrivacyView: View {
     var body: some View {
         LegalDocumentView(
-            kicker: "LEGAL / PRIVACY",
+            kicker: "Legal / privacy",
             title: "Privacy Policy",
             lastUpdated: "June 11, 2026",
             intro: "AutoCoach (“we”, “us”) is an AI-powered study tool that turns documents you upload into interactive quizzes. This policy explains what data we collect, how we use it, and the choices you have. By using AutoCoach you agree to this policy.",

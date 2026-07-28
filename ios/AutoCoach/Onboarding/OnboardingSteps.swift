@@ -25,7 +25,7 @@ struct TopicsStep: View {
 
     var body: some View {
         OnboardingStepBody(
-            kicker: "01 / ONBOARDING",
+            kicker: "Onboarding",
             title: "What are you studying?",
             subtitle: "Choose up to 3. This shapes the questions we write for you."
         ) {
@@ -84,7 +84,7 @@ struct ExperienceStep: View {
 
     var body: some View {
         OnboardingStepBody(
-            kicker: "02 / ONBOARDING",
+            kicker: "Onboarding",
             title: "How much do you already know?",
             subtitle: "We start you at the right difficulty instead of wasting a quiz finding out."
         ) {
@@ -110,7 +110,7 @@ struct GoalStep: View {
 
     var body: some View {
         OnboardingStepBody(
-            kicker: "03 / ONBOARDING",
+            kicker: "Onboarding",
             title: "What are you working toward?",
             subtitle: "A deadline changes how we pace the review queue."
         ) {
@@ -188,7 +188,7 @@ struct CadenceStep: View {
 
     var body: some View {
         OnboardingStepBody(
-            kicker: "04 / ONBOARDING",
+            kicker: "Onboarding",
             title: "When will you study?",
             subtitle: "Pick a slot you'll actually keep. We only ever nudge you once a day."
         ) {
@@ -240,7 +240,7 @@ struct NotificationPrimeStep: View {
 
     var body: some View {
         OnboardingStepBody(
-            kicker: "05 / ONBOARDING",
+            kicker: "Onboarding",
             title: "Want a nudge at that time?",
             subtitle: "A single reminder when your queue is due. Nothing else — no streak spam, no marketing, and never more than once a day."
         ) {

@@ -34,8 +34,7 @@ struct SegmentedControl<Value: Hashable>: View {
                     Text(segment.label)
                         .font(ACXFont.monoBold(12))
                         .kerning(0.6)
-                        .textCase(.uppercase)
-                        .foregroundStyle(isSelected ? ACXColor.ground : ACXColor.ink)
+                            .foregroundStyle(isSelected ? ACXColor.ground : ACXColor.ink)
                         .frame(maxWidth: .infinity)
                         // 44pt minimum hit target.
                         .frame(minHeight: 44)
@@ -196,13 +195,13 @@ struct EmptyState: View {
 #Preview("EmptyState") {
     VStack(spacing: 28) {
         EmptyState(
-            kicker: "NO DOCUMENTS",
+            kicker: "No documents",
             message: "Upload a PDF or a set of notes and AutoCoach will pull the concepts out of it.",
             actionLabel: "UPLOAD",
             action: {},
             showsCrosshair: true
         )
-        EmptyState(kicker: "NOTHING DUE", message: "No concepts are due for review today.")
+        EmptyState(kicker: "Nothing due", message: "No concepts are due for review today.")
     }
     .padding(24)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

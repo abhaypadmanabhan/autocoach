@@ -146,7 +146,6 @@ struct DestructiveButtonStyle: ButtonStyle {
         configuration.label
             .font(ACXFont.monoBold(14))
             .kerning(0.4)
-            .textCase(.uppercase)
             .foregroundStyle(ACXColor.ground)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)

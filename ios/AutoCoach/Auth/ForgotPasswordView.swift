@@ -42,7 +42,7 @@ struct ForgotPasswordView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header(kicker: "03 / RESET PASSWORD",
+            header(kicker: "Reset password",
                    title: "Forgot your password?",
                    subtitle: "We'll email you a link to set a new one.")
                 .padding(.bottom, 40)
@@ -97,7 +97,7 @@ struct ForgotPasswordView: View {
 
     private func sentState(address: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            header(kicker: "03 / RESET LINK SENT",
+            header(kicker: "Reset link sent",
                    title: "Check your email",
                    subtitle: "If an account exists for this address, a reset link is on its way.")
                 .padding(.bottom, 32)

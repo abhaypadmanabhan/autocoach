@@ -134,13 +134,13 @@ struct ProfileView: View {
             }
         case .empty:
             EmptyState(
-                kicker: "02 / MASTERY",
+                kicker: "Mastery",
                 message: "No documents yet. Upload one from Library and mastery will show up here.",
                 showsCrosshair: true
             )
         case .error(let message):
             EmptyState(
-                kicker: "02 / MASTERY",
+                kicker: "Mastery",
                 message: message,
                 actionLabel: "Retry",
                 action: { Task { await load() } }

@@ -59,7 +59,7 @@ struct SignupView: View {
 
     private var form: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header(kicker: "02 / CREATE ACCOUNT",
+            header(kicker: "Create account",
                    title: "Create your account",
                    subtitle: "Upload a document, get questions that adapt to what you miss.")
                 .padding(.bottom, 40)
@@ -140,7 +140,7 @@ struct SignupView: View {
 
     private var checkInbox: some View {
         VStack(alignment: .leading, spacing: 0) {
-            header(kicker: "02 / CHECK YOUR INBOX",
+            header(kicker: "Check your inbox",
                    title: "Confirm your email",
                    subtitle: "We sent a confirmation link to:")
                 .padding(.bottom, 24)

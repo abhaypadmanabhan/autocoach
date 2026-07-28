@@ -124,34 +124,6 @@ extension View {
     func acxHardShadow(offset: CGFloat = 4) -> some View { modifier(HardShadow(offset: offset)) }
 }
 
-/// Numbered mono kicker label, e.g. `01 / LIBRARY`.
-struct Kicker: View {
-    let text: String
-    init(_ text: String) { self.text = text }
-    var body: some View {
-        Text(text)
-            .font(ACXFont.monoBold(11))
-            .kerning(1.2)
-            .textCase(.uppercase)
-            .foregroundStyle(ACXColor.muted)
-    }
-}
-
-/// Apply kicker styling to an existing `Text`.
-struct KickerStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .font(ACXFont.monoBold(11))
-            .kerning(1.2)
-            .textCase(.uppercase)
-            .foregroundStyle(ACXColor.muted)
-    }
-}
-
-extension View {
-    func kickerStyle() -> some View { modifier(KickerStyle()) }
-}
-
 /// 1px hairline divider on cream (scaled for display).
 struct Hairline: View {
     @Environment(\.displayScale) private var displayScale

@@ -134,7 +134,7 @@
 		F4251C9CFABE24532762CACB /* ACX.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ACX.swift; sourceTree = "<group>"; };
 		F4C04D7751CF4CE2F9EC9275 /* AuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthStore.swift; sourceTree = "<group>"; };
 		FD20C58B38D1DC3927C970AC /* AutoCoach.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AutoCoach.entitlements; sourceTree = "<group>"; };
-		"TEMP_43894ED6-4AD8-451B-897D-15298EF47CED" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		"TEMP_F7A4BAEE-9E66-4D94-A7FA-55112B1F1554" /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -330,10 +330,10 @@
 			path = Fonts;
 			sourceTree = "<group>";
 		};
-		"TEMP_F5A65DF5-E9B0-46F7-AD75-A170828BAE34" /* ios */ = {
+		"TEMP_341CA4A3-FEEC-42F2-AD8A-B148A5436D83" /* ios */ = {
 			isa = PBXGroup;
 			children = (
-				"TEMP_43894ED6-4AD8-451B-897D-15298EF47CED" /* Config.xcconfig */,
+				"TEMP_F7A4BAEE-9E66-4D94-A7FA-55112B1F1554" /* Config.xcconfig */,
 			);
 			path = ios;
 			sourceTree = "<group>";
@@ -481,7 +481,7 @@
 /* Begin XCBuildConfiguration section */
 		4E1D2010D662D65FE717F20E /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_43894ED6-4AD8-451B-897D-15298EF47CED" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_F7A4BAEE-9E66-4D94-A7FA-55112B1F1554" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoCoach/AutoCoach.entitlements;
@@ -625,7 +625,7 @@
 		};
 		B7A38C4FDEAED7CF2D47B30A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = "TEMP_43894ED6-4AD8-451B-897D-15298EF47CED" /* Config.xcconfig */;
+			baseConfigurationReference = "TEMP_F7A4BAEE-9E66-4D94-A7FA-55112B1F1554" /* Config.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = AutoCoach/AutoCoach.entitlements;
