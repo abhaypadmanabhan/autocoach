@@ -107,11 +107,30 @@ final class LibraryModel {
 
     init(api: APIClient) {
         self.api = api
+        #if DEBUG
+        if LibrarySample.isActive { seedFromSample() }
+        #endif
     }
 
     deinit {
         pollTask?.cancel()
     }
+
+    #if DEBUG
+    /// True when this model is showing `LibrarySample` data inside `DesignHarness`.
+    /// Loading is then a no-op, so a design screenshot never touches the network.
+    private(set) var isSeeded = false
+
+    private func seedFromSample() {
+        documents = LibrarySample.documents
+        progressByDocument = Dictionary(
+            LibrarySample.progress.map { ($0.document_id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        phase = .loaded
+        isSeeded = true
+    }
+    #endif
 
     // MARK: Derived
 
@@ -170,6 +189,9 @@ final class LibraryModel {
     /// Full reload. `initial` drives the loading screen; a pull-to-refresh keeps
     /// the current list on screen instead of flashing a skeleton over it.
     func load(initial: Bool = false) async {
+        #if DEBUG
+        if isSeeded { return }
+        #endif
         seedFirstSeenDayIfNeeded()
         if initial && documents.isEmpty { phase = .loading }
         do {
@@ -281,3 +303,69 @@ final class LibraryModel {
         (error as? APIError)?.errorDescription ?? error.localizedDescription
     }
 }
+
+// MARK: - Harness sample data
+
+#if DEBUG
+/// Fixed data for `DesignHarness` (design PRD §2.5 — "verification is visual").
+///
+/// Library and Document detail both sit behind a signed-in session, and opening
+/// a real document spends LLM tokens, so neither screen could be reviewed
+/// without either credentials or a bill. The two models seed themselves from
+/// here when `HARNESS_SCREEN` is in the environment, which the harness launch
+/// sets and the shipping app never does. Release builds do not compile it.
+enum LibrarySample {
+    static var isActive: Bool {
+        ProcessInfo.processInfo.environment["HARNESS_SCREEN"] != nil
+    }
+
+    /// Deliberately mixed status: a long AI title that has to wrap, a plain
+    /// filename, an in-flight document and a failed one — the four row forms.
+    static let documents: [Document] = [
+        Document(id: "d1", filename: "ddia.pdf", file_type: "pdf", file_size: 8_912_331,
+                 status: "ready", ai_title: "Designing Data-Intensive Applications",
+                 session_id: nil, concept_count: 24, created_at: "2026-07-21T10:04:00Z"),
+        Document(id: "d2", filename: "attention-is-all-you-need.pdf", file_type: "pdf",
+                 file_size: 2_204_160, status: "ready", ai_title: "Attention Is All You Need",
+                 session_id: nil, concept_count: 11, created_at: "2026-07-23T18:40:00Z"),
+        Document(id: "d3", filename: "product-analytics-week-4.pptx", file_type: "pptx",
+                 file_size: 5_030_912, status: "processing", ai_title: nil,
+                 session_id: nil, concept_count: nil, created_at: "2026-07-27T08:12:00Z"),
+        Document(id: "d4", filename: "lecture-scan.pdf", file_type: "pdf", file_size: 1_048_576,
+                 status: "failed", ai_title: nil, session_id: nil, concept_count: nil,
+                 created_at: "2026-07-26T21:55:00Z"),
+    ]
+
+    static let progress: [DocumentProgress] = [
+        DocumentProgress(document_id: "d1", document_title: "Designing Data-Intensive Applications",
+                         mastery_percent: 62, concepts_total: 24, concepts_practiced: 15,
+                         weak_concepts_count: 6, mastered_concepts_count: 7, milestone: "50"),
+        DocumentProgress(document_id: "d2", document_title: "Attention Is All You Need",
+                         mastery_percent: 18, concepts_total: 11, concepts_practiced: 3,
+                         weak_concepts_count: 5, mastered_concepts_count: 0, milestone: "none"),
+    ]
+
+    static let detailDocument = documents[0]
+    static let detailProgress = progress[0]
+
+    static let concepts: [Concept] = [
+        concept("c1", "Write-ahead logging", mastery: 0.08, importance: 0.94, core: true, tested: 4, correct: 0),
+        concept("c2", "Two-phase commit", mastery: 0.21, importance: 0.81, core: true, tested: 7, correct: 2),
+        concept("c3", "Serializable snapshot isolation", mastery: 0.34, importance: 0.72, core: false, tested: 6, correct: 3),
+        concept("c4", "Leader election", mastery: 0.47, importance: 0.66, core: false, tested: 0, correct: 0),
+        concept("c5", "Consistent hashing", mastery: 0.68, importance: 0.58, core: true, tested: 9, correct: 7),
+        concept("c6", "Change data capture", mastery: 0.91, importance: 0.41, core: false, tested: 5, correct: 5),
+    ]
+
+    private static func concept(
+        _ id: String, _ name: String, mastery: Double, importance: Double,
+        core: Bool, tested: Int, correct: Int
+    ) -> Concept {
+        Concept(id: id, concept_name: name, concept_description: nil,
+                importance_score: importance, is_core: core, parent_concept_id: nil,
+                created_at: "2026-07-21T10:06:00Z", mastery_score: mastery,
+                times_tested: tested, times_correct: correct,
+                last_tested_at: tested > 0 ? "2026-07-26T19:00:00Z" : nil, mastered_at: nil)
+    }
+}
+#endif

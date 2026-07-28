@@ -52,9 +52,26 @@ final class DocumentDetailModel {
         self.quotaLimit = LibraryDefaults.isQuotaExhaustedToday
             ? UserDefaults.standard.integer(forKey: LibraryDefaults.quotaLimit)
             : nil
+        #if DEBUG
+        if LibrarySample.isActive { seedFromSample() }
+        #endif
     }
 
     deinit { pollTask?.cancel() }
+
+    #if DEBUG
+    /// See ``LibrarySample`` — fixed data so this screen is reviewable without a
+    /// session or token spend. `load` is a no-op while seeded.
+    private(set) var isSeeded = false
+
+    private func seedFromSample() {
+        document = LibrarySample.detailDocument
+        concepts = LibrarySample.concepts
+        progress = LibrarySample.detailProgress
+        phase = .loaded
+        isSeeded = true
+    }
+    #endif
 
     // MARK: Derived
 
@@ -97,6 +114,9 @@ final class DocumentDetailModel {
     // MARK: Loading
 
     func load(initial: Bool = false) async {
+        #if DEBUG
+        if isSeeded { return }
+        #endif
         if initial { phase = .loading }
         do {
             let doc: Document = try await api.get("/documents/\(documentID)")

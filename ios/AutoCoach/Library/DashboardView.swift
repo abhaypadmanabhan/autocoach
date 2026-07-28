@@ -61,7 +61,9 @@ struct DashboardView: View {
         .environment(\.defaultMinListRowHeight, 0)
         .refreshable { await model.load() }
         .navigationTitle("")
-        .toolbar(.hidden, for: .navigationBar)
+        // The bar stays *visible* with an empty title: `MainTabView` hangs the `+`
+        // upload item off this view, and `.toolbar(.hidden, for: .navigationBar)`
+        // — which used to be here — took the only way to add a document with it.
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(ACXColor.ground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
@@ -81,7 +83,7 @@ struct DashboardView: View {
                 ACXConfirmDialog(
                     title: "Delete document",
                     message: "This removes “\(doc.displayTitle)”, its concepts and every quiz session built from it. This cannot be undone.",
-                    confirmLabel: model.isDeleting ? "Deleting…" : "DELETE",
+                    confirmLabel: model.isDeleting ? "Deleting…" : "Delete",
                     onConfirm: {
                         pendingDelete = nil
                         Task { await model.delete(doc) }
@@ -107,20 +109,18 @@ struct DashboardView: View {
 
     // MARK: - Header
 
+    /// One title, one line of orientation. The previous version stacked
+    /// `ScreenTitle("Library")` *and* a 28pt "Your documents" display line, so the
+    /// screen announced itself twice before showing a single document.
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ScreenTitle("Library")
+            ScreenTitle(
+                "Library",
+                subtitle: "Tap a document to see its concepts and start a focused session."
+            )
             Hairline()
-            Text("Your documents")
-                .font(ACXFont.display(28))
-                .foregroundStyle(ACXColor.ink)
-                .padding(.top, 6)
-            Text("Tap a document to see its concepts and start a focused session.")
-                .font(ACXFont.body(15))
-                .foregroundStyle(ACXColor.muted)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.top, 8)
+        .padding(.top, 4)
     }
 
     // MARK: - Five states
@@ -161,7 +161,7 @@ struct DashboardView: View {
 
     private func failedState(_ detail: String) -> some View {
         EmptyState(
-            kicker: "COULDN'T load",
+            kicker: "Couldn't load",
             message: detail,
             actionLabel: "Try again",
             action: { Task { await model.load(initial: true) } }
@@ -190,32 +190,45 @@ struct DashboardView: View {
         }
     }
 
+    /// Title + right-aligned mastery percent, one quiet meta line, one 8pt bar.
+    ///
+    /// The percentages line up in a column down the right edge, so the list can
+    /// be scanned for "what am I worst at" without reading a single row. The
+    /// per-row "Mastery" caption the previous version repeated four times said
+    /// nothing the bar did not.
     @ViewBuilder
     private func documentRow(_ doc: Document) -> some View {
         let mastery = model.masteryPercent(for: doc)
         let concepts = model.conceptCount(for: doc)
+        let isReady = doc.status == "ready"
 
-        VStack(alignment: .leading, spacing: 10) {
-            Text(doc.displayTitle)
-                .font(ACXFont.bodyMedium(16))
-                .foregroundStyle(ACXColor.ink)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(doc.displayTitle)
+                    .font(ACXFont.bodyMedium(17))
+                    .foregroundStyle(ACXColor.ink)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 8)
+                if isReady {
+                    Text("\(mastery ?? 0)%")
+                        .font(ACXFont.monoBold(17))
+                        .monospacedDigit()
+                        .foregroundStyle(ACXColor.ink)
+                }
+            }
 
             HStack(spacing: 10) {
                 StatusPill(documentStatus: doc.status)
-                TagPill(doc.file_type.uppercased())
-                if let concepts, concepts > 0 {
-                    Text("\(concepts) CONCEPTS")
-                        .font(ACXFont.mono(13))
-                        .monospacedDigit()
-                        .foregroundStyle(ACXColor.muted)
-                }
+                Text(metaLine(doc, concepts: concepts))
+                    .font(ACXFont.body(15))
+                    .monospacedDigit()
+                    .foregroundStyle(ACXColor.muted)
                 Spacer(minLength: 0)
             }
 
-            if doc.status == "ready" {
-                MasteryBar(percent: mastery ?? 0, label: "Mastery")
+            if isReady {
+                ProgressHairline(value: Double(mastery ?? 0) / 100)
             } else if doc.status == "failed" {
                 Text("Processing failed. Delete it and try uploading again.")
                     .font(ACXFont.body(15))
@@ -232,6 +245,16 @@ struct DashboardView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(rowAccessibilityLabel(doc, mastery: mastery, concepts: concepts))
         .accessibilityHint("Opens concepts and session options")
+    }
+
+    /// `PDF · 24 concepts`. Sentence case — the file type is the only token that
+    /// is genuinely an identifier, and a bare count needs no shouted caption.
+    private func metaLine(_ doc: Document, concepts: Int?) -> String {
+        var parts = [doc.file_type.uppercased()]
+        if let concepts, concepts > 0 {
+            parts.append("\(concepts) concept\(concepts == 1 ? "" : "s")")
+        }
+        return parts.joined(separator: " · ")
     }
 
     private func rowAccessibilityLabel(_ doc: Document, mastery: Int?, concepts: Int?) -> String {

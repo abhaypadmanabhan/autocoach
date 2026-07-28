@@ -38,10 +38,9 @@ struct ActivationChecklistView: View {
 
             ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                 row(item)
+                Hairline()
             }
         }
-        .padding(16)
-        .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 2))
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Get set up. \(checklist.doneCount) of \(ActivationChecklist.total) done.")
     }
@@ -49,21 +48,24 @@ struct ActivationChecklistView: View {
     private func row(_ item: (label: String, hint: String, done: Bool)) -> some View {
         HStack(alignment: .top, spacing: 12) {
             StatusMark(item.done ? .ready : .pending)
-                .padding(.top, 5)
+                .padding(.top, 6)
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.label)
-                    .font(ACXFont.monoBold(13))
-                    .kerning(0.6)
-                    .foregroundStyle(ACXColor.ink)
+                    .font(ACXFont.bodyMedium(17))
+                    .foregroundStyle(item.done ? ACXColor.muted : ACXColor.ink)
                     .strikethrough(item.done, color: ACXColor.muted)
-                Text(item.hint)
-                    .font(ACXFont.body(15))
-                    .foregroundStyle(ACXColor.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                // A finished step does not need its instructions. Keeping them
+                // made the checklist taller than the document list it sits above.
+                if !item.done {
+                    Text(item.hint)
+                        .font(ACXFont.body(15))
+                        .foregroundStyle(ACXColor.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             Spacer(minLength: 0)
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 11)
         .frame(minHeight: 44, alignment: .top)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(item.label). \(item.done ? "Done" : "Not done yet"). \(item.hint)")
@@ -83,7 +85,7 @@ struct QuotaNotice: View {
     var compact: Bool = false
 
     private var limitLine: String {
-        limit > 0 ? "\(limit) QUIZZES / DAY" : "Daily limit reached"
+        limit > 0 ? "\(limit)/day" : "—"
     }
 
     var body: some View {

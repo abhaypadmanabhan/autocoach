@@ -92,46 +92,44 @@ struct DocumentDetailView: View {
 
     // MARK: - Header
 
+    /// The document's own title *is* the screen title. The previous version put a
+    /// generic `ScreenTitle("Document")` above it, which named the route rather
+    /// than the thing, and pushed the real title into a second display line.
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ScreenTitle("Document")
+        VStack(alignment: .leading, spacing: 8) {
+            ScreenTitle(model.title, subtitle: model.document.map(Self.metaLine))
             Hairline()
-            Text(model.title)
-                .font(ACXFont.display(26))
-                .foregroundStyle(ACXColor.ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 6)
-
-            if let doc = model.document {
-                HStack(spacing: 10) {
-                    TagPill(doc.file_type.uppercased())
-                    Text(Self.sizeLabel(doc.file_size))
-                        .font(ACXFont.body(15))
-                        .monospacedDigit()
-                        .foregroundStyle(ACXColor.muted)
-                    Text(Self.dateLabel(doc.created_at))
-                        .font(ACXFont.body(15))
-                        .monospacedDigit()
-                        .foregroundStyle(ACXColor.muted)
-                    Spacer(minLength: 0)
-                }
-            }
         }
-        .padding(.top, 8)
+        .padding(.top, 4)
+    }
+
+    /// `PDF · 8.5 MB · 2026-07-21` — provenance, not state, so no pill.
+    static func metaLine(_ doc: Document) -> String {
+        [doc.file_type.uppercased(), sizeLabel(doc.file_size), dateLabel(doc.created_at)]
+            .joined(separator: " · ")
     }
 
     // MARK: - Mastery block
 
+    /// The one bordered element on this screen. Everything below it is a
+    /// hairline-separated table, so the border reads as "this is the headline"
+    /// rather than as the page's default box.
     private var masteryBlock: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text("\(model.progress?.mastery_percent ?? 0)")
-                    .font(ACXFont.monoBold(44, relativeTo: .largeTitle))
+                    .font(ACXFont.monoBold(48, relativeTo: .largeTitle))
                     .monospacedDigit()
                     .foregroundStyle(ACXColor.ink)
                 Text("%")
                     .font(ACXFont.mono(20))
                     .foregroundStyle(ACXColor.muted)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Mastery")
+                        .font(ACXFont.body(15))
+                        .foregroundStyle(ACXColor.muted)
+                }
+                .padding(.leading, 2)
                 Spacer(minLength: 0)
                 if let milestone = model.progress?.milestone {
                     MilestoneBadge(level: MilestoneBadge.Level(apiValue: milestone))
@@ -145,22 +143,43 @@ struct DocumentDetailView: View {
 
             statRow
         }
+        .padding(16)
+        .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 2))
     }
 
+    /// Four counts as a numeric row: value in mono, caption in sentence-case Inter.
+    /// Replaces `CONCEPTS 24 · PRACTISED 15 · WEAK 6 · MASTERED 7`, which shouted
+    /// four labels in a face reserved for data.
     private var statRow: some View {
         let p = model.progress
         let total = p?.concepts_total ?? model.concepts.count
         let practised = p?.concepts_practiced ?? model.concepts.filter(\.hasBeenTested).count
         let weak = p?.weak_concepts_count ?? 0
         let mastered = p?.mastered_concepts_count ?? 0
-        let line = "CONCEPTS \(total) · PRACTISED \(practised) · WEAK \(weak) · MASTERED \(mastered)"
-        return Text(line)
-            .font(ACXFont.body(15))
-            .monospacedDigit()
-            .foregroundStyle(ACXColor.muted)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityLabel(
-                "\(total) concepts, \(practised) practised, \(weak) weak, \(mastered) mastered")
+        return HStack(alignment: .top, spacing: 8) {
+            stat(total, "Concepts")
+            stat(practised, "Practised")
+            stat(weak, "Weak")
+            stat(mastered, "Mastered")
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(total) concepts, \(practised) practised, \(weak) weak, \(mastered) mastered")
+    }
+
+    private func stat(_ value: Int, _ caption: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("\(value)")
+                .font(ACXFont.monoBold(17))
+                .monospacedDigit()
+                .foregroundStyle(ACXColor.ink)
+            Text(caption)
+                .font(ACXFont.body(15))
+                .foregroundStyle(ACXColor.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: - Concept table
@@ -205,29 +224,37 @@ struct DocumentDetailView: View {
                     .overlay(Rectangle().stroke(ACXColor.ink, lineWidth: 1.5))
                     .padding(.top, 3)
 
-                VStack(alignment: .leading, spacing: 8) {
+                // Two lines: what it is, then how it is going. Mastery is the
+                // trailing number and *only* the trailing number — the earlier
+                // shape put a full-width bar under every row, and a later one
+                // paired the number with a 56pt bar that said the same thing
+                // twice and rendered as a 4pt sliver at the low percentages this
+                // weakest-first table exists to show.
+                VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(concept.concept_name)
-                            .font(ACXFont.bodyMedium(16))
+                            .font(ACXFont.bodyMedium(17))
                             .foregroundStyle(ACXColor.ink)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                         if concept.is_core { CoreBadge() }
-                        Spacer(minLength: 0)
+                        Spacer(minLength: 8)
+                        Text("\(Self.masteryPercent(concept.mastery_score))%")
+                            .font(ACXFont.monoBold(17))
+                            .monospacedDigit()
+                            .foregroundStyle(ACXColor.ink)
                     }
 
                     HStack(spacing: 12) {
                         ImportanceDots(score: concept.importance_score)
                         Text(concept.hasBeenTested
-                             ? "\(concept.times_correct)/\(concept.times_tested)"
+                             ? "\(concept.times_correct)/\(concept.times_tested) correct"
                              : "Not tested")
-                            .font(ACXFont.mono(13))
+                            .font(ACXFont.body(15))
                             .monospacedDigit()
                             .foregroundStyle(ACXColor.muted)
                         Spacer(minLength: 0)
                     }
-
-                    MasteryBar(percent: Self.masteryPercent(concept.mastery_score), showsLabel: false)
                 }
             }
             .padding(.vertical, 14)
@@ -286,8 +313,8 @@ struct DocumentDetailView: View {
         if model.quotaExhausted { return "No credits" }
         switch model.selection.count {
         case 0: return "Start quiz"
-        case 1: return "START — 1 FOCUS"
-        default: return "START — \(model.selection.count) FOCUS"
+        case 1: return "Start · 1 concept"
+        default: return "Start · \(model.selection.count) concepts"
         }
     }
 
@@ -306,7 +333,7 @@ struct DocumentDetailView: View {
             ForEach(0..<4, id: \.self) { _ in
                 VStack(alignment: .leading, spacing: 8) {
                     Rectangle().fill(ACXColor.surface).frame(height: 14).frame(maxWidth: 240)
-                    Rectangle().fill(ACXColor.surface).frame(height: 2)
+                    Rectangle().fill(ACXColor.surface).frame(height: 8)
                 }
                 .padding(.vertical, 6)
             }
@@ -346,7 +373,7 @@ struct DocumentDetailView: View {
 
     private func failedState(_ detail: String) -> some View {
         EmptyState(
-            kicker: "COULDN'T load",
+            kicker: "Couldn't load",
             message: detail,
             actionLabel: "Try again",
             action: { Task { await model.load(initial: true) } }

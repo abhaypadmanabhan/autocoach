@@ -30,6 +30,20 @@ struct DesignHarness: View {
             Tab("Library", systemImage: "books.vertical", value: 3) {
                 NavigationStack { DashboardView(auth: auth, api: api) }
             }
+            // The real `DocumentDetailView`, not a redraw — `DocumentDetailModel`
+            // seeds itself from `LibrarySample` while `HARNESS_SCREEN` is set, so
+            // no request is made and no session is started.
+            Tab("Document", systemImage: "doc.text", value: 4) {
+                NavigationStack {
+                    DocumentDetailView(
+                        route: DocumentRoute(
+                            documentID: LibrarySample.detailDocument.id,
+                            fallbackTitle: LibrarySample.detailDocument.displayTitle
+                        ),
+                        api: api
+                    )
+                }
+            }
             Tab("Credits", systemImage: "bolt", value: 2) {
                 CreditsSheet(api: api)
             }
