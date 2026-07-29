@@ -58,9 +58,9 @@ class Settings(BaseSettings):
     next_question_max_wait_ms: int = 10000
 
     # Langfuse / observability
-    # See docs/specs/langfuse-selfhost.md §5. All optional — when any of the
-    # three credentials below is missing, the observability module enters its
-    # NOOP path and `@observe()` decorators become no-ops.
+    # All optional — when any of the three credentials below is missing, the
+    # observability module enters its NOOP path and `@observe()` decorators
+    # become no-ops.
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
     langfuse_host: str = ""

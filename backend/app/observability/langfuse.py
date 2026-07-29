@@ -1,10 +1,14 @@
 """Langfuse client singleton and FastAPI lifespan helpers.
 
-Implements the client-init module described in
-``docs/specs/langfuse-selfhost.md`` §5 ("Backend integration plan"). The
-module owns one process-wide Langfuse v4 client (or ``None`` when the
+The module owns one process-wide Langfuse v4 client (or ``None`` when the
 NOOP path is taken) and exposes :func:`flush` and :func:`is_enabled` for
-the FastAPI lifespan to call.
+the FastAPI lifespan to call. Backend runs against Langfuse Cloud.
+
+Failure mode
+------------
+Observability must never break the request path or application startup.
+Every entry point here — construction, scoring, flush — swallows its own
+exceptions and degrades to a no-op.
 
 NOOP path
 ---------
@@ -87,9 +91,8 @@ def _init_client() -> Optional[Langfuse]:
 
     Idempotent: callers should assign the result to the module-level
     ``langfuse`` global. The NOOP path logs exactly once per process.
-    Any exception raised by the SDK constructor is swallowed — per spec
-    §5 "Failure mode", Langfuse must never break the request path or
-    application startup.
+    Any exception raised by the SDK constructor is swallowed — see this
+    module's "Failure mode" note.
     """
     settings = get_settings()
     pub = getattr(settings, "langfuse_public_key", "") or ""
@@ -181,7 +184,7 @@ def flush() -> None:
     try:
         langfuse.flush()
     except Exception:  # pragma: no cover — SDK swallows internally
-        # Per spec §5 "Failure mode": Langfuse must not break the app.
+        # Failure mode: Langfuse must not break the app.
         logger.exception("Langfuse flush failed; continuing shutdown")
 
 

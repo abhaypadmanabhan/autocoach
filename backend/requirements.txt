@@ -88,6 +88,6 @@ alembic==1.13.1
 SQLAlchemy==2.0.25
 psycopg2-binary==2.9.9
 
-# Observability (Phase 1.7 — see docs/specs/langfuse-selfhost.md §5)
+# Observability (Phase 1.7 — Langfuse Cloud; see app/observability/langfuse.py)
 langfuse>=4.5,<5
 sentry-sdk[fastapi]==2.62.0

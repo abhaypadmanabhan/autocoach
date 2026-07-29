@@ -1,6 +1,6 @@
 """Tests for app.observability.langfuse (Phase 1.7 task 1).
 
-Covers spec §5 "Client init module": NOOP-when-keys-missing, enabled
+Covers the client-init module: NOOP-when-keys-missing, enabled
 construction, safe flush, and propagation of the ``environment`` /
 ``release`` kwargs to the Langfuse v4 constructor. We patch the
 Langfuse SDK to avoid opening any real network connections.
