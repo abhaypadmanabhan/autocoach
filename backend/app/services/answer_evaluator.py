@@ -5,15 +5,28 @@ import logging
 
 from langfuse import propagate_attributes
 
-from app.observability.langfuse import observe
-from app.services.llm import call_kimi, call_openai, tag_current_generation
+from app.observability.langfuse import observe, score_current_trace
+from app.services.llm import (
+    call_kimi,
+    call_openai,
+    mark_current_observation_error,
+    tag_current_generation,
+)
 
 logger = logging.getLogger(__name__)
+
+# Live-traffic score name (#73). Deliberately distinct from the offline
+# harness's `ragas_eval` so the Langfuse UI can separate "what real users
+# scored" from "what the eval set scored".
+LIVE_ANSWER_SCORE_NAME = "answer_correct"
 
 
 def normalize_answer(answer: str) -> str:
     """Normalize an answer string for comparison."""
     return answer.strip().lower()
+
+
+MCQ_LETTERS = "ABCD"
 
 
 def normalize_mcq_answer(answer: str) -> str:
@@ -23,24 +36,83 @@ def normalize_mcq_answer(answer: str) -> str:
     if len(normalized) > 1 and normalized[1] in [")", ".", " "]:
         normalized = normalized[0]
     # If answer is just the letter
-    if len(normalized) == 1 and normalized in "ABCD":
+    if len(normalized) == 1 and normalized in MCQ_LETTERS:
         return normalized
     return normalized
 
 
-def evaluate_mcq(user_answer: str, correct_answer: str) -> tuple[bool, str]:
+def _canonical_option_text(text: str) -> str:
+    """Case- and whitespace-insensitive form used to compare option text."""
+    return " ".join(str(text).split()).casefold()
+
+
+def _strip_option_label(option: str) -> str:
+    """Drop a leading ``A) `` / ``B.`` / ``C:`` label from a stored option.
+
+    A bare space is deliberately *not* treated as a label delimiter: "A
+    device that ..." is a legitimate option and stripping it would match
+    the wrong text. Callers keep the unstripped form as a candidate too,
+    so unlabelled options still match.
+    """
+    text = str(option).strip()
+    if len(text) > 1 and text[0].upper() in MCQ_LETTERS and text[1] in (")", ".", ":"):
+        return text[2:].strip()
+    return text
+
+
+def _letter_from_options(answer: str, options: list[str] | None) -> str | None:
+    """Map a submitted option *text* back to its letter, or ``None``."""
+    if not options or not isinstance(options, (list, tuple)):
+        return None
+    target = _canonical_option_text(answer)
+    if not target:
+        return None
+    for index, option in enumerate(options):
+        if index >= len(MCQ_LETTERS):
+            break
+        if target in {
+            _canonical_option_text(option),
+            _canonical_option_text(_strip_option_label(option)),
+        }:
+            return MCQ_LETTERS[index]
+    return None
+
+
+def resolve_mcq_answer(answer: str, options: list[str] | None = None) -> str:
+    """Resolve an MCQ submission to its canonical letter.
+
+    Letters win: an answer that already normalizes to A-D never consults
+    the option list. Everything else falls back to text matching, and then
+    to the normalized input so unknown answers still grade wrong.
+    """
+    normalized = normalize_mcq_answer(answer)
+    if len(normalized) == 1 and normalized in MCQ_LETTERS:
+        return normalized
+    return _letter_from_options(answer, options) or normalized
+
+
+def evaluate_mcq(
+    user_answer: str,
+    correct_answer: str,
+    options: list[str] | None = None,
+) -> tuple[bool, str]:
     """
     Evaluate a multiple choice question answer.
 
     Args:
         user_answer: The user's answer (e.g., "A", "A) option", "option text").
         correct_answer: The correct answer (e.g., "A", "A) option").
+        options: The question's option list, when the caller has it. Lets a
+            client submitting bare option text grade the same as one
+            submitting the letter (#61). Optional — omit it and the
+            letter-only behaviour every existing caller relies on is
+            unchanged.
 
     Returns:
         Tuple of (is_correct, feedback_message).
     """
-    user_normalized = normalize_mcq_answer(user_answer)
-    correct_normalized = normalize_mcq_answer(correct_answer)
+    user_normalized = resolve_mcq_answer(user_answer, options)
+    correct_normalized = resolve_mcq_answer(correct_answer, options)
 
     is_correct = user_normalized == correct_normalized
 
@@ -149,6 +221,10 @@ def evaluate_free_text(
 
     `session_id`/`user_id` are tagged onto the Langfuse trace (#71); model +
     token usage are tagged onto this generation span per cascade branch (#72).
+    A `LIVE_ANSWER_SCORE_NAME` score carries the grade itself (#73) — emitted
+    only when the LLM actually graded, so the score's mean stays a real
+    accuracy rate. Every path that returns without a grade marks the
+    observation ERROR instead.
     """
     with propagate_attributes(user_id=user_id, session_id=session_id):
         try:
@@ -174,6 +250,9 @@ def evaluate_free_text(
 
             if not response:
                 logger.error("Both LLM evaluations failed — failing closed (is_correct=False)")
+                mark_current_observation_error(
+                    "Both Kimi and OpenAI returned no evaluation"
+                )
                 return False, "Could not evaluate. Please retry.", correct_answer
 
             tag_current_generation(response)
@@ -191,14 +270,21 @@ def evaluate_free_text(
                 result = json.loads(cleaned)
                 is_correct = bool(result.get("is_correct", False))
                 feedback = str(result.get("feedback", "Answer evaluated."))[:1000]
+                score_current_trace(
+                    LIVE_ANSWER_SCORE_NAME,
+                    1.0 if is_correct else 0.0,
+                    comment="Live free-text grade",
+                )
                 return is_correct, feedback, correct_answer
 
             except (json.JSONDecodeError, TypeError, ValueError) as e:
                 logger.error(f"Failed to parse evaluation JSON: {e}")
+                mark_current_observation_error(f"Unparseable evaluation JSON: {e}")
                 return False, "Could not evaluate. Please retry.", correct_answer
 
         except Exception as e:
             logger.error(f"Error evaluating free text answer: {e}")
+            mark_current_observation_error(f"Free-text evaluation raised: {e}")
             return False, "Could not evaluate. Please try again.", correct_answer
 
 
@@ -209,16 +295,18 @@ def evaluate_answer(
     question_text: str = "",
     session_id: str | None = None,
     user_id: str | None = None,
+    options: list[str] | None = None,
 ) -> dict:
     """Route answer evaluation by canonical question_type enum value.
 
     `session_id`/`user_id` are only used by the `text_free` branch (the only
     one that calls an LLM / has a Langfuse trace) — ignored otherwise.
+    `options` is only used by the `text_mcq` branch.
     """
     question_type = question_type.lower()
 
     if question_type == "text_mcq":
-        is_correct, feedback = evaluate_mcq(user_answer, correct_answer)
+        is_correct, feedback = evaluate_mcq(user_answer, correct_answer, options)
         return {"is_correct": is_correct, "feedback": feedback}
 
     if question_type == "text_tf":

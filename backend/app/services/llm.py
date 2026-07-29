@@ -68,6 +68,22 @@ def tag_current_generation(response: str) -> None:
         logger.warning(f"Langfuse generation tagging failed: {e}")
 
 
+def mark_current_observation_error(status_message: str) -> None:
+    """Flag the current Langfuse observation as failed (#73).
+
+    Both LLM callers swallow their exception and return `""` so the request
+    path stays up — which also made every failure invisible in the Langfuse
+    UI. `update_current_span` writes the generic observation attributes, so
+    it applies to generation spans too. Fails open like the tagging helper."""
+    try:
+        get_client().update_current_span(
+            level="ERROR", status_message=status_message[:500]
+        )
+    except Exception as e:
+        # Observability must never break the request path — fail open.
+        logger.warning(f"Langfuse error tagging failed: {e}")
+
+
 def call_kimi(system_prompt: str, user_prompt: str) -> str:
     """
     Call the Kimi API to generate a response using Instant Mode.
@@ -109,6 +125,7 @@ def call_kimi(system_prompt: str, user_prompt: str) -> str:
         )
     except Exception as e:
         logger.error(f"Kimi API call failed: {e}")
+        mark_current_observation_error(f"Kimi API call failed: {e}")
         return ""
 
 
@@ -151,4 +168,5 @@ def call_openai(
         )
     except Exception as e:
         logger.error(f"OpenAI API call failed: {e}")
+        mark_current_observation_error(f"OpenAI API call failed: {e}")
         return ""
