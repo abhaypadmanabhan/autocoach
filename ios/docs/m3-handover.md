@@ -42,9 +42,9 @@ likely to break, with the reason.
 ### Auth
 - [ ] Fresh install → Welcome renders, not Login
 - [ ] Continue with email → Signup → create a genuinely new account → lands in onboarding
-- [ ] ⚠ **If the Supabase project has email confirmation ON**, signup shows "check your inbox"
-      with a working Resend. If it is OFF, that state is unreachable. *Nobody has confirmed which
-      it is* — this is open question 1 below.
+- [ ] **Email confirmation is ON** (confirmed in the Supabase dashboard 2026-07-29, #88). So
+      signup MUST show "check your inbox" with a working Resend, and a new account is not usable
+      until the link is clicked. That state is live, not dead code — test it.
 - [ ] ⚠ Signing up with an **existing** email offers "Sign in instead". Detection relies on
       Supabase returning an empty `identities` array, which is observed behaviour, not contract.
 - [ ] ⚠ **Sign in with Apple needs two console changes nobody has made** (see Blockers). Until
@@ -114,16 +114,21 @@ likely to break, with the reason.
 ## Blockers needing you (config, not code)
 
 1. **Sign in with Apple will not work until:**
-   - the Apple provider is enabled in the **Supabase dashboard** with the correct Services ID, and
    - Sign in with Apple is enabled on the `com.padzy.autocoach` **App ID** in the Apple Developer
-     portal.
+     portal, and
+   - the Apple provider is enabled in the **Supabase dashboard** with the bundle ID
+     `com.padzy.autocoach` listed under *Client IDs*. The native flow uses
+     `signInWithIdToken`, so a Services ID and generated client secret are **only** needed if a
+     web OAuth flow is added later — not for the iOS app.
 2. **App Group / Keychain access group are declared but inert on this build.** `DEVELOPMENT_TEAM`
    is unset, so the entitlement is stripped and the container falls back to local storage. Chosen
    identifiers — `group.com.padzy.autocoach` and `$(AppIdentifierPrefix)com.padzy.autocoach` —
    need registering. Worth renaming *now* if you want different ones, before the widget and share
    extension exist.
-3. **Is email confirmation ON in the Supabase project?** It decides whether the signup
-   check-your-inbox state is reachable at all.
+3. ~~Is email confirmation ON in the Supabase project?~~ **Answered 2026-07-29: it is ON** (#88).
+   The check-your-inbox state is reachable and must be tested. Duplicate-account detection still
+   relies on Supabase returning an empty `identities` array — observed behaviour, not a documented
+   contract — so re-verify it against this setting.
 
 ---
 

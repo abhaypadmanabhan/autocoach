@@ -156,5 +156,12 @@ git push origin --force --all
 
 **Human Action Required:** Please select one of the following decisions before any history rewrite action is taken:
 
-- [ ] **APPROVE OPTION A (RECOMMENDED):** Leave `dev` history as-is. Accept that `main` is clean, 0 forks exist, and `.gitignore` prevents future CSV commits. No history rewrite or force-push will be executed.
+- [x] **APPROVE OPTION A (RECOMMENDED):** Leave `dev` history as-is. Accept that `main` is clean, 0 forks exist, and `.gitignore` prevents future CSV commits. No history rewrite or force-push will be executed.
 - [ ] **APPROVE OPTION B:** Schedule a history rewrite using `git filter-repo` to purge the 3 CSV blobs from `dev` history **after** all active Herdr agent runs finish.
+
+**Decision — 2026-07-29, by the repository owner: Option A.** History stays as-is; no rewrite,
+no force-push. Revisit only if the repo gains forks or a legal requirement appears.
+
+**Follow-up raised by this assessment:** the `backend/evals/golden/*.jsonl` files carry verbatim
+`source_chunk_text` and are **live in the tree on both `dev` and `main`** — a current exposure,
+unlike these deleted CSVs. Out of scope here; tracked separately.
