@@ -5,6 +5,8 @@ Retrieval/answer/judge are injected as stubs — no network or API key needed.
 
 from __future__ import annotations
 
+import io
+import json
 import logging
 
 import pytest
@@ -120,7 +122,6 @@ def test_build_dataset_missing_chunk_id_records_null_and_warns(caplog):
         return [
             {"id": "pt-ok", "content": "TEST FIXTURE chunk with id"},
             {"content": "TEST FIXTURE chunk without id"},
-            "TEST FIXTURE bare string chunk",
         ]
 
     tuples = [{"question": "q1", "ideal_answer": "a1",
@@ -128,9 +129,23 @@ def test_build_dataset_missing_chunk_id_records_null_and_warns(caplog):
     with caplog.at_level(logging.WARNING):
         ds = rr.build_dataset(tuples, document_id="doc-id", top_k=3,
                               retrieve=idless_retrieve, answer=_stub_answer, doc="t")
-    assert ds["retrieved_chunk_ids"] == [["pt-ok", None, None]]
+    assert ds["retrieved_chunk_ids"] == [["pt-ok", None]]
     warnings = [r.getMessage() for r in caplog.records if "no stable ID" in r.getMessage()]
-    assert len(warnings) == 2
+    assert len(warnings) == 1
+
+
+def test_build_dataset_rejects_bare_string_items():
+    """Bare-string retrieved items violate the RetrieveFn (list[dict]) protocol."""
+    pytest.importorskip("datasets")
+
+    def bare_string_retrieve(query, document_id, top_k):
+        return ["TEST FIXTURE bare string chunk"]
+
+    tuples = [{"question": "q1", "ideal_answer": "a1",
+               "source_chunk_text": "s1", "concept_label": "c1"}]
+    with pytest.raises(TypeError):
+        rr.build_dataset(tuples, document_id="doc-id", top_k=3,
+                         retrieve=bare_string_retrieve, answer=_stub_answer, doc="t")
 
 
 def test_run_one_end_to_end_writes_csv(fixtures_dir, tmp_path, capsys):
@@ -183,7 +198,70 @@ def test_safe_chunk_ids_keeps_order_and_null_gaps():
     row = {"retrieved_chunk_ids": ["pt-a", None, 42, "pt-b"]}
     assert rr._safe_chunk_ids(row) == ["pt-a", None, "42", "pt-b"]
     assert rr._safe_chunk_ids({"retrieved_chunk_ids": "not-a-list"}) == []
-    assert rr._safe_chunk_ids({}) == []
+    # A missing retrieved_chunk_ids column fails loudly instead of silently
+    # uploading [] (the legacy chunk_ids fallback key is gone).
+    with pytest.raises(KeyError):
+        rr._safe_chunk_ids({})
+
+
+def test_safe_chunk_ids_excludes_bool_and_empty_strings():
+    row = {"retrieved_chunk_ids": ["pt-a", True, False, "", 42, None, "pt-b"]}
+    assert rr._safe_chunk_ids(row) == ["pt-a", None, None, None, "42", None, "pt-b"]
+
+
+def test_coerce_chunk_id_excludes_bool_and_empty_strings():
+    assert rr._coerce_chunk_id("pt-a") == "pt-a"
+    assert rr._coerce_chunk_id(42) == "42"
+    assert rr._coerce_chunk_id(None) is None
+    assert rr._coerce_chunk_id(True) is None
+    assert rr._coerce_chunk_id(False) is None
+    assert rr._coerce_chunk_id("") is None
+    assert rr._coerce_chunk_id(3.14) is None
+
+
+def test_retrieved_chunk_ids_csv_round_trips_through_json_with_null_holes():
+    """json.dumps on write -> json.loads recovers the exact list incl. None."""
+    df = pd.DataFrame([{"retrieved_chunk_ids": ["pt-a", None, 42]}])
+    csv_df = rr._serialize_chunk_ids_column(df)
+    # In-memory frame is untouched (still real lists, not strings).
+    assert df["retrieved_chunk_ids"].tolist() == [["pt-a", None, 42]]
+    # CSV cell is JSON, not a Python repr.
+    buf = csv_df.to_csv(index=False)
+    read_back = pd.read_csv(io.StringIO(buf), dtype={"retrieved_chunk_ids": str})
+    raw_cell = read_back["retrieved_chunk_ids"].iloc[0]
+    assert raw_cell.startswith("[")
+    assert "pt-a" in raw_cell and "null" in raw_cell  # JSON null, not None
+    assert json.loads(raw_cell) == ["pt-a", None, 42]
+    # _safe_chunk_ids recovers the same list (with int id coerced to str).
+    assert rr._safe_chunk_ids({"retrieved_chunk_ids": raw_cell}) == ["pt-a", None, "42"]
+
+
+def test_warn_all_chunk_ids_missing_fires_when_every_id_is_null(caplog):
+    df = pd.DataFrame([
+        {"retrieved_chunk_ids": [None, None]},
+        {"retrieved_chunk_ids": []},
+    ])
+    with caplog.at_level(logging.WARNING):
+        rr._warn_all_chunk_ids_missing("ddia", df)
+    warnings = [r.getMessage() for r in caplog.records if "ALL" in r.getMessage()]
+    assert len(warnings) == 1
+    assert "missing" in warnings[0].lower()
+
+
+def test_warn_all_chunk_ids_missing_silent_when_some_id_present(caplog):
+    df = pd.DataFrame([{"retrieved_chunk_ids": ["pt-a", None]}])
+    with caplog.at_level(logging.WARNING):
+        rr._warn_all_chunk_ids_missing("ddia", df)
+    warnings = [r.getMessage() for r in caplog.records if "ALL" in r.getMessage()]
+    assert len(warnings) == 0
+
+
+def test_warn_all_chunk_ids_missing_noop_on_empty_or_missing_column(caplog):
+    with caplog.at_level(logging.WARNING):
+        rr._warn_all_chunk_ids_missing("ddia", pd.DataFrame())
+        rr._warn_all_chunk_ids_missing("ddia", pd.DataFrame({"other": [1]}))
+    warnings = [r.getMessage() for r in caplog.records if "ALL" in r.getMessage()]
+    assert len(warnings) == 0
 
 
 def test_run_one_zero_context_retrieval_aborts_before_csv(fixtures_dir, tmp_path):

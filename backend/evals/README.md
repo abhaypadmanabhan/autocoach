@@ -70,7 +70,7 @@ python -m evals.run_ragas --doc ddia --no-langfuse
 
 Output:
 - Stdout: per-metric mean ± std.
-- `evals/results/<doc>_<utc-timestamp>.csv`: local per-row scores including `concept_label`, `reference`, and deterministic `retrieval_hit_at_k`.
+- `evals/results/<doc>_<utc-timestamp>.csv`: local per-row scores including `concept_label`, `reference`, and deterministic `retrieval_hit_at_k`. The `retrieved_chunk_ids` column is JSON-encoded (`json.dumps` on write) so it round-trips through `json.loads` with its `None` holes intact — do not parse it as a Python repr.
 - Langfuse Cloud (when keys present): one aggregate trace with document-level means, plus one inspectable trace per golden row.
 
 The answer-generation prompt in `run_ragas.py` is an eval-only synthetic QA path. It is not an exact copy of the current AutoCoach adaptive quiz product flow.
