@@ -1267,6 +1267,7 @@ def submit_answer(
             question_text=question["question_text"],
             session_id=session_id,
             user_id=user_id,
+            options=question.get("options"),
         )
         is_correct = eval_result["is_correct"]
         feedback = eval_result.get("feedback", "")
