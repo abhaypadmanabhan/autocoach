@@ -7,7 +7,10 @@ options:
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    DEVELOPMENT_TEAM: ""
+    # Padzy team. Required for the entitlements to survive signing — with this
+    # empty, App Group + Keychain access group were stripped and the stores
+    # silently fell back to local storage while the build still succeeded (#87).
+    DEVELOPMENT_TEAM: "A47GG9FV27"
     CODE_SIGN_STYLE: Automatic
 packages:
   supabase-swift:
