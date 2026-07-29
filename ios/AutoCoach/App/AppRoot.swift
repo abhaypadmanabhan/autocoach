@@ -39,6 +39,19 @@ struct AppRoot: View {
     }
 }
 
+/// Lets Settings re-enter onboarding without threading the root gate through
+/// `MainTabView` → `ProfileView` (neither is in this lane's scope). The root is
+/// the only reader of `needsRedo`; Settings is the only writer. A shared
+/// singleton so both ends observe the same instance without `.environmentObject`
+/// plumbing — which the DEBUG-only `DesignHarness` (off-limits here) wouldn't
+/// inject, and which would otherwise crash it on open.
+@MainActor
+final class OnboardingRedo: ObservableObject {
+    @Published var needsRedo = false
+
+    static let shared = OnboardingRedo()
+}
+
 /// Root switch on `AuthStore.state` (driven by `authStateChanges`), plus the
 /// onboarding gate.
 ///
@@ -62,8 +75,22 @@ struct RootView: View {
     }
 
     @State private var gate: Gate = .probing
+    @ObservedObject private var redo = OnboardingRedo.shared
 
     var body: some View {
+        routingBody
+            .onChange(of: redo.needsRedo) { _, requested in
+                guard requested else { return }
+                // Re-arm the gate so the user re-enters OnboardingFlowView.
+                // Reset immediately so a *second* request after they finish is
+                // still seen as a value change.
+                gate = .needsOnboarding
+                redo.needsRedo = false
+            }
+    }
+
+    @ViewBuilder
+    private var routingBody: some View {
         switch auth.state {
         case .loading:
             BootView()

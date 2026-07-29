@@ -6,6 +6,7 @@ struct SettingsView: View {
     let auth: AuthStore
 
     @Environment(\.openURL) private var openURL
+    @ObservedObject private var redo = OnboardingRedo.shared
 
     @State private var studyTime: StudyTime = ProfileSettingsStore.studyTime
     @State private var daysPerWeek: Int = ProfileSettingsStore.daysPerWeek
@@ -35,6 +36,7 @@ struct SettingsView: View {
                     securityBlock
                     analyticsBlock
                     legalBlock
+                    onboardingBlock
                     accountBlock
                     footer
                 }
@@ -186,6 +188,25 @@ struct SettingsView: View {
             }
             .tint(ACXColor.accent)
             .frame(minHeight: 44)
+        }
+    }
+
+    private var onboardingBlock: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionLabel("Onboarding")
+            Hairline()
+                .padding(.top, 10)
+                .padding(.bottom, 8)
+
+            // Not a navigation push — a state flip the root observes. The row
+            // treatment is identical to the legal rows so it reads as native.
+            Button {
+                redo.needsRedo = true
+            } label: {
+                settingsRow("Redo onboarding")
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Re-run the onboarding flow")
         }
     }
 
