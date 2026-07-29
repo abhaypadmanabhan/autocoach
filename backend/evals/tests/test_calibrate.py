@@ -115,7 +115,7 @@ def make_evaluator(script, *, echo_questions=True, reverse_rows=False, per_row=N
     can tell rows apart. ``reverse_rows`` simulates a judge returning results
     out of order.
     """
-    import pandas as pd
+    pd = pytest.importorskip("pandas")
 
     calls: list[dict] = []
     cursors: dict[str, int] = {}

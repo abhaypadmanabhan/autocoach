@@ -114,7 +114,7 @@ class StubResult:
 
 def make_evaluator(per_case: dict[int, dict[str, float]], *, judge_offset=None):
     """Stub judge returning a fixed score per case_id, echoing questions back."""
-    import pandas as pd
+    pd = pytest.importorskip("pandas")
 
     calls: list[dict] = []
 
