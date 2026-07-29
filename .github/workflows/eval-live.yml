@@ -1,0 +1,172 @@
+# Live Ragas eval — scheduled + manual. Paid LLM/Qdrant/embedding calls; not a PR gate.
+#
+# Required repository secrets (job skips with a notice when any are missing):
+#   QDRANT_URL
+#   QDRANT_API_KEY
+#   KIMI_API_KEY
+#   OPENAI_API_KEY
+#   SUPABASE_URL
+#   SUPABASE_SECRET_KEY
+#   SUPABASE_PUBLISHABLE_KEY
+#
+# Optional Langfuse score upload (run continues when absent):
+#   LANGFUSE_PUBLIC_KEY
+#   LANGFUSE_SECRET_KEY
+#   LANGFUSE_HOST
+#
+# Metric gate: disabled by default. Flip on via workflow_dispatch input
+# `enforce_metric_bars` (see job env). Pass bars when enabled:
+#   faithfulness >= 0.6, context_recall >= 0.7, context_precision >= 0.8,
+#   answer_relevancy >= 0.75
+
+name: Live Ragas eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      enforce_metric_bars:
+        description: >-
+          Enforce README pass bars (faithfulness 0.6, context_recall 0.7,
+          context_precision 0.8, answer_relevancy 0.75). Off until baseline
+          is reviewed.
+        type: boolean
+        default: false
+  schedule:
+    # Weekly Sunday 06:00 UTC
+    - cron: "0 6 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-live-${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  secrets-guard:
+    name: secrets guard
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - id: check
+        run: |
+          missing=()
+          [[ -z "${{ secrets.QDRANT_URL }}" ]] && missing+=("QDRANT_URL")
+          [[ -z "${{ secrets.QDRANT_API_KEY }}" ]] && missing+=("QDRANT_API_KEY")
+          [[ -z "${{ secrets.KIMI_API_KEY }}" ]] && missing+=("KIMI_API_KEY")
+          [[ -z "${{ secrets.OPENAI_API_KEY }}" ]] && missing+=("OPENAI_API_KEY")
+          [[ -z "${{ secrets.SUPABASE_URL }}" ]] && missing+=("SUPABASE_URL")
+          [[ -z "${{ secrets.SUPABASE_SECRET_KEY }}" ]] && missing+=("SUPABASE_SECRET_KEY")
+          [[ -z "${{ secrets.SUPABASE_PUBLISHABLE_KEY }}" ]] && missing+=("SUPABASE_PUBLISHABLE_KEY")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::notice title=Live Ragas eval skipped::Missing required secrets: ${missing[*]}. Configure repository secrets before running."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  ragas-live:
+    name: live ragas eval
+    needs: secrets-guard
+    if: needs.secrets-guard.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    env:
+      # Metric gate ships disabled; only workflow_dispatch can flip it on.
+      ENFORCE_METRIC_BARS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.enforce_metric_bars == 'true' }}
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/evals/requirements.lock.txt
+
+      - name: Install eval stack (dedicated venv)
+        # ragas/langchain-openai conflict with the app's openai==2.x pin — see
+        # backend/evals/README.md → Environment.
+        run: |
+          python -m venv .venv-evals
+          .venv-evals/bin/python -m pip install --upgrade pip
+          .venv-evals/bin/pip install -r evals/requirements.lock.txt
+
+      - name: Run live Ragas eval
+        env:
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          KIMI_API_KEY: ${{ secrets.KIMI_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          ENVIRONMENT: production
+        run: |
+          LANGFUSE_ARGS=""
+          if [[ -n "${{ secrets.LANGFUSE_PUBLIC_KEY }}" && -n "${{ secrets.LANGFUSE_SECRET_KEY }}" && -n "${{ secrets.LANGFUSE_HOST }}" ]]; then
+            export LANGFUSE_PUBLIC_KEY="${{ secrets.LANGFUSE_PUBLIC_KEY }}"
+            export LANGFUSE_SECRET_KEY="${{ secrets.LANGFUSE_SECRET_KEY }}"
+            export LANGFUSE_HOST="${{ secrets.LANGFUSE_HOST }}"
+            echo "Langfuse secrets present — score upload enabled."
+          else
+            LANGFUSE_ARGS="--no-langfuse"
+            echo "Langfuse secrets absent — skipping score upload (--no-langfuse)."
+          fi
+          .venv-evals/bin/python -m evals.run_ragas --doc all ${LANGFUSE_ARGS}
+
+      - name: Enforce metric bars (optional gate)
+        if: env.ENFORCE_METRIC_BARS == 'true'
+        run: |
+          .venv-evals/bin/python <<'PY'
+          import glob
+          import sys
+          from pathlib import Path
+
+          import pandas as pd
+
+          # faithfulness 0.6 / context_recall 0.7 / context_precision 0.8 / answer_relevancy 0.75
+          bars = {
+              "faithfulness": 0.6,
+              "context_recall": 0.7,
+              "context_precision": 0.8,
+              "answer_relevancy": 0.75,
+          }
+
+          csvs = sorted(glob.glob("evals/results/*.csv"), key=Path)
+          if not csvs:
+              print("No CSV results found under evals/results/")
+              sys.exit(1)
+
+          latest = csvs[-1]
+          df = pd.read_csv(latest)
+          print(f"Checking metric bars against {latest}")
+
+          failures = []
+          for metric, bar in bars.items():
+              if metric not in df.columns:
+                  failures.append(f"{metric}: column missing")
+                  continue
+              mean = df[metric].mean()
+              print(f"  {metric}: mean={mean:.4f} (bar >= {bar})")
+              if mean < bar:
+                  failures.append(f"{metric}: {mean:.4f} < {bar}")
+
+          if failures:
+              print("Metric gate FAILED:")
+              for item in failures:
+                  print(f"  - {item}")
+              sys.exit(1)
+
+          print("Metric gate passed.")
+          PY
+
+      - name: Upload Ragas CSV artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ragas-results-${{ github.run_id }}
+          path: backend/evals/results/*.csv
+          if-no-files-found: warn
