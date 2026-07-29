@@ -5,10 +5,20 @@ import logging
 
 from langfuse import propagate_attributes
 
-from app.observability.langfuse import observe
-from app.services.llm import call_kimi, call_openai, tag_current_generation
+from app.observability.langfuse import observe, score_current_trace
+from app.services.llm import (
+    call_kimi,
+    call_openai,
+    mark_current_observation_error,
+    tag_current_generation,
+)
 
 logger = logging.getLogger(__name__)
+
+# Live-traffic score name (#73). Deliberately distinct from the offline
+# harness's `ragas_eval` so the Langfuse UI can separate "what real users
+# scored" from "what the eval set scored".
+LIVE_ANSWER_SCORE_NAME = "answer_correct"
 
 
 def normalize_answer(answer: str) -> str:
@@ -149,6 +159,10 @@ def evaluate_free_text(
 
     `session_id`/`user_id` are tagged onto the Langfuse trace (#71); model +
     token usage are tagged onto this generation span per cascade branch (#72).
+    A `LIVE_ANSWER_SCORE_NAME` score carries the grade itself (#73) — emitted
+    only when the LLM actually graded, so the score's mean stays a real
+    accuracy rate. Every path that returns without a grade marks the
+    observation ERROR instead.
     """
     with propagate_attributes(user_id=user_id, session_id=session_id):
         try:
@@ -174,6 +188,9 @@ def evaluate_free_text(
 
             if not response:
                 logger.error("Both LLM evaluations failed — failing closed (is_correct=False)")
+                mark_current_observation_error(
+                    "Both Kimi and OpenAI returned no evaluation"
+                )
                 return False, "Could not evaluate. Please retry.", correct_answer
 
             tag_current_generation(response)
@@ -191,14 +208,21 @@ def evaluate_free_text(
                 result = json.loads(cleaned)
                 is_correct = bool(result.get("is_correct", False))
                 feedback = str(result.get("feedback", "Answer evaluated."))[:1000]
+                score_current_trace(
+                    LIVE_ANSWER_SCORE_NAME,
+                    1.0 if is_correct else 0.0,
+                    comment="Live free-text grade",
+                )
                 return is_correct, feedback, correct_answer
 
             except (json.JSONDecodeError, TypeError, ValueError) as e:
                 logger.error(f"Failed to parse evaluation JSON: {e}")
+                mark_current_observation_error(f"Unparseable evaluation JSON: {e}")
                 return False, "Could not evaluate. Please retry.", correct_answer
 
         except Exception as e:
             logger.error(f"Error evaluating free text answer: {e}")
+            mark_current_observation_error(f"Free-text evaluation raised: {e}")
             return False, "Could not evaluate. Please try again.", correct_answer
 
 

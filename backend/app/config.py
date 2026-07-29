@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_host: str = ""
     langfuse_environment: str = "development"
+    # Fraction of traces exported, 0.0-1.0. 1.0 = today's unsampled behaviour;
+    # turn it down from the env if live traffic outgrows the Cloud free tier.
+    langfuse_sample_rate: float = 1.0
 
     # Sentry
     sentry_dsn: str | None = None
