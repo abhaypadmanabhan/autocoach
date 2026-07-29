@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import logging
 import math
 import re
@@ -76,22 +77,17 @@ _RESULT_METADATA_COLUMNS = (
     "retrieved_chunk_ids",
 )
 
-_SKIP_RESULT_COLUMNS = frozenset({
-    "row_index",
-    "doc",
-    "document_label",
-    "question",
+# Columns that are NOT Ragas metrics but should not be re-added from the Ragas
+# result frame (they are either golden metadata we already set, or Ragas's own
+# renamed aliases of those columns). Derived from _RESULT_METADATA_COLUMNS so the
+# two stay in lockstep — the chunk-ID PR had to hand-edit both when it added
+# retrieved_chunk_ids.
+_SKIP_RESULT_COLUMNS = frozenset(_RESULT_METADATA_COLUMNS) | {
     "user_input",
-    "answer",
     "response",
     "ground_truth",
-    "reference",
-    "concept_label",
-    "context_count",
-    "retrieval_hit_at_k",
-    "retrieved_chunk_ids",
     "source_chunk_text",
-})
+}
 
 
 class RetrievalCoverageError(RuntimeError):
@@ -135,24 +131,44 @@ def live_retrieve(query: str, document_id: str, top_k: int) -> list[dict[str, An
     return [{"id": c.get("id"), "content": c["content"]} for c in chunks] if chunks else []
 
 
+def _coerce_chunk_id(value: Any) -> Optional[str]:
+    """Coerce a retrieved chunk ID to a stable string, or ``None``.
+
+    Single coercion rule shared by retrieval-splitting and CSV round-tripping.
+    ``bool`` is rejected even though it is an ``int`` subclass (a Qdrant point
+    ID is never a Python boolean), and empty strings are rejected so neither
+    ``'True'``/``'False'`` nor ``''`` can sneak in as a fake ID.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, int):
+        return str(value)
+    return None
+
+
 def _split_contexts_and_chunk_ids(
     retrieved: list[Any], *, doc: str, row_index: int
 ) -> tuple[list[str], list[Optional[str]]]:
     """Split retrieved items into parallel content / chunk-ID lists (order kept).
 
-    Items missing a stable ID get an explicit ``None`` (never a fabricated ID)
-    plus a warning, so gaps are visible downstream instead of silently dropped.
+    Items are dicts per the ``RetrieveFn`` protocol (``list[dict[str, Any]]``);
+    a non-dict item is a protocol violation and raises ``TypeError`` instead of
+    being silently coerced into a context with a null ID. Items missing a stable
+    ID get an explicit ``None`` (never a fabricated ID) plus a warning, so gaps
+    are visible downstream instead of silently dropped.
     """
     contexts: list[str] = []
     chunk_ids: list[Optional[str]] = []
     for position, item in enumerate(retrieved):
-        if isinstance(item, dict):
-            contexts.append(item.get("content", "") or "")
-            raw_id = item.get("id")
-            chunk_ids.append(str(raw_id) if isinstance(raw_id, (str, int)) else None)
-        else:
-            contexts.append(str(item))
-            chunk_ids.append(None)
+        if not isinstance(item, dict):
+            raise TypeError(
+                f"retrieved item at position {position} is "
+                f"{type(item).__name__!r}, expected dict per RetrieveFn protocol"
+            )
+        contexts.append(item.get("content", "") or "")
+        chunk_ids.append(_coerce_chunk_id(item.get("id")))
         if chunk_ids[-1] is None:
             logger.warning(
                 "[%s row %d] retrieved chunk %d has no stable ID — recording null",
@@ -384,12 +400,78 @@ def _first_value(df: Any, column: str, default: Any = "") -> Any:
         return default
 
 
+# Sentinel distinguishing "column absent" from "column present with a falsy
+# value" (None/[]), so _safe_chunk_ids can fail loudly on a missing column.
+_MISSING_COLUMN = object()
+
+
 def _safe_chunk_ids(row: Any) -> list[Optional[str]]:
-    """Chunk IDs in retrieval order; missing IDs stay as explicit ``None``."""
-    raw = _row_get(row, "retrieved_chunk_ids", _row_get(row, "chunk_ids", []))
+    """Chunk IDs in retrieval order; missing IDs stay as explicit ``None``.
+
+    Reads only the ``retrieved_chunk_ids`` column. The legacy ``chunk_ids``
+    fallback key is gone — it was produced nowhere, and falling back to it let
+    a missing ``retrieved_chunk_ids`` column silently upload ``[]`` instead of
+    failing loudly. A row genuinely missing the column now raises ``KeyError``.
+
+    A CSV cell is a JSON-encoded string (``json.dumps`` on write); decode it
+    with ``json.loads`` so a row round-tripped through ``pd.read_csv`` recovers
+    the exact list including its ``None`` holes instead of returning ``[]``.
+    """
+    raw = _row_get(row, "retrieved_chunk_ids", _MISSING_COLUMN)
+    if raw is _MISSING_COLUMN:
+        raise KeyError(
+            "retrieved_chunk_ids column is missing — cannot extract chunk IDs"
+        )
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            return []
     if not isinstance(raw, (list, tuple)):
         return []
-    return [str(item) if isinstance(item, (str, int)) else None for item in raw]
+    return [_coerce_chunk_id(item) for item in raw]
+
+
+def _serialize_chunk_ids_column(df: Any) -> Any:
+    """JSON-encode the ``retrieved_chunk_ids`` list column for CSV round-trip.
+
+    ``df.to_csv`` writes a Python list as its repr (``\"['pt-a', None]\"``),
+    which ``json.loads`` cannot parse, so a round-tripped row fed back through
+    ``_safe_chunk_ids`` silently returned ``[]``. Serializing each cell with
+    ``json.dumps`` makes the CSV artifact machine-readable. The in-memory frame
+    is left untouched (a copy is returned) so callers still see real lists.
+    """
+    if "retrieved_chunk_ids" not in df.columns or len(df) == 0:
+        return df
+    out = df.copy()
+    out["retrieved_chunk_ids"] = out["retrieved_chunk_ids"].map(
+        lambda v: json.dumps(v) if isinstance(v, (list, tuple)) else v
+    )
+    return out
+
+
+def _warn_all_chunk_ids_missing(doc: str, df: Any) -> None:
+    """Emit one end-of-run warning when every retrieved chunk ID is missing.
+
+    ``_split_contexts_and_chunk_ids`` already logs per-chunk warnings, but a
+    100%-missing run still exited 0 silently. This is the run-end signal that
+    an upstream ``id``-key regression (e.g. Qdrant point ids gone) is visible
+    even when retrieval otherwise returns contexts. Complements — and is
+    partially mitigated by — ``tests/test_qdrant_search.py`` pinning the key.
+    """
+    if "retrieved_chunk_ids" not in df.columns or len(df) == 0:
+        return
+    present_ids = 0
+    for raw in df["retrieved_chunk_ids"]:
+        ids = _safe_chunk_ids({"retrieved_chunk_ids": raw})
+        present_ids += sum(1 for cid in ids if cid is not None)
+    if present_ids == 0:
+        logger.warning(
+            "[%s] ALL %d row(s) have missing/None retrieved_chunk_ids — "
+            "upstream retrieval `id` key may be broken; the CSV will contain "
+            "only null chunk IDs.",
+            doc or "?", len(df),
+        )
 
 
 def _upload_scores(langfuse: Any, *, trace_id: str, values: dict[str, Any], metadata: dict) -> None:
@@ -540,10 +622,13 @@ def run_one(
     results_dir.mkdir(parents=True, exist_ok=True)
     ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out_path = results_dir / f"{doc}_{ts}.csv"
-    df.to_csv(out_path, index=False)
+    # JSON-encode the retrieved_chunk_ids list column so the CSV round-trips
+    # through json.loads (a Python repr like "['pt-a', None]" is not JSON).
+    _serialize_chunk_ids_column(df).to_csv(out_path, index=False)
     logger.info("Wrote %s", out_path)
 
     summarize(doc, df)
+    _warn_all_chunk_ids_missing(doc, df)
     if not no_langfuse:
         maybe_upload_to_langfuse(doc, df)
     return df
