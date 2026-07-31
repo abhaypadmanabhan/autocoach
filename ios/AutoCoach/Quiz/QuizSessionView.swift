@@ -43,7 +43,7 @@ struct QuizSessionView: View {
             .navigationTitle(documentTitle)
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(isPresented: $showResults) {
-                ResultsView(sessionId: engine.sessionId, api: api)
+                ResultsView(sessionId: engine.sessionId, api: api, onDone: onClose)
             }
         }
         .task {

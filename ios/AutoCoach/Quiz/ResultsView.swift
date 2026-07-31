@@ -4,6 +4,11 @@ import SwiftUI
 struct ResultsView: View {
     let sessionId: String
     let api: APIClient
+    /// Dismisses the whole quiz. Results is pushed onto the quiz's own
+    /// NavigationStack, so the system back button pops to the last *answered*
+    /// question — a dead end. This is the only way out, and the back button is
+    /// hidden below so it cannot be mistaken for one.
+    let onDone: () -> Void
 
     @State private var status: SessionStatus?
     @State private var loading = true
@@ -24,6 +29,9 @@ struct ResultsView: View {
                         .foregroundStyle(ACXColor.error)
                         .padding(.top, 24)
                 }
+                // Outside the if/else on purpose: even a failed load must have a
+                // way out, otherwise the error state is the dead end instead.
+                doneButton
             }
             .padding(.horizontal, 24)
             .padding(.top, 8)
@@ -33,7 +41,15 @@ struct ResultsView: View {
         .background(GroundBackground())
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
         .task { await load() }
+    }
+
+    private var doneButton: some View {
+        Button("Back to dashboard") { onDone() }
+            .buttonStyle(PrimaryButtonStyle())
+            .padding(.top, 32)
+            .accessibilityHint("Ends the session and returns to the dashboard")
     }
 
     private var header: some View {

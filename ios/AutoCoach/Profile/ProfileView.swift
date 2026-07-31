@@ -60,6 +60,7 @@ struct ProfileView: View {
                 creditsRow
                 streakBlock
                 xpRow
+                settingsRow
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
@@ -72,20 +73,19 @@ struct ProfileView: View {
         .navigationTitle("")
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showSettings = true
-                } label: {
-                    Text("Settings")
-                        .font(ACXFont.bodySemibold(15))
-                        .foregroundStyle(ACXColor.ink)
-                        .frame(minHeight: 44)
-                }
-                .accessibilityLabel("Settings")
+        .task { await load() }
+        // `.task` runs once per view lifetime, and TabView keeps this view alive
+        // across tab switches — so returning from a finished quiz showed a stale
+        // credit count until a manual pull-to-refresh. Re-read the balances (cheap,
+        // no document summary) every time the tab comes forward.
+        .onAppear {
+            Task {
+                await ProfileBalanceRefresh.refresh(supabase: auth.supabase)
+                xp = ProfileBalanceCache.totalXP
+                creditsUsed = ProfileBalanceCache.quizzesUsed
+                creditsAllowance = ProfileBalanceCache.dailyAllowance
             }
         }
-        .task { await load() }
         .refreshable { await load() }
         .sheet(isPresented: $showCredits) {
             CreditsSheet(api: api)
@@ -212,6 +212,27 @@ struct ProfileView: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Quiz credits, \(max(0, creditsAllowance - creditsUsed)) of \(creditsAllowance) left. Opens credits.")
+    }
+
+    /// Settings is reached from a row in the page body, not a nav-bar item.
+    /// This screen hides the navigation bar (861c2c3, "clean top area"), so the
+    /// toolbar button that used to live there was built but never rendered —
+    /// which took sign out and redo-onboarding with it.
+    private var settingsRow: some View {
+        Button {
+            showSettings = true
+        } label: {
+            ACXRow(
+                label: "Settings",
+                detail: "Reminders, onboarding, privacy, sign out"
+            ) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ACXColor.muted)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Settings. Reminders, redo onboarding, privacy, and sign out.")
     }
 
     private var streakBlock: some View {
