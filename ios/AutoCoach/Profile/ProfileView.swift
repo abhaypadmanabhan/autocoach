@@ -293,7 +293,13 @@ struct ProfileView: View {
 
     @MainActor
     private func load() async {
-        loadState = .loading
+        // Only show the placeholder when there is genuinely nothing to show. A
+        // pull-to-refresh used to reset this to .loading unconditionally, tearing
+        // the mastery figure down to "Loading mastery…" and an indeterminate bar
+        // before putting the same number back — which reads as a flicker/glitch.
+        if documents.isEmpty {
+            loadState = .loading
+        }
         streak = LocalStreakSnapshot.read()
         await ProfileBalanceRefresh.refresh(supabase: auth.supabase)
         xp = ProfileBalanceCache.totalXP
