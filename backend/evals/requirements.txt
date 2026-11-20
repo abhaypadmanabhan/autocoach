@@ -1,6 +1,7 @@
-# Eval-only deps. Kept out of backend/requirements.txt so they do not ship
-# to Railway. Install into the eval venv with:
-#   pip install -r backend/evals/requirements.txt
+# Eval-only loose dependency ranges. Kept out of backend/requirements.txt so
+# they do not ship to Railway. Normal reproducible installs should use:
+#   pip install -r backend/evals/requirements.lock.txt
+# Use this file only when intentionally refreshing the lockfile.
 #
 # ragas is pinned to the 0.2.x line on purpose: kimi_judge.py uses the 0.2.x
 # adapter API (`ragas.llms.LangchainLLMWrapper`, `ragas.embeddings.

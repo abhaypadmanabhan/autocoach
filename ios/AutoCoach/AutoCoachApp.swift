@@ -8,6 +8,12 @@ import SwiftUI
 /// stays a thin shell.
 @main
 struct AutoCoachApp: App {
+    init() {
+        // Debug-only: trips immediately if a bundled face failed to register,
+        // rather than letting the app quietly render in San Francisco.
+        ACXFont.assertBundledFacesResolve()
+    }
+
     var body: some Scene {
         WindowGroup {
             AppRoot()

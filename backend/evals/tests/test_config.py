@@ -11,6 +11,7 @@ from pathlib import Path
 
 import pytest
 
+import evals.config as config
 from evals.config import (
     DEFAULT_TOP_K,
     ConfigError,
@@ -31,19 +32,26 @@ def _path(name: str = "sample.config.json") -> Path:
 
 def test_valid_config_parses():
     cfg = validate_config(
-        json.dumps({"document_id": VALID_UUID, "label": "Doc", "top_k": 7}),
+        json.dumps({
+            "document_id": VALID_UUID,
+            "label": "Doc",
+            "top_k": 7,
+            "max_zero_context_rows": 2,
+        }),
         doc="ddia", path=_path(),
     )
     assert isinstance(cfg, EvalConfig)
     assert cfg.document_id == VALID_UUID
     assert cfg.label == "Doc"
     assert cfg.top_k == 7
+    assert cfg.max_zero_context_rows == 2
     assert cfg.is_placeholder is False
 
 
 def test_valid_config_defaults_top_k_and_label():
     cfg = validate_config(json.dumps({"document_id": VALID_UUID}), doc="ddia", path=_path())
     assert cfg.top_k == DEFAULT_TOP_K
+    assert cfg.max_zero_context_rows == config.DEFAULT_MAX_ZERO_CONTEXT_ROWS
     assert cfg.label == "ddia"  # falls back to slug
 
 
@@ -117,6 +125,30 @@ def test_bool_top_k_rejected():
     with pytest.raises(ConfigError):
         validate_config(json.dumps({"document_id": VALID_UUID, "top_k": True}),
                         doc="ddia", path=_path())
+
+
+def test_bad_max_zero_context_rows_type_raises_config_error():
+    with pytest.raises(ConfigError):
+        validate_config(
+            json.dumps({"document_id": VALID_UUID, "max_zero_context_rows": "1"}),
+            doc="ddia", path=_path(),
+        )
+
+
+def test_negative_max_zero_context_rows_raises_config_error():
+    with pytest.raises(ConfigError):
+        validate_config(
+            json.dumps({"document_id": VALID_UUID, "max_zero_context_rows": -1}),
+            doc="ddia", path=_path(),
+        )
+
+
+def test_bool_max_zero_context_rows_rejected():
+    with pytest.raises(ConfigError):
+        validate_config(
+            json.dumps({"document_id": VALID_UUID, "max_zero_context_rows": False}),
+            doc="ddia", path=_path(),
+        )
 
 
 def test_unknown_field_warns_not_fails(caplog):

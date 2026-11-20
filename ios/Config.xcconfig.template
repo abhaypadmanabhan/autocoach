@@ -9,6 +9,11 @@
 // swappable (dev/prod) and keeps real values out of git. NEVER commit a
 // filled-in Config.xcconfig — it is gitignored.
 
-SUPABASE_URL = https://YOUR-PROJECT.supabase.co
+// xcconfig treats `//` as a comment — even inside a value. Without this
+// indirection `https://host` silently truncates to `https:`, which is a valid
+// URL with no host and crashes the Supabase client at launch.
+SLASH = /
+
+SUPABASE_URL = https:$(SLASH)$(SLASH)YOUR-PROJECT.supabase.co
 SUPABASE_PUBLISHABLE_KEY = YOUR_PUBLISHABLE_KEY
-BACKEND_BASE_URL = https://autocoach-production.up.railway.app
+BACKEND_BASE_URL = https:$(SLASH)$(SLASH)autocoach-production.up.railway.app

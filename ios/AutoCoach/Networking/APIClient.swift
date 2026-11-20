@@ -48,6 +48,16 @@ actor APIClient {
         return try await send(path: path, method: "POST", query: query, body: data)
     }
 
+    /// `DELETE` a resource.
+    ///
+    /// `DELETE /documents/{id}` answers **204 No Content** — the only non-JSON success
+    /// in the API. Without this entry point callers were hand-rolling a second
+    /// URLSession path just to tolerate an empty body, which duplicated the bearer
+    /// attach and the 401-refresh-retry and would have drifted from them.
+    func delete(_ path: String, query: [URLQueryItem] = []) async throws {
+        _ = try await validated(path: path, method: "DELETE", query: query, body: nil)
+    }
+
     // MARK: - Core
 
     /// One request, with a single 401 → refresh → retry cycle baked in.
@@ -57,17 +67,47 @@ actor APIClient {
         query: [URLQueryItem],
         body: Data?
     ) async throws -> T {
+        let data = try await validated(path: path, method: method, query: query, body: body)
+        if data.isEmpty {
+            throw APIError.decoding("Empty response body")
+        }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw APIError.decoding("Could not decode response: \(error.localizedDescription)")
+        }
+    }
+
+    /// Performs the request and validates the status, returning the raw body without
+    /// decoding it. Shared by `send` (which decodes) and `delete` (which must not,
+    /// because a 204 carries no body at all).
+    private func validated(
+        path: String,
+        method: String,
+        query: [URLQueryItem],
+        body: Data?
+    ) async throws -> Data {
         var refreshed = false
         while true {
             let (data, response): (Data, URLResponse)
             do {
                 (data, response) = try await perform(path: path, method: method, query: query, body: body)
+            } catch let err as APIError {
+                // `perform` raises typed errors of its own (e.g. `.configMissing`
+                // for an unbuildable URL). Blanket-wrapping them in `.network`
+                // told the user "check your connection" for a config bug.
+                throw err
             } catch let err as URLError {
                 throw APIError.network(err.localizedDescription)
             } catch {
                 throw APIError.network(error.localizedDescription)
             }
-            let http = response as! HTTPURLResponse
+
+            // A non-HTTP `URLResponse` is reachable (custom URL protocols, some
+            // proxy failures). Force-casting crashed the app; report it instead.
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.network("Server returned a non-HTTP response.")
+            }
 
             if http.statusCode == 401 {
                 if !refreshed {
@@ -87,14 +127,7 @@ actor APIClient {
                 throw APIErrorDecoder.decode(status: http.statusCode, body: data)
             }
 
-            if data.isEmpty {
-                throw APIError.decoding("Empty response body")
-            }
-            do {
-                return try JSONDecoder().decode(T.self, from: data)
-            } catch {
-                throw APIError.decoding("Could not decode response: \(error.localizedDescription)")
-            }
+            return data
         }
     }
 

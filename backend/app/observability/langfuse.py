@@ -1,10 +1,14 @@
 """Langfuse client singleton and FastAPI lifespan helpers.
 
-Implements the client-init module described in
-``docs/specs/langfuse-selfhost.md`` §5 ("Backend integration plan"). The
-module owns one process-wide Langfuse v4 client (or ``None`` when the
+The module owns one process-wide Langfuse v4 client (or ``None`` when the
 NOOP path is taken) and exposes :func:`flush` and :func:`is_enabled` for
-the FastAPI lifespan to call.
+the FastAPI lifespan to call. Backend runs against Langfuse Cloud.
+
+Failure mode
+------------
+Observability must never break the request path or application startup.
+Every entry point here — construction, scoring, flush — swallows its own
+exceptions and degrades to a no-op.
 
 NOOP path
 ---------
@@ -19,20 +23,29 @@ Environment tag
 The v4 ``Langfuse(...)`` constructor accepts ``environment`` and
 ``release`` directly, so we pass them as kwargs and avoid mutating the
 process environment. ``settings.langfuse_environment`` (default
-``"development"``) feeds the ``environment`` kwarg.
+``"development"``) feeds the ``environment`` kwarg. ``sample_rate`` is
+threaded the same way from ``settings.langfuse_sample_rate``.
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from typing import Optional
+from typing import Literal, Optional
 
 from langfuse import Langfuse, get_client, observe  # noqa: F401  (re-export observe)
 
 from app.config import Settings, get_settings
 
-__all__ = ["observe", "flush", "is_enabled", "langfuse"]
+__all__ = [
+    "observe",
+    "flush",
+    "is_enabled",
+    "langfuse",
+    "score_current_trace",
+]
+
+ScoreDataType = Literal["NUMERIC", "CATEGORICAL", "BOOLEAN", "TEXT"]
 
 logger = logging.getLogger(__name__)
 
@@ -51,14 +64,35 @@ def _missing_credential(settings: Settings) -> Optional[str]:
     return None
 
 
+def _resolve_sample_rate(settings: Settings) -> float:
+    """Return a constructor-safe ``sample_rate`` from settings.
+
+    The v4 constructor raises ``ValueError`` outside ``[0.0, 1.0]`` and
+    :func:`_init_client` swallows constructor exceptions — so a typo'd
+    ``LANGFUSE_SAMPLE_RATE`` would silently disable *all* tracing rather
+    than just mis-sampling. Fall back to 1.0 and say so in the log.
+    """
+    raw = getattr(settings, "langfuse_sample_rate", 1.0)
+    try:
+        rate = float(raw)
+    except (TypeError, ValueError):
+        logger.warning("LANGFUSE_SAMPLE_RATE is not a number; falling back to 1.0")
+        return 1.0
+    if not 0.0 <= rate <= 1.0:
+        logger.warning(
+            "LANGFUSE_SAMPLE_RATE=%s outside [0.0, 1.0]; falling back to 1.0", rate
+        )
+        return 1.0
+    return rate
+
+
 def _init_client() -> Optional[Langfuse]:
     """Build the Langfuse singleton from settings, or return ``None``.
 
     Idempotent: callers should assign the result to the module-level
     ``langfuse`` global. The NOOP path logs exactly once per process.
-    Any exception raised by the SDK constructor is swallowed — per spec
-    §5 "Failure mode", Langfuse must never break the request path or
-    application startup.
+    Any exception raised by the SDK constructor is swallowed — see this
+    module's "Failure mode" note.
     """
     settings = get_settings()
     pub = getattr(settings, "langfuse_public_key", "") or ""
@@ -85,6 +119,7 @@ def _init_client() -> Optional[Langfuse]:
         getattr(settings, "langfuse_environment", "development") or "development"
     )
     release = os.environ.get("RAILWAY_GIT_COMMIT_SHA") or None
+    sample_rate = _resolve_sample_rate(settings)
 
     try:
         Langfuse(
@@ -93,12 +128,14 @@ def _init_client() -> Optional[Langfuse]:
             host=host,
             environment=environment,
             release=release,
+            sample_rate=sample_rate,
         )
         client = get_client()
         logger.info(
-            "Langfuse client constructed: environment=%s host_set=%s",
+            "Langfuse client constructed: environment=%s host_set=%s sample_rate=%s",
             environment,
             bool(host),
+            sample_rate,
         )
         return client
     except Exception as exc:  # pragma: no cover — diagnostic
@@ -114,6 +151,32 @@ def is_enabled() -> bool:
     return langfuse is not None
 
 
+def score_current_trace(
+    name: str,
+    value: float | str,
+    *,
+    data_type: ScoreDataType = "NUMERIC",
+    comment: Optional[str] = None,
+) -> None:
+    """Attach a score to the trace currently in context.
+
+    No-op when the client is disabled (NOOP path) and never raises: a
+    missing active span, a transport hiccup or an SDK change must not turn
+    a graded answer into a 500. Used for live-traffic quality signals —
+    offline eval scores come from ``backend/evals`` instead.
+    """
+    if langfuse is None:
+        return
+    try:
+        langfuse.score_current_trace(
+            name=name, value=value, data_type=data_type, comment=comment
+        )
+    except Exception as exc:
+        logger.warning(
+            "Langfuse score %r failed (%s); continuing", name, type(exc).__name__
+        )
+
+
 def flush() -> None:
     """Flush buffered events. No-op when the client is disabled."""
     if langfuse is None:
@@ -121,7 +184,7 @@ def flush() -> None:
     try:
         langfuse.flush()
     except Exception:  # pragma: no cover — SDK swallows internally
-        # Per spec §5 "Failure mode": Langfuse must not break the app.
+        # Failure mode: Langfuse must not break the app.
         logger.exception("Langfuse flush failed; continuing shutdown")
 
 

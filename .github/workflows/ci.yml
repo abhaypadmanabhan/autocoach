@@ -52,10 +52,16 @@ jobs:
       - name: pytest
         # `python -m pytest` (not bare `pytest`) so cwd (backend/) lands on
         # sys.path and `import app` resolves — there is no conftest/rootdir hook.
-        # Skip the eval-harness test: it imports evals/run_ragas.py (pandas/ragas
-        # from the separate backend/evals/requirements.txt). It gets its own gate
-        # under issue #20 when the eval deps are wired into CI.
+        # Eval-harness tests run in the dedicated step below with their own deps.
         run: python -m pytest -q --ignore=tests/test_evals_review_fixes.py
+      - name: Install eval-harness test deps
+        # pandas/datasets only — hermetic eval tests stub or importorskip the
+        # rest. ragas/langchain-openai are NOT installable next to the app's
+        # openai==2.x / langchain-core 1.x pins (see backend/evals/README.md
+        # "Environment"), so ragas-specific tests skip here by design.
+        run: pip install "pandas>=2.2.0" "datasets>=3.0.0"
+      - name: pytest (eval harness, hermetic — no network, no real keys)
+        run: python -m pytest -q evals/tests tests/test_evals_review_fixes.py
 
   frontend:
     name: frontend · tsc + eslint

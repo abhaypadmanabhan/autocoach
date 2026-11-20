@@ -5,6 +5,8 @@ Retrieval/answer/judge are injected as stubs — no network or API key needed.
 
 from __future__ import annotations
 
+import io
+import json
 import logging
 
 import pytest
@@ -16,6 +18,7 @@ pd = pytest.importorskip("pandas")
 
 import evals.run_ragas as rr
 from evals.config import PlaceholderDocIdError
+from evals.tuples_io import load_tuples
 
 
 class _StubResult:
@@ -27,7 +30,17 @@ class _StubResult:
 
 
 def _stub_retrieve(query, document_id, top_k):
-    return [f"TEST FIXTURE context for: {query}"]
+    if "sky" in query:
+        return [{"id": "pt-sky-1", "content": "Retrieved chunk. TEST FIXTURE: the toy doc states the sky is blue during the day."}]
+    if "two plus two" in query:
+        return [{"id": "pt-math-1", "content": "Retrieved chunk. TEST FIXTURE: the toy doc says two plus two equals four."}]
+    if "animal" in query or "meows" in query:
+        return [{"id": "pt-cat-1", "content": "Retrieved chunk. TEST FIXTURE: the toy doc mentions a cat that meows."}]
+    return [{"id": "pt-generic-1", "content": f"TEST FIXTURE context for: {query}"}]
+
+
+def _stub_empty_retrieve(query, document_id, top_k):
+    return []
 
 
 def _stub_answer(question, contexts):
@@ -38,14 +51,32 @@ def _stub_answer(question, contexts):
 def _stub_evaluator(dataset, metrics):
     n = len(dataset)
     return _StubResult(pd.DataFrame({
-        "question": dataset["question"],
-        "answer": dataset["answer"],
-        "concept_label": dataset["concept_label"],
+        # Simulate recent Ragas output: original metadata columns are not
+        # preserved, and question/answer/reference use Ragas schema names.
+        "user_input": dataset["question"],
+        "response": dataset["answer"],
+        "reference": dataset["ground_truth"],
         "context_precision": [0.91] * n,
         "context_recall": [0.82] * n,
         "faithfulness": [1.0] * n,
         "answer_relevancy": [0.77] * n,
     }))
+
+
+def test_retrieval_hit_at_k_succeeds_when_expected_evidence_is_retrieved():
+    expected = "The model handles long-range dependencies with self attention."
+    contexts = [
+        "An unrelated lead-in.\nThe model handles long-\nrange dependencies with self-attention."
+    ]
+
+    assert rr.retrieval_hit_at_k(expected, contexts) is True
+
+
+def test_retrieval_hit_at_k_fails_when_expected_evidence_is_absent():
+    expected = "The toy document says the sky is blue."
+    contexts = ["TEST FIXTURE: this chunk talks only about a database index."]
+
+    assert rr.retrieval_hit_at_k(expected, contexts) is False
 
 
 def test_build_dataset_uses_injected_adapters():
@@ -61,6 +92,60 @@ def test_build_dataset_uses_injected_adapters():
     assert ds["ground_truth"] == ["a1", "a2"]
     assert all(len(c) == 1 for c in ds["contexts"])
     assert ds["answer"][0].startswith("TEST FIXTURE answer to: q1")
+    assert ds["retrieved_chunk_ids"] == [["pt-generic-1"], ["pt-generic-1"]]
+
+
+def test_build_dataset_preserves_chunk_ids_in_retrieval_order():
+    pytest.importorskip("datasets")
+
+    def multi_chunk_retrieve(query, document_id, top_k):
+        return [
+            {"id": "pt-first", "content": "TEST FIXTURE chunk one"},
+            {"id": "pt-second", "content": "TEST FIXTURE chunk two"},
+            {"id": "pt-third", "content": "TEST FIXTURE chunk three"},
+        ]
+
+    tuples = [{"question": "q1", "ideal_answer": "a1",
+               "source_chunk_text": "s1", "concept_label": "c1"}]
+    ds = rr.build_dataset(tuples, document_id="doc-id", top_k=3,
+                          retrieve=multi_chunk_retrieve, answer=_stub_answer, doc="t")
+    assert ds["retrieved_chunk_ids"] == [["pt-first", "pt-second", "pt-third"]]
+    assert ds["contexts"] == [[
+        "TEST FIXTURE chunk one", "TEST FIXTURE chunk two", "TEST FIXTURE chunk three",
+    ]]
+
+
+def test_build_dataset_missing_chunk_id_records_null_and_warns(caplog):
+    pytest.importorskip("datasets")
+
+    def idless_retrieve(query, document_id, top_k):
+        return [
+            {"id": "pt-ok", "content": "TEST FIXTURE chunk with id"},
+            {"content": "TEST FIXTURE chunk without id"},
+        ]
+
+    tuples = [{"question": "q1", "ideal_answer": "a1",
+               "source_chunk_text": "s1", "concept_label": "c1"}]
+    with caplog.at_level(logging.WARNING):
+        ds = rr.build_dataset(tuples, document_id="doc-id", top_k=3,
+                              retrieve=idless_retrieve, answer=_stub_answer, doc="t")
+    assert ds["retrieved_chunk_ids"] == [["pt-ok", None]]
+    warnings = [r.getMessage() for r in caplog.records if "no stable ID" in r.getMessage()]
+    assert len(warnings) == 1
+
+
+def test_build_dataset_rejects_bare_string_items():
+    """Bare-string retrieved items violate the RetrieveFn (list[dict]) protocol."""
+    pytest.importorskip("datasets")
+
+    def bare_string_retrieve(query, document_id, top_k):
+        return ["TEST FIXTURE bare string chunk"]
+
+    tuples = [{"question": "q1", "ideal_answer": "a1",
+               "source_chunk_text": "s1", "concept_label": "c1"}]
+    with pytest.raises(TypeError):
+        rr.build_dataset(tuples, document_id="doc-id", top_k=3,
+                         retrieve=bare_string_retrieve, answer=_stub_answer, doc="t")
 
 
 def test_run_one_end_to_end_writes_csv(fixtures_dir, tmp_path, capsys):
@@ -71,12 +156,140 @@ def test_run_one_end_to_end_writes_csv(fixtures_dir, tmp_path, capsys):
     assert len(df) == 3
     for col in rr.METRIC_COLUMNS:
         assert col in df.columns
+    assert "retrieval_hit_at_k" in df.columns
+    assert df["retrieval_hit_at_k"].tolist() == [True, True, True]
     csvs = list(tmp_path.glob("ddia_valid_*.csv"))
     assert len(csvs) == 1
     written = pd.read_csv(csvs[0])
+    golden_rows = load_tuples("ddia_valid", golden_dir=fixtures_dir)
     assert "faithfulness" in written.columns and len(written) == 3
+    assert written["concept_label"].tolist() == [r["concept_label"] for r in golden_rows]
+    assert written["question"].tolist() == [r["question"] for r in golden_rows]
+    assert written["reference"].tolist() == [r["ideal_answer"] for r in golden_rows]
+    assert written["retrieval_hit_at_k"].tolist() == [True, True, True]
+    assert "retrieved_chunk_ids" in written.columns
+    assert df["retrieved_chunk_ids"].tolist() == [
+        ["pt-sky-1"], ["pt-math-1"], ["pt-cat-1"],
+    ]
     out = capsys.readouterr().out
     assert "ddia_valid" in out and "faithfulness" in out
+
+
+def test_live_retrieve_maps_point_ids_and_content_only(monkeypatch):
+    import sys
+    import types
+
+    fake = types.ModuleType("app.services.retrieval")
+    fake.retrieve_relevant_chunks = lambda **_kwargs: [
+        {"id": "pt-1", "content": "TEST FIXTURE c1", "chunk_index": 0, "score": 0.9},
+        {"content": "TEST FIXTURE c2", "chunk_index": 1, "score": 0.8},
+    ]
+    monkeypatch.setitem(sys.modules, "app.services.retrieval", fake)
+
+    out = rr.live_retrieve(query="q", document_id="d", top_k=2)
+
+    assert out == [
+        {"id": "pt-1", "content": "TEST FIXTURE c1"},
+        {"id": None, "content": "TEST FIXTURE c2"},
+    ]
+
+
+def test_safe_chunk_ids_keeps_order_and_null_gaps():
+    row = {"retrieved_chunk_ids": ["pt-a", None, 42, "pt-b"]}
+    assert rr._safe_chunk_ids(row) == ["pt-a", None, "42", "pt-b"]
+    assert rr._safe_chunk_ids({"retrieved_chunk_ids": "not-a-list"}) == []
+    # A missing retrieved_chunk_ids column fails loudly instead of silently
+    # uploading [] (the legacy chunk_ids fallback key is gone).
+    with pytest.raises(KeyError):
+        rr._safe_chunk_ids({})
+
+
+def test_safe_chunk_ids_excludes_bool_and_empty_strings():
+    row = {"retrieved_chunk_ids": ["pt-a", True, False, "", 42, None, "pt-b"]}
+    assert rr._safe_chunk_ids(row) == ["pt-a", None, None, None, "42", None, "pt-b"]
+
+
+def test_coerce_chunk_id_excludes_bool_and_empty_strings():
+    assert rr._coerce_chunk_id("pt-a") == "pt-a"
+    assert rr._coerce_chunk_id(42) == "42"
+    assert rr._coerce_chunk_id(None) is None
+    assert rr._coerce_chunk_id(True) is None
+    assert rr._coerce_chunk_id(False) is None
+    assert rr._coerce_chunk_id("") is None
+    assert rr._coerce_chunk_id(3.14) is None
+
+
+def test_retrieved_chunk_ids_csv_round_trips_through_json_with_null_holes():
+    """json.dumps on write -> json.loads recovers the exact list incl. None."""
+    df = pd.DataFrame([{"retrieved_chunk_ids": ["pt-a", None, 42]}])
+    csv_df = rr._serialize_chunk_ids_column(df)
+    # In-memory frame is untouched (still real lists, not strings).
+    assert df["retrieved_chunk_ids"].tolist() == [["pt-a", None, 42]]
+    # CSV cell is JSON, not a Python repr.
+    buf = csv_df.to_csv(index=False)
+    read_back = pd.read_csv(io.StringIO(buf), dtype={"retrieved_chunk_ids": str})
+    raw_cell = read_back["retrieved_chunk_ids"].iloc[0]
+    assert raw_cell.startswith("[")
+    assert "pt-a" in raw_cell and "null" in raw_cell  # JSON null, not None
+    assert json.loads(raw_cell) == ["pt-a", None, 42]
+    # _safe_chunk_ids recovers the same list (with int id coerced to str).
+    assert rr._safe_chunk_ids({"retrieved_chunk_ids": raw_cell}) == ["pt-a", None, "42"]
+
+
+def test_warn_all_chunk_ids_missing_fires_when_every_id_is_null(caplog):
+    df = pd.DataFrame([
+        {"retrieved_chunk_ids": [None, None]},
+        {"retrieved_chunk_ids": []},
+    ])
+    with caplog.at_level(logging.WARNING):
+        rr._warn_all_chunk_ids_missing("ddia", df)
+    warnings = [r.getMessage() for r in caplog.records if "ALL" in r.getMessage()]
+    assert len(warnings) == 1
+    assert "missing" in warnings[0].lower()
+
+
+def test_warn_all_chunk_ids_missing_silent_when_some_id_present(caplog):
+    df = pd.DataFrame([{"retrieved_chunk_ids": ["pt-a", None]}])
+    with caplog.at_level(logging.WARNING):
+        rr._warn_all_chunk_ids_missing("ddia", df)
+    warnings = [r.getMessage() for r in caplog.records if "ALL" in r.getMessage()]
+    assert len(warnings) == 0
+
+
+def test_warn_all_chunk_ids_missing_noop_on_empty_or_missing_column(caplog):
+    with caplog.at_level(logging.WARNING):
+        rr._warn_all_chunk_ids_missing("ddia", pd.DataFrame())
+        rr._warn_all_chunk_ids_missing("ddia", pd.DataFrame({"other": [1]}))
+    warnings = [r.getMessage() for r in caplog.records if "ALL" in r.getMessage()]
+    assert len(warnings) == 0
+
+
+def test_run_one_zero_context_retrieval_aborts_before_csv(fixtures_dir, tmp_path):
+    pytest.importorskip("datasets")
+
+    with pytest.raises(rr.RetrievalCoverageError) as exc:
+        rr.run_one("ddia_valid", limit=None, top_k=3,
+                   retrieve=_stub_empty_retrieve, answer=_stub_answer,
+                   evaluator=_stub_evaluator, results_dir=tmp_path,
+                   no_langfuse=True, golden_dir=fixtures_dir)
+
+    msg = str(exc.value)
+    assert "row 1" in msg
+    assert "what does the toy doc say the sky is" in msg
+    assert list(tmp_path.glob("*.csv")) == []
+
+
+def test_csv_metric_means_match_recomputed_csv_means(fixtures_dir, tmp_path):
+    pytest.importorskip("datasets")
+    rr.run_one("ddia_valid", limit=None, top_k=3,
+               retrieve=_stub_retrieve, answer=_stub_answer, evaluator=_stub_evaluator,
+               results_dir=tmp_path, no_langfuse=True, golden_dir=fixtures_dir)
+    written = pd.read_csv(next(tmp_path.glob("ddia_valid_*.csv")))
+
+    means = rr.metric_means(written)
+
+    for col in rr.REPORTED_METRIC_COLUMNS:
+        assert means[col] == pytest.approx(float(written[col].mean()))
 
 
 def test_run_one_limit_caps_rows(fixtures_dir, tmp_path):
@@ -149,6 +362,18 @@ def test_cli_doc_all_discovers_configs(fixtures_dir, monkeypatch):
     rc = rr.main(["--doc", "all"], golden_dir=fixtures_dir)
     assert rc == 1
     assert "ddia_valid" in calls and "ddia_placeholder" in calls
+
+
+def test_cli_retrieval_coverage_error_returns_nonzero(fixtures_dir, monkeypatch, caplog):
+    def fake_run_one(doc, **kwargs):
+        raise rr.RetrievalCoverageError("row 1: TEST FIXTURE broken retrieval")
+
+    monkeypatch.setattr(rr, "run_one", fake_run_one)
+    with caplog.at_level(logging.ERROR):
+        rc = rr.main(["--doc", "ddia_valid"], golden_dir=fixtures_dir)
+
+    assert rc == 1
+    assert "broken retrieval" in "\n".join(r.getMessage() for r in caplog.records)
 
 
 def test_cli_missing_doc_clean_error(fixtures_dir, capsys, caplog):

@@ -45,7 +45,8 @@ async def get_onboarding(
         row = raw_row if isinstance(raw_row, dict) else None
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception:
+        logger.exception("Failed to load onboarding for user %s", user_id)
         raise HTTPException(status_code=500, detail="Failed to load onboarding from db")
 
     if not row:
@@ -136,7 +137,11 @@ async def save_onboarding(
             )
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception:
+        # Was `except Exception as exc` with `exc` never used, so a real driver
+        # error ("record \"new\" has no field \"updated_at\"") reached the client
+        # as an opaque 500 and left no trace in the logs at all. Log it.
+        logger.exception("Failed to save onboarding for user %s", user_id)
         raise HTTPException(status_code=500, detail="Failed to save onboarding to db")
 
     return OnboardingResponse(

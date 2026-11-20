@@ -179,7 +179,7 @@ Frontend needs `NEXT_PUBLIC_BACKEND_URL` and Supabase publishable keys.
 - **`render_kind`/`render_payload` columns** exist but unused until Phase 2 (Mermaid + Plotly).
 - **Service-role client bypasses RLS** — every backend query MUST `.eq("user_id", str(user_id))`. Audit any new route.
 - **In-memory rate limiter (`core/rate_limit.py`) is per-worker** — multi-replica deploys multiply the effective limit. Daily quotas (Postgres-backed) are the real gate.
-- **Frontend design system is "Quiet Brutalism" (Padzy OS), light-only** — warm cream `#F9F1E6` ground, ink `#171717`, single emerald accent `#109462`, error `#C2402A`. Fonts: Space Grotesk (display) / Inter (body) / Space Mono (all data) via `next/font/google`. ALL radii are 0 (zeroed in `globals.css` `@theme`). Hard offset shadow (`.shadow-hard`, 4px ink, zero blur) is reserved for primary CTA buttons + the active quiz card ONLY. No blurred shadows, gradients, `backdrop-blur`, pills, or dark mode (next-themes removed). Any future `shadcn add` pulls rounded/shadowed defaults — audit and brutalize before committing. Status = mono text + dot (`StatusPill`), section labels = numbered mono kickers (`.kicker`, e.g. `01 / DASHBOARD`), active state = 2px green left tick.
+- **Frontend design system is "Quiet Brutalism" (Padzy OS), light-only** — warm cream `#F9F1E6` ground, ink `#171717`, single emerald accent `#109462`, error `#C2402A`. Fonts: Space Grotesk (display) / Inter (body) / Space Mono (all data) via `next/font/google`. ALL radii are 0 (zeroed in `globals.css` `@theme`). Hard offset shadow (`.shadow-hard`, 4px ink, zero blur) is reserved for primary CTA buttons + the active quiz card ONLY. No blurred shadows, gradients, `backdrop-blur`, pills, or dark mode (next-themes removed). Any future `shadcn add` pulls rounded/shadowed defaults — audit and brutalize before committing. Status = `StatusMark` (form carries state, colour only on failure). **Numbered mono kickers (`01 / DASHBOARD`) are BANNED** — overruled 2026-07-27 as AI slop; use a real title in the display face, or nothing. **Mono is for data only** (counts, percentages, timers, IDs) — labels, buttons and body copy are Inter, sentence case, never forced uppercase. Progress bars are 8pt, not hairlines. The house UI-UX vault (`~/Documents/Obsidian Vault/UI-UX`, `AI Design Tells.md`) outranks this design system wherever they conflict.
 
 ## Specs
 
@@ -215,3 +215,28 @@ Next:
 3. `railway run alembic current` → `02968ade0f8e`
 4. Open https://autocoach-rho.vercel.app/ in incognito → no console errors, login works
 5. Upload small PDF → wait ready → Start Quiz → answer 2 questions (Langfuse trace check N/A until Cloud migration — see `tasks/todo.md`)
+
+## Herdr (multi-agent orchestration) — verified 2026-07-27
+
+Herdr (skill: `herdr`, requires `HERDR_ENV=1`) dispatches real coding agents
+(claude/codex/cursor/opencode/cline/agy) to real work in parallel panes — proven on a
+live Tokei release and on AutoCoach iOS M3.
+
+**Before fanning out on this repo, read the orchestration vault:**
+`/Users/abhayp/Documents/Obsidian Vault/Herdr` — `START HERE.md`, then
+`System/Orchestration Protocol.md`, `System/Agent Roster.md`,
+`Herdr/Herdr - Gotchas and Limits.md`. It ships a `bin/herd` CLI that implements the
+whole protocol (`herd doctor|init|task new|spawn|dispatch|wait|collect|cleanup`).
+Full usage + the verified `agent_pane_busy` recovery are in the global
+`~/.claude/CLAUDE.md`.
+
+Repo-specific routing:
+- Delegates write results to `~/.herd/runs/<run>/tasks/<id>.result.{md,json}` — the
+  orchestrator reads files, never terminal output.
+- One worktree per lane, and **lanes must not share files.** iOS lanes split cleanly by
+  screen (`ios/AutoCoach/<Feature>/`); shared files like `Design/ACX.swift`,
+  `Networking/Models.swift` and `project.yml` are a **serialized foundation lane** that
+  must land before the feature lanes start.
+- `backend/**` is frozen for iOS work — client-only changes. `frontend/**` is read-only
+  reference for intended UX.
+- Never assign the review of a lane to the slot that wrote it.

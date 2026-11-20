@@ -1,4 +1,5 @@
 {
-  "document_id": "REPLACE_WITH_PRODUCT_ANALYTICS_DOCUMENT_UUID_FROM_SUPABASE",
-  "label": "Product Analytics"
+  "document_id": "b78cb4e7-f690-41df-b322-d06c9c1ff985",
+  "label": "Product Analytics",
+  "notes": "Uploaded as 'Product_Analytics.pdf' (32 chunks, status=ready, ai_title 'Product-Led Growth (PLG) Guide'). Ingested through the real pipeline 2026-07-10; tuples curated from real chunk contents."
 }

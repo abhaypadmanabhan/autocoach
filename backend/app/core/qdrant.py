@@ -189,7 +189,9 @@ def search_vectors(
 
     Returns:
         List of dictionaries containing chunk information:
-        [{"content": str, "chunk_index": int, "score": float}]
+        [{"id": str, "content": str, "chunk_index": int, "score": float}]
+        where "id" is the stable Qdrant point ID (same UUID stored as
+        chunks.embedding_id at ingestion).
     """
     try:
         # Search in Qdrant using query_points (new API)
@@ -210,6 +212,7 @@ def search_vectors(
         # Format results - access via results_wrapper.points
         results = [
             {
+                "id": str(point.id),
                 "content": point.payload.get("content", ""),
                 "chunk_index": point.payload.get("chunk_index", 0),
                 "score": point.score

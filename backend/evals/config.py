@@ -23,10 +23,17 @@ GOLDEN_DIR = EVAL_DIR / "golden"
 _BACKEND_DIR = EVAL_DIR.parent  # for relative paths in error messages
 
 _REQUIRED_FIELDS = ("document_id",)
-_KNOWN_FIELDS = frozenset({"document_id", "label", "top_k", "notes"})
+_KNOWN_FIELDS = frozenset({
+    "document_id",
+    "label",
+    "top_k",
+    "max_zero_context_rows",
+    "notes",
+})
 _PLACEHOLDER_TOKENS = ("REPLACE_WITH", "PLACEHOLDER", "TODO", "YOUR_", "XXX")
 
 DEFAULT_TOP_K = 5
+DEFAULT_MAX_ZERO_CONTEXT_ROWS = 0
 
 
 class ConfigError(ValueError):
@@ -43,6 +50,7 @@ class EvalConfig:
     document_id: str
     label: str
     top_k: int
+    max_zero_context_rows: int
     notes: str
     path: Path
 
@@ -138,6 +146,20 @@ def validate_config(raw: str, *, doc: str, path: Path) -> EvalConfig:
     if top_k < 1:
         raise ConfigError(f"{_rel(path)}: 'top_k' must be >= 1, got {top_k}.")
 
+    max_zero_context_rows = data.get(
+        "max_zero_context_rows", DEFAULT_MAX_ZERO_CONTEXT_ROWS
+    )
+    if not isinstance(max_zero_context_rows, int) or isinstance(max_zero_context_rows, bool):
+        raise ConfigError(
+            f"{_rel(path)}: 'max_zero_context_rows' must be an integer, "
+            f"got {type(max_zero_context_rows).__name__}."
+        )
+    if max_zero_context_rows < 0:
+        raise ConfigError(
+            f"{_rel(path)}: 'max_zero_context_rows' must be >= 0, "
+            f"got {max_zero_context_rows}."
+        )
+
     if _looks_like_placeholder(document_id):
         raise PlaceholderDocIdError(
             _placeholder_message(doc=doc, document_id=document_id, path=path)
@@ -148,6 +170,7 @@ def validate_config(raw: str, *, doc: str, path: Path) -> EvalConfig:
         document_id=document_id.strip(),
         label=label.strip() or doc,
         top_k=top_k,
+        max_zero_context_rows=max_zero_context_rows,
         notes=notes,
         path=path,
     )
