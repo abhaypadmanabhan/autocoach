@@ -15,6 +15,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from fastapi.testclient import TestClient
+
+from app.api.routes import sessions
+from app.main import app
 from app.services import answer_evaluator as ae
 from app.services import session_manager
 
@@ -374,6 +378,26 @@ def test_verdict_carries_score_hint_and_points_hit():
     assert result["score"] == 1
     assert result["hint"] == "What happens to the green pigment?"
     assert result["points_hit"] == ["chlorophyll breaks down"]
+
+
+def test_verdict_endpoint_returns_the_extras():
+    db = _FakeDB(_free_text_question(is_correct=False, eval_result=STORED))
+    app.dependency_overrides[sessions.enforce_quiz_rate_limit] = lambda: USER_ID
+    try:
+        with patch.object(session_manager, "supabase_admin", db):
+            response = TestClient(app).get(
+                f"/quiz/sessions/{SESSION_ID}/answer",
+                params={"question_id": QUESTION_ID, "wait_ms": 0},
+            )
+    finally:
+        app.dependency_overrides.pop(sessions.enforce_quiz_rate_limit, None)
+
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["score"] == 1
+    assert result["hint"] == "What happens to the green pigment?"
+    assert result["points_hit"] == ["chlorophyll breaks down"]
+    assert "rubric" not in result  # stored for analysis, not exposed
 
 
 def test_mcq_answer_result_leaves_extras_empty():
