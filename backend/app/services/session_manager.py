@@ -1359,6 +1359,13 @@ def evaluate_answer_bg(session_id: str, user_id: str, question_id: str) -> None:
         )
         is_correct = bool(verdict["is_correct"])
         feedback = verdict.get("feedback", "")
+        # Feedback and the grade details (score, points hit, rubric, hint).
+        # They go in with the verdict: the verdict long-poll returns the
+        # moment `is_correct` is set, so anything written later is missed.
+        grade = {
+            "feedback": feedback,
+            **{k: verdict[k] for k in FREE_TEXT_GRADE_EXTRAS if k in verdict},
+        }
 
         # Atomic verdict write — the exactly-once finalize gate. Conditional
         # on `is_correct IS NULL`: if a racing worker (duplicate bg task or a
@@ -1366,7 +1373,7 @@ def evaluate_answer_bg(session_id: str, user_id: str, question_id: str) -> None:
         # we MUST NOT finalize (mastery would double-count one answer).
         write = (
             supabase_admin.table("questions")
-            .update({"is_correct": is_correct})
+            .update({"is_correct": is_correct, "eval_result": grade})
             .eq("id", question_id)
             .is_("is_correct", "null")
             .execute()
@@ -1380,17 +1387,15 @@ def evaluate_answer_bg(session_id: str, user_id: str, question_id: str) -> None:
 
         finalized = _finalize_answer(session, user_id, question, is_correct, feedback)
 
-        # Best-effort: persist feedback + real mastery_delta/xp so the verdict
-        # long-poll can return them instead of hardcoded zeros, plus the grade
-        # details (score, points hit, rubric, hint) the grader produced.
+        # Best-effort: add the real mastery_delta/xp, known only after
+        # finalize, so a later verdict read returns them instead of zeros.
         try:
             supabase_admin.table("questions").update(
                 {
                     "eval_result": {
-                        "feedback": feedback,
+                        **grade,
                         "mastery_delta": finalized["result"].get("mastery_delta", 0.0),
                         "xp_awarded": finalized["result"].get("xp_awarded", 0),
-                        **{k: verdict[k] for k in FREE_TEXT_GRADE_EXTRAS if k in verdict},
                     }
                 }
             ).eq("id", question_id).execute()

@@ -347,18 +347,23 @@ def test_bg_eval_threads_document_id_and_persists_extras():
         session_manager.evaluate_answer_bg(SESSION_ID, USER_ID, QUESTION_ID)
 
     assert retrieve.call_args.kwargs["document_id"] == DOC_ID
-    stored = [p["eval_result"] for t, p in db.updates if t == "questions" and "eval_result" in p]
-    assert stored == [{
+    grade = {
         "feedback": "Good start.",
-        "mastery_delta": 1.5,
-        "xp_awarded": 0,
         "score": 1,
         "points_hit": ["chlorophyll breaks down"],
         "rubric": ["chlorophyll breaks down", "other pigments become visible"],
         "hint": "What happens to the green pigment?",
-    }]
-    verdicts = [p["is_correct"] for t, p in db.updates if t == "questions" and "is_correct" in p]
-    assert verdicts == [False]
+    }
+    question_writes = [p for t, p in db.updates if t == "questions"]
+    # The verdict poll returns as soon as is_correct is set, so the grade
+    # details must land in that same write (seen live 2026-11-23: a partly
+    # right answer showed a bare "Incorrect" because the hint arrived later).
+    assert question_writes[0] == {"is_correct": False, "eval_result": grade}
+    # Mastery and XP are only known after finalize; they are merged in after.
+    assert question_writes[1] == {
+        "eval_result": {**grade, "mastery_delta": 1.5, "xp_awarded": 0}
+    }
+    assert len(question_writes) == 2
 
 
 STORED = {

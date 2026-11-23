@@ -441,8 +441,11 @@ def test_evaluate_answer_bg_persists_eval_result():
         for u in fake.updates
         if u["table"] == "questions" and "eval_result" in u["payload"]
     ]
+    # Feedback lands with the verdict write (the poller returns as soon as
+    # is_correct is set); mastery and XP are merged in after finalize.
     assert stored == [
-        {"feedback": "well reasoned", "mastery_delta": 2.75, "xp_awarded": 10}
+        {"feedback": "well reasoned"},
+        {"feedback": "well reasoned", "mastery_delta": 2.75, "xp_awarded": 10},
     ]
 
 
