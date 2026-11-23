@@ -61,6 +61,7 @@ from app.services.question_checks import (
     key_letter,
     option_text,
     parse_solver_reply,
+    passages_block,
     question_stem,
     quote_in_context,
     solver_task,
@@ -225,10 +226,8 @@ def gate_failures(summary: dict, thresholds: dict = DEFAULT_THRESHOLDS) -> list[
 
 
 def open_book_prompt(question: dict) -> str:
-    passages = "\n\n".join(
-        c.get("content", "") for c in (question.get("context_chunks") or [])
-    )
-    head = f"<passages>\n{passages}\n</passages>\n\n{question_stem(question)}\n\n"
+    block = passages_block(c.get("content", "") for c in (question.get("context_chunks") or []))
+    head = f"{block}\n\n{question_stem(question)}\n\n"
     quote_rule = (
         '"quote": the one sentence from the passages that settles it, copied '
         'character for character (empty string if the passages do not settle it)'

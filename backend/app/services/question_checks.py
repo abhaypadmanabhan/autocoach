@@ -102,21 +102,38 @@ def structural_problems(question: dict) -> list[str]:
     return problems
 
 
-def _letters_and_digits(text: str) -> str:
-    """Only the letters and digits of ``text``, case-folded. Comparing on this
-    keeps every word and its order but ignores what a PDF or a model changes
-    when text is copied: line-wrap hyphens, spacing and punctuation."""
-    return "".join(ch for ch in normalize(text) if ch.isalnum())
+def _words(text: str) -> str:
+    """``text`` as space-separated lower-case words, padded with a space at
+    each end. Keeps every word, its order and its boundaries, and the point
+    or comma inside a number (10.0 is not 100), but drops what a PDF or a
+    model changes when text is copied: line-wrap hyphens, spacing and other
+    punctuation."""
+    text = normalize(text)
+    text = re.sub(r"(?<=\w)-\s+(?=\w)", "", text)  # "volt-\nage" -> "voltage"
+    text = re.sub(r"(?<=\d)[.,](?=\d)", "\x00", text)
+    text = re.sub(r"[^\w\x00]+", " ", text).replace("\x00", ".")
+    return f" {text.strip()} "
 
 
 def quote_in_context(quote: Optional[str], context: Iterable[str]) -> bool:
     """True when ``quote`` appears word for word inside one of the context
-    passages: the same letters and digits in the same order, at least
-    MIN_QUOTE_CHARS of them. Punctuation, spacing and line wraps may differ."""
-    needle = _letters_and_digits(quote or "")
-    if len(needle) < MIN_QUOTE_CHARS:
+    passages: the same whole words and numbers in the same order, at least
+    MIN_QUOTE_CHARS long. Punctuation, spacing and line wraps may differ."""
+    needle = _words(quote or "")
+    if len(needle.strip()) < MIN_QUOTE_CHARS:
         return False
-    return any(needle in _letters_and_digits(passage) for passage in context)
+    return any(needle in _words(passage) for passage in context)
+
+
+_PASSAGE_TAG = re.compile(r"</?\s*passages\s*>", re.I)
+
+
+def passages_block(passages: Iterable[str]) -> str:
+    """Passages inside the <passages> envelope SOLVER_SYSTEM marks as
+    untrusted. Document text is uploaded by users: any envelope tag in it is
+    removed so it cannot close the block and pose as instructions."""
+    body = "\n\n".join(_PASSAGE_TAG.sub("", p or "") for p in passages)
+    return f"<passages>\n{body}\n</passages>"
 
 
 def question_stem(question: dict) -> str:

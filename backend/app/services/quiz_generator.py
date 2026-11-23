@@ -14,6 +14,7 @@ from app.services.question_checks import (
     SOLVER_SYSTEM,
     expected_answer,
     parse_solver_reply,
+    passages_block,
     question_stem,
     quote_in_context,
     solver_task,
@@ -242,11 +243,8 @@ def _quote_passage(question: dict, passages: list[dict]) -> dict | None:
 
 
 def _solver_prompt(question: dict, passages: list[dict]) -> str:
-    text = "\n\n".join(p.get("content", "") for p in passages)
-    return (
-        f"<passages>\n{text}\n</passages>\n\n{question_stem(question)}\n\n"
-        f"{solver_task(question)}}}"
-    )
+    block = passages_block(p.get("content", "") for p in passages)
+    return f"{block}\n\n{question_stem(question)}\n\n{solver_task(question)}}}"
 
 
 def _verification_failure(question: dict, passages: list[dict], solver: bool) -> str | None:
@@ -491,6 +489,19 @@ Return ONLY the JSON object {{"questions": [...]}} with no markdown formatting."
                 valid_questions = _retry_generation_once(
                     user_prompt, focus_concept_ids=focus_concept_ids
                 )
+                if not valid_questions and verify_checks:
+                    # Two malformed outputs: ask for the simpler true/false
+                    # item, which then goes through verification like any other.
+                    fallback = _regenerate(
+                        user_prompt
+                        + _TRUE_FALSE_FALLBACK_SUFFIX.format(
+                            reason="the output did not match the required JSON shape"
+                        ),
+                        focus_concept_ids,
+                        [],
+                    )
+                    if fallback and fallback.get("question_type") == "text_tf":
+                        valid_questions = [fallback]
                 if not valid_questions:
                     return []
 

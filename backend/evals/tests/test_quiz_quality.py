@@ -312,3 +312,4 @@ def test_free_text_open_book_prompt_judges_the_reference_answer():
     prompt = qq.open_book_prompt(question)
     assert "Reference answer: They assemble proteins." in prompt
     assert '"supported" or "unsupported"' in prompt and '"quote"' in prompt
+
