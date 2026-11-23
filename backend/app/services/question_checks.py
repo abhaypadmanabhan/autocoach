@@ -105,13 +105,14 @@ def structural_problems(question: dict) -> list[str]:
 def _words(text: str) -> str:
     """``text`` as space-separated lower-case words, padded with a space at
     each end. Keeps every word, its order and its boundaries, and the point
-    or comma inside a number (10.0 is not 100), but drops what a PDF or a
+    or comma inside a number (10.0, 10,000 and 100 all differ), but drops what a PDF or a
     model changes when text is copied: line-wrap hyphens, spacing and other
     punctuation."""
     text = normalize(text)
     text = re.sub(r"(?<=\w)-\s+(?=\w)", "", text)  # "volt-\nage" -> "voltage"
-    text = re.sub(r"(?<=\d)[.,](?=\d)", "\x00", text)
-    text = re.sub(r"[^\w\x00]+", " ", text).replace("\x00", ".")
+    text = re.sub(r"(?<=\d)\.(?=\d)", "\x00", text)
+    text = re.sub(r"(?<=\d),(?=\d)", "\x01", text)
+    text = re.sub(r"[^\w\x00\x01]+", " ", text).replace("\x00", ".").replace("\x01", ",")
     return f" {text.strip()} "
 
 
@@ -132,8 +133,18 @@ def passages_block(passages: Iterable[str]) -> str:
     """Passages inside the <passages> envelope SOLVER_SYSTEM marks as
     untrusted. Document text is uploaded by users: any envelope tag in it is
     removed so it cannot close the block and pose as instructions."""
-    body = "\n\n".join(_PASSAGE_TAG.sub("", p or "") for p in passages)
+    body = "\n\n".join(_without_passage_tags(p or "") for p in passages)
     return f"<passages>\n{body}\n</passages>"
+
+
+def _without_passage_tags(text: str) -> str:
+    """Remove envelope tags until none is left: removing one can join the
+    fragments around it into another ("</pass</passages>ages>")."""
+    while True:
+        stripped = _PASSAGE_TAG.sub("", text)
+        if stripped == text:
+            return text
+        text = stripped
 
 
 def question_stem(question: dict) -> str:
