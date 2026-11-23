@@ -268,18 +268,32 @@ def test_catch_all_option_is_rejected(models):
     assert "catch_all_option" in stub.calls[1][1]
 
 
-def test_free_text_verifies_the_quote_only(models):
-    free = {
-        "question_type": "text_free",
-        "question_text": "Explain what the Raft leader does.",
-        "correct_answer": "It replicates the log to followers.",
-        "explanation": "See the passage.",
-        "source_quote": QUOTE,
-    }
-    stub = models([_wrapped(free)])
+FREE = {
+    "question_type": "text_free",
+    "question_text": "Explain what the Raft leader does.",
+    "correct_answer": "It replicates the log to followers.",
+    "explanation": "See the passage.",
+    "source_quote": QUOTE,
+}
+
+
+def test_free_text_reference_answer_must_be_supported_by_the_passages(models):
+    stub = models([_wrapped(FREE)], solver=['{"answer": "supported"}'])
 
     assert _generate()["question_type"] == "text_free"
-    assert stub.kinds() == ["gen"]
+    assert stub.kinds() == ["gen", "solve"]
+    # The solver judges the reference answer, so it must see it.
+    assert "It replicates the log to followers." in stub.calls[1][1]
+
+
+def test_unsupported_free_text_reference_answer_is_regenerated(models):
+    stub = models(
+        [_wrapped(FREE), _wrapped(_mcq())],
+        solver=['{"answer": "unsupported"}', '{"answer": "A"}'],
+    )
+
+    assert _generate()["question_type"] == "text_mcq"
+    assert "'unsupported'" in stub.calls[2][1]
 
 
 # --- latency split and outages ----------------------------------------------

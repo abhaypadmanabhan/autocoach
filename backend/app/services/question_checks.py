@@ -102,13 +102,21 @@ def structural_problems(question: dict) -> list[str]:
     return problems
 
 
+def _letters_and_digits(text: str) -> str:
+    """Only the letters and digits of ``text``, case-folded. Comparing on this
+    keeps every word and its order but ignores what a PDF or a model changes
+    when text is copied: line-wrap hyphens, spacing and punctuation."""
+    return "".join(ch for ch in normalize(text) if ch.isalnum())
+
+
 def quote_in_context(quote: Optional[str], context: Iterable[str]) -> bool:
-    """True when ``quote`` (at least MIN_QUOTE_CHARS) appears verbatim, after
-    normalisation, inside one of the context passages."""
-    needle = normalize(quote or "").strip(" .\"'")
+    """True when ``quote`` appears word for word inside one of the context
+    passages: the same letters and digits in the same order, at least
+    MIN_QUOTE_CHARS of them. Punctuation, spacing and line wraps may differ."""
+    needle = _letters_and_digits(quote or "")
     if len(needle) < MIN_QUOTE_CHARS:
         return False
-    return any(needle in normalize(passage) for passage in context)
+    return any(needle in _letters_and_digits(passage) for passage in context)
 
 
 def question_stem(question: dict) -> str:
@@ -127,6 +135,24 @@ def answer_spec(question: dict) -> str:
     if question.get("question_type") == "text_mcq":
         return '"answer": one of "A", "B", "C", "D"'
     return '"answer": "true" or "false"'
+
+
+def solver_task(question: dict) -> str:
+    """What the open-book solver is asked to do, after the passages and stem.
+    MCQ and true/false: answer from the passages alone. Free text has no key
+    to pick, so the solver judges the reference answer against the passages."""
+    if question.get("question_type") == "text_free":
+        return (
+            f"Reference answer: {question.get('correct_answer', '')}\n\n"
+            "Using ONLY the passages, decide whether the reference answer is correct "
+            "and fully supported by them.\n"
+            'Reply as JSON: {"answer": "supported" or "unsupported"'
+        )
+    return (
+        "Answer using ONLY the passages. If they do not settle the question, "
+        'use "answer": "unknown".\n'
+        f"Reply as JSON: {{{answer_spec(question)}"
+    )
 
 
 def parse_solver_reply(reply: str) -> Optional[dict]:

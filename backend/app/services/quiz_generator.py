@@ -12,11 +12,11 @@ from app.models.quiz import LLMQuestion
 from app.observability.langfuse import observe
 from app.services.question_checks import (
     SOLVER_SYSTEM,
-    answer_spec,
     expected_answer,
     parse_solver_reply,
     question_stem,
     quote_in_context,
+    solver_task,
     structural_problems,
 )
 from app.services.retrieval import retrieve_for_concept, retrieve_relevant_chunks
@@ -245,9 +245,7 @@ def _solver_prompt(question: dict, passages: list[dict]) -> str:
     text = "\n\n".join(p.get("content", "") for p in passages)
     return (
         f"<passages>\n{text}\n</passages>\n\n{question_stem(question)}\n\n"
-        "Answer using ONLY the passages. If they do not settle the question, "
-        'use "answer": "unknown".\n'
-        f"Reply as JSON: {{{answer_spec(question)}}}"
+        f"{solver_task(question)}}}"
     )
 
 
@@ -255,16 +253,18 @@ def _verification_failure(question: dict, passages: list[dict], solver: bool) ->
     """Why a question must not reach a learner, or None when it passes.
 
     Deterministic checks first (free), then the verbatim source quote, then
-    (MCQ and true/false, when `solver`) a blind solver from another model
-    family that sees passages and options but not the key. A solver outage
-    fails open: the question already passed the free checks.
+    (when `solver`) a blind solver from another model family: for MCQ and
+    true/false it sees passages and options but not the key and must reach
+    it; for free text it must find the reference answer supported by the
+    passages. A solver outage fails open: the question already passed the
+    free checks.
     """
     problems = structural_problems(question)
     if problems:
         return "structural defects: " + ", ".join(problems)
     if _quote_passage(question, passages) is None:
         return "source_quote is not a sentence copied verbatim from the content"
-    if not solver or question.get("question_type") not in {"text_mcq", "text_tf"}:
+    if not solver:
         return None
     try:
         reply = parse_solver_reply(

@@ -89,6 +89,17 @@ def test_quote_matches_across_whitespace_case_and_curly_quotes():
     assert qq.quote_in_context(quote, [c["content"] for c in CONTEXT]) is True
 
 
+def test_quote_matches_across_pdf_line_wraps_and_punctuation_drift():
+    passage = "Each inspec-\ntion records four readings: lens clarity, battery volt-\nage and tilt."
+    quote = "Each inspection records four readings — lens clarity, battery voltage, and tilt"
+    assert qq.quote_in_context(quote, [passage]) is True
+
+
+def test_a_changed_word_is_still_not_a_match():
+    passage = "Each inspection records four readings: lens clarity, battery voltage and tilt."
+    assert qq.quote_in_context("Each inspection records five readings: lens clarity", [passage]) is False
+
+
 def test_paraphrased_or_tiny_quote_is_not_evidence():
     passages = [c["content"] for c in CONTEXT]
     assert qq.quote_in_context("Mitochondria make most of the ATP in a cell.", passages) is False
@@ -275,3 +286,11 @@ def test_live_run_refuses_to_start_without_a_spend_ledger(monkeypatch, capsys):
     )
     assert qq.main(["--doc", "none"]) == 2
     assert "LLM_SPEND_LEDGER_PATH" in capsys.readouterr().err
+
+
+def test_free_text_open_book_prompt_judges_the_reference_answer():
+    question = {"question_type": "text_free", "question_text": "What do ribosomes do?",
+                "correct_answer": "They assemble proteins.", "context_chunks": CONTEXT}
+    prompt = qq.open_book_prompt(question)
+    assert "Reference answer: They assemble proteins." in prompt
+    assert '"supported" or "unsupported"' in prompt and '"quote"' in prompt

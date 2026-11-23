@@ -63,6 +63,7 @@ from app.services.question_checks import (
     parse_solver_reply,
     question_stem,
     quote_in_context,
+    solver_task,
     structural_problems,
 )
 from evals.config import GOLDEN_DIR, load_config
@@ -232,18 +233,7 @@ def open_book_prompt(question: dict) -> str:
         '"quote": the one sentence from the passages that settles it, copied '
         'character for character (empty string if the passages do not settle it)'
     )
-    if question.get("question_type") == "text_free":
-        return (
-            f"{head}Reference answer: {question.get('correct_answer', '')}\n\n"
-            "Using ONLY the passages, decide whether the reference answer is correct "
-            "and fully supported by them.\n"
-            f'Reply as JSON: {{"answer": "supported" or "unsupported", {quote_rule}}}'
-        )
-    return (
-        f"{head}Answer using ONLY the passages. If they do not settle the "
-        'question, use "answer": "unknown".\n'
-        f"Reply as JSON: {{{answer_spec(question)}, {quote_rule}}}"
-    )
+    return f"{head}{solver_task(question)}, {quote_rule}}}"
 
 
 def closed_book_prompt(question: dict) -> str:
@@ -365,17 +355,20 @@ def _live_generate(document_id: str, concept: dict, requested_type: str, mode: s
     )
 
 
-def _live_solve(prompt: str) -> str:
-    from app.services.llm import call_kimi  # lazy
+def _live_solver(model: str) -> SolveFn:
+    def solve(prompt: str) -> str:
+        from app.services.llm import call_kimi  # lazy
 
-    return call_kimi(
-        _SOLVER_SYSTEM,
-        prompt,
-        model=SOLVER_MODEL,
-        temperature=0,
-        response_format={"type": "json_object"},
-        max_tokens=400,
-    )
+        return call_kimi(
+            _SOLVER_SYSTEM,
+            prompt,
+            model=model,
+            temperature=0,
+            response_format={"type": "json_object"},
+            max_tokens=400,
+        )
+
+    return solve
 
 
 # --------------------------------------------------------------------------
@@ -450,6 +443,8 @@ def main(argv: Optional[list[str]] = None, *, golden_dir: Path = GOLDEN_DIR) -> 
     )
     parser.add_argument("--label", default="run", help="Tag for the output file names.")
     parser.add_argument("--replay", type=Path, help="Re-score a recorded .jsonl; no network.")
+    parser.add_argument("--solver-model", default=SOLVER_MODEL,
+                        help="OpenRouter model id for the open- and closed-book solver.")
     parser.add_argument("--gate", action="store_true", help="Exit 1 when a threshold is missed.")
     parser.add_argument("--out-dir", type=Path, default=RESULTS_DIR)
     args = parser.parse_args(argv)
@@ -467,15 +462,17 @@ def main(argv: Optional[list[str]] = None, *, golden_dir: Path = GOLDEN_DIR) -> 
                   file=sys.stderr)
             return 2
         cap = settings.llm_spend_cap_usd
+        over_cap = lambda: cap > 0 and llm.spend_total() >= cap  # noqa: E731
+        solve = _live_solver(args.solver_model)
         rows = collect(
             _resolve_docs(args.doc, args.document_id, golden_dir),
             per_doc=args.per_doc,
             modes=[m.strip() for m in args.modes.split(",") if m.strip()],
             load_concepts=_live_load_concepts,
             generate=_live_generate,
-            solve=_live_solve,
+            solve=solve,
             spend_total=llm.spend_total,
-            stop=lambda: cap > 0 and llm.spend_total() >= cap,
+            stop=over_cap,
         )
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         recording = args.out_dir / f"quiz_quality_{args.label}_{stamp}.jsonl"
