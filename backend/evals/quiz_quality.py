@@ -28,7 +28,9 @@ Three ways to run it::
 A live run refuses to start unless ``LLM_SPEND_LEDGER_PATH`` is set, so every
 call it makes is counted (and capped by ``LLM_SPEND_CAP_USD``).
 
-App imports are lazy: scoring and replay need no keys and no network.
+The question checks are shared with the generator
+(``app.services.question_checks``, pure string logic). Other app imports are
+lazy: scoring and replay need no keys and no network.
 """
 
 from __future__ import annotations
@@ -37,16 +39,25 @@ import argparse
 import csv
 import json
 import logging
-import re
 import statistics
 import sys
 import time
-import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable, Optional
+from typing import Any, Callable, Optional
 
+from app.services.question_checks import (
+    LETTERS,
+    answer_spec,
+    expected_answer,
+    key_letter,
+    option_text,
+    parse_solver_reply,
+    question_stem,
+    quote_in_context,
+    structural_problems,
+)
 from evals.config import GOLDEN_DIR, load_config
 
 logger = logging.getLogger(__name__)
@@ -62,7 +73,6 @@ SOLVER_MODEL = "openai/gpt-6-luna"
 TYPE_CYCLE = ("text_mcq", "text_tf", "text_mcq", "text_free")
 
 QUESTIONS_PER_QUIZ = 5
-MIN_QUOTE_CHARS = 20
 #: A key more than this many times longer than the average distractor (and at
 #: least 25 characters longer) is a giveaway: "pick the long one".
 KEY_LENGTH_RATIO = 1.8
@@ -77,90 +87,11 @@ DEFAULT_THRESHOLDS = {
     "max_guess_rate": 0.65,
 }
 
-_LETTERS = "ABCD"
-_OPTION_PREFIX = re.compile(r"^\s*[A-Da-d]\s*[\).:\-]\s*")
-_CATCH_ALL = re.compile(r"\b(all|none|both|neither) of the above\b|\ball of these\b", re.I)
 
 
 # --------------------------------------------------------------------------
 # pure scoring
 # --------------------------------------------------------------------------
-
-
-def normalize(text: str) -> str:
-    """Fold case, unicode forms, quote/dash variants and whitespace runs so a
-    quote copied by a model still matches the text it was copied from."""
-    text = unicodedata.normalize("NFKC", text or "")
-    text = text.translate(
-        str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"', "–": "-", "—": "-"})
-    )
-    return re.sub(r"\s+", " ", text).strip().casefold()
-
-
-def option_text(option: str) -> str:
-    """'B) Paris' -> 'Paris'."""
-    return _OPTION_PREFIX.sub("", option or "", count=1).strip()
-
-
-def key_letter(question: dict) -> Optional[str]:
-    """Letter of the keyed MCQ option, or None when the key names no option.
-    Accepts 'B', 'b)', 'B) Paris' and a key that is the option's full text."""
-    options = question.get("options") or []
-    key = (question.get("correct_answer") or "").strip()
-    if not key or not options:
-        return None
-    head = key[0].upper()
-    if head in _LETTERS and (len(key) == 1 or key[1] in ").:- "):
-        index = _LETTERS.index(head)
-        return head if index < len(options) else None
-    wanted = normalize(option_text(key))
-    for index, option in enumerate(options[: len(_LETTERS)]):
-        if normalize(option_text(option)) == wanted:
-            return _LETTERS[index]
-    return None
-
-
-def expected_answer(question: dict) -> Optional[str]:
-    """What a solver must return to agree with the key."""
-    qtype = question.get("question_type")
-    if qtype == "text_mcq":
-        return key_letter(question)
-    if qtype == "text_tf":
-        key = (question.get("correct_answer") or "").strip().lower()
-        return key if key in {"true", "false"} else None
-    if qtype == "text_free":
-        return "supported"
-    return None
-
-
-def structural_problems(question: dict) -> list[str]:
-    """Hard defects findable without a model. Empty list means none."""
-    problems: list[str] = []
-    qtype = question.get("question_type")
-    if not (question.get("question_text") or "").strip():
-        problems.append("empty_question")
-    if qtype == "text_mcq":
-        options = question.get("options") or []
-        texts = [normalize(option_text(o)) for o in options]
-        if len(options) != 4:
-            problems.append("option_count")
-        if any(not t for t in texts):
-            problems.append("empty_option")
-        if len(set(texts)) != len(texts):
-            problems.append("duplicate_options")
-        if any(_CATCH_ALL.search(t) for t in texts):
-            problems.append("catch_all_option")
-        if key_letter(question) is None:
-            problems.append("key_not_an_option")
-    elif qtype == "text_tf":
-        if expected_answer(question) is None:
-            problems.append("key_not_true_false")
-    elif qtype == "text_free":
-        if not (question.get("correct_answer") or "").strip():
-            problems.append("empty_reference_answer")
-    else:
-        problems.append("unknown_type")
-    return problems
 
 
 def key_length_outlier(question: dict) -> bool:
@@ -171,19 +102,10 @@ def key_length_outlier(question: dict) -> bool:
     options = [option_text(o) for o in (question.get("options") or [])]
     if letter is None or len(options) != 4:
         return False
-    key_len = len(options[_LETTERS.index(letter)])
-    others = [len(o) for i, o in enumerate(options) if i != _LETTERS.index(letter)]
+    key_len = len(options[LETTERS.index(letter)])
+    others = [len(o) for i, o in enumerate(options) if i != LETTERS.index(letter)]
     mean_other = sum(others) / len(others)
     return key_len > KEY_LENGTH_RATIO * mean_other and key_len - mean_other >= KEY_LENGTH_MIN_GAP
-
-
-def quote_in_context(quote: Optional[str], context: Iterable[str]) -> bool:
-    """True when ``quote`` (at least MIN_QUOTE_CHARS) appears verbatim, after
-    normalisation, inside one of the context passages."""
-    needle = normalize(quote or "").strip(" .\"'")
-    if len(needle) < MIN_QUOTE_CHARS:
-        return False
-    return any(needle in normalize(passage) for passage in context)
 
 
 def score_row(raw: dict) -> dict:
@@ -298,27 +220,11 @@ _SOLVER_SYSTEM = (
 )
 
 
-def _stem(question: dict) -> str:
-    lines = [f"Question: {question.get('question_text', '')}"]
-    if question.get("question_type") == "text_mcq":
-        for letter, option in zip(_LETTERS, question.get("options") or []):
-            lines.append(f"{letter}) {option_text(option)}")
-    elif question.get("question_type") == "text_tf":
-        lines.append("The statement above is either true or false.")
-    return "\n".join(lines)
-
-
-def _answer_spec(question: dict) -> str:
-    if question.get("question_type") == "text_mcq":
-        return '"answer": one of "A", "B", "C", "D"'
-    return '"answer": "true" or "false"'
-
-
 def open_book_prompt(question: dict) -> str:
     passages = "\n\n".join(
         c.get("content", "") for c in (question.get("context_chunks") or [])
     )
-    head = f"<passages>\n{passages}\n</passages>\n\n{_stem(question)}\n\n"
+    head = f"<passages>\n{passages}\n</passages>\n\n{question_stem(question)}\n\n"
     quote_rule = (
         '"quote": the one sentence from the passages that settles it, copied '
         'character for character (empty string if the passages do not settle it)'
@@ -333,34 +239,15 @@ def open_book_prompt(question: dict) -> str:
     return (
         f"{head}Answer using ONLY the passages. If they do not settle the "
         'question, use "answer": "unknown".\n'
-        f"Reply as JSON: {{{_answer_spec(question)}, {quote_rule}}}"
+        f"Reply as JSON: {{{answer_spec(question)}, {quote_rule}}}"
     )
 
 
 def closed_book_prompt(question: dict) -> str:
     return (
-        f"{_stem(question)}\n\nYou have no reference material. Give your best answer.\n"
-        f"Reply as JSON: {{{_answer_spec(question)}}}"
+        f"{question_stem(question)}\n\nYou have no reference material. Give your best answer.\n"
+        f"Reply as JSON: {{{answer_spec(question)}}}"
     )
-
-
-def parse_solver_reply(reply: str) -> Optional[dict]:
-    """{'answer': normalised, 'quote': str} or None when the reply is unusable."""
-    if not reply:
-        return None
-    text = reply.strip()
-    start, end = text.find("{"), text.rfind("}")
-    if start == -1 or end <= start:
-        return None
-    try:
-        data = json.loads(text[start : end + 1])
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    answer = str(data.get("answer", "")).strip()
-    answer = answer.upper() if answer.upper() in set(_LETTERS) else answer.lower()
-    return {"answer": answer, "quote": str(data.get("quote") or "")}
 
 
 # --------------------------------------------------------------------------
