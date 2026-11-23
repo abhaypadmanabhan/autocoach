@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     kimi_api_key: str = ""
     openrouter_api_key: str = ""
     openrouter_model: str = "deepseek/deepseek-v4.1-flash"
+    # Provider price ceiling sent with every OpenRouter request, in USD per
+    # million tokens. OpenRouter refuses to route above it, so a model whose
+    # cheap endpoint is down cannot drift to a $1.50/M one. The default sits
+    # ~3x over DeepSeek v4.1 Flash list ($0.05 in / $0.20 out, 2026-11-22).
+    openrouter_max_price_prompt: float = 0.15
+    openrouter_max_price_completion: float = 0.60
+    # Optional spend guard for eval and overnight runs: when a path is set,
+    # every LLM call appends its usage and estimated cost to that JSONL file,
+    # and once the file's total reaches the cap (> 0) calls are refused.
+    # Unset in production.
+    llm_spend_ledger_path: str = ""
+    llm_spend_cap_usd: float = 0.0
     openai_api_key: str = ""
 
     # URLs
