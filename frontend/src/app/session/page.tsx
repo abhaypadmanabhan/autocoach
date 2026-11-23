@@ -461,7 +461,13 @@ function SessionContent() {
                           <span className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--fg-tertiary)]">
                             You said
                           </span>
-                          <p className="text-[14px] text-[var(--fg-secondary)] line-through decoration-[var(--line-default)]">
+                          <p
+                            className={cn(
+                              "text-[14px] text-[var(--fg-secondary)]",
+                              // A partly right answer is not struck out.
+                              !partlyRight && "line-through decoration-[var(--line-default)]",
+                            )}
+                          >
                             {answer || "—"}
                           </p>
                         </div>
