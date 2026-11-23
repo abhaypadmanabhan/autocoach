@@ -313,3 +313,12 @@ def test_free_text_open_book_prompt_judges_the_reference_answer():
     assert "Reference answer: They assemble proteins." in prompt
     assert '"supported" or "unsupported"' in prompt and '"quote"' in prompt
 
+
+def test_gate_fails_when_the_judge_answered_for_too_few_questions():
+    row = {"completed": True, "solver_ran": True, "valid": True, "problems": [],
+           "evidence_hit": True, "guessable": False, "mode": "default"}
+    silent = {**row, "solver_ran": False, "guessable": None}
+    summary = qq.summarize([row] + [silent] * 19)
+
+    assert summary["validity_rate"] == 1.0 and summary["judge_coverage"] == 0.05
+    assert "judge_coverage 0.050 < 0.90" in qq.gate_failures(summary)

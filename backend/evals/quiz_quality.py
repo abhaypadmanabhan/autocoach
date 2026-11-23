@@ -91,6 +91,9 @@ KEY_LENGTH_MIN_GAP = 25
 #: alone is roughly 0.35, so the ceiling is loose on purpose.
 DEFAULT_THRESHOLDS = {
     "min_completion_rate": 0.90,
+    # Rates below are over judged questions only: a run where the judge
+    # mostly failed must not pass on the few it answered.
+    "min_judge_coverage": 0.90,
     "min_validity_rate": 0.90,
     "min_evidence_hit_rate": 0.80,
     "max_guess_rate": 0.65,
@@ -181,6 +184,7 @@ def summarize(scored_rows: list[dict]) -> dict:
         "attempted": len(scored_rows),
         "completed": len(completed),
         "completion_rate": _rate(len(completed), len(scored_rows)),
+        "judge_coverage": _rate(len(judged), len(completed)),
         "validity_rate": _rate(sum(r["valid"] for r in judged), len(judged)),
         "structural_defect_rate": _rate(sum(bool(r["problems"]) for r in completed), len(completed)),
         "evidence_hit_rate": _rate(sum(r["evidence_hit"] for r in judged), len(judged)),
