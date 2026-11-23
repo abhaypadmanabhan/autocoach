@@ -402,6 +402,17 @@ Return ONLY a valid JSON array with no markdown formatting."""
                         except json.JSONDecodeError:
                             logger.warning("Regeneration parse failed, using original questions")
 
+            # Keep the passages each question was written from: the quality
+            # eval scores against them and citations are built from them.
+            # Callers that persist a question pick named fields, so this
+            # extra key never reaches the database.
+            context_chunks = [
+                {"chunk_index": c.get("chunk_index"), "content": c.get("content", "")}
+                for c in chunks
+            ]
+            for q in valid_questions:
+                q["context_chunks"] = context_chunks
+
             logger.info(f"Successfully generated {len(valid_questions)} questions")
             return valid_questions[:num_questions]
 

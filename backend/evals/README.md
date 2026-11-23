@@ -215,3 +215,20 @@ Run from `backend/` with `KIMI_API_KEY` + `OPENAI_API_KEY` in the environment (o
 - Synthetic answer generation: 1 Kimi call per row.
 - Judge: ~4 Kimi calls per row × 30 rows × 3 docs = ~360 Kimi judge calls per full run. Each ≤4k output tokens. Low cost, not free.
 - Storage: CSV local. Langfuse Cloud free tier covers it.
+
+## Quiz-quality eval (`quiz_quality.py`)
+
+Scores the questions learners see, not retrieval. For each concept of a document it generates a question through the real `generate_single_question` path, then checks it: structural checks in plain code, an open-book solver (`openai/gpt-6-luna` via OpenRouter, a different family from the generator) that must reach the key from the generator's own passages and quote the sentence that settles it (the quote is string-matched against the passages), and a closed-book pass that measures how guessable the question is without the document.
+
+It runs in the **app venv** (no Ragas needed):
+
+```bash
+cd backend
+# live: refuses to start unless the spend ledger is on
+LLM_SPEND_LEDGER_PATH=/tmp/spend.jsonl LLM_SPEND_CAP_USD=1.80 \
+  ./venv/bin/python -m evals.quiz_quality --doc all --per-doc 30 --label baseline
+# re-score a recording, no network; --gate exits 1 on a missed threshold
+./venv/bin/python -m evals.quiz_quality --replay evals/results/quiz_quality_baseline_<ts>.jsonl --gate
+```
+
+A live run writes a `.jsonl` recording (question, passages, solver replies) and a per-row `.csv` under `results/`, and prints the summary table. About $0.001 per question at the routing price ceiling (measured 2026-11-22). Read `guess_rate` with the document in mind: on a famous text the solver answers from memory, so compare runs on the same documents only. CI runs the scoring, replay and gate against synthetic fixtures in `tests/fixtures/quiz_quality_*.jsonl`; the planted-bad one must fail the gate.
