@@ -13,6 +13,7 @@ Every Langfuse client here is a ``MagicMock``. No network, no LLM tokens.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -194,9 +195,12 @@ def test_unparseable_json_marks_error_and_emits_no_score():
 
 def test_kimi_failure_marks_the_observation_error():
     fake = MagicMock(name="LangfuseClient")
-    with patch.object(llm, "OpenAI", side_effect=RuntimeError("connection refused")):
-        with patch.object(llm, "get_client", return_value=fake):
-            assert llm.call_kimi("sys", "user") == ""
+    # Pin the backend: a developer's local env may have OPENROUTER_API_KEY set.
+    kimi_only = SimpleNamespace(kimi_api_key="x", openrouter_api_key="")
+    with patch.object(llm, "settings", kimi_only):
+        with patch.object(llm, "OpenAI", side_effect=RuntimeError("connection refused")):
+            with patch.object(llm, "get_client", return_value=fake):
+                assert llm.call_kimi("sys", "user") == ""
 
     kwargs = fake.update_current_span.call_args.kwargs
     assert kwargs["level"] == "ERROR"

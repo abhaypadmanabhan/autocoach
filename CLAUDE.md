@@ -10,7 +10,7 @@ AutoCoach is an AI-powered tutoring app that turns documents (PDF, PPTX) into in
 - Frontend: Next.js 16 (App Router), React 19, TypeScript, TailwindCSS 4, SWR
 - Backend: FastAPI, Python 3.11.9
 - DBs: Supabase (Postgres + Auth + Storage), Qdrant Cloud (vectors)
-- LLMs: Kimi K2.6 (primary, Moonshot first-party), OpenAI GPT-4o-mini (fallback)
+- LLMs: primary = OpenRouter (`OPENROUTER_MODEL`, default `deepseek/deepseek-v4.1-flash`) when `OPENROUTER_API_KEY` is set, else Kimi K2.6 direct (Moonshot); OpenAI GPT-4o-mini fallback
 - Embeddings: OpenAI `text-embedding-3-small` (1536 dim)
 - Observability: Langfuse v4. Migrated to Langfuse Cloud free tier on 2026-07-01 (Issue #16). Tracing is fully enabled and instrumented via 6 `@observe()` decorators. Configured on Railway with production environment settings and locally for development.
 
@@ -53,8 +53,8 @@ On ingestion, also: AI-generated title + concept extraction (top 20 chunks via K
 4. Question selection: mastery-weighted concept selector with `RECENT_ASK_WINDOW=3` dedup (PR #10) — excludes any concept asked in the last 3 answered Qs. Two-level fallback for tiny core pools.
 
 ### LLM Layer (`backend/app/services/llm.py`)
-- `KIMI_MODEL` constant at `llm.py:15` — single-token revert path.
-- `call_kimi` sends `extra_body={"thinking": {"type": "disabled"}}` (suppresses K2.6 reasoning output).
+- `call_kimi` (historical name) picks its backend in `_primary_llm()`: OpenRouter if `OPENROUTER_API_KEY` is set (model from `OPENROUTER_MODEL`), else Kimi direct via the `KIMI_MODEL` constant. Unset the OpenRouter key to revert.
+- Reasoning is suppressed per backend: Kimi direct sends `extra_body={"thinking": {"type": "disabled"}}`, OpenRouter sends `{"reasoning": {"enabled": false}}` (models that force reasoning, e.g. `z-ai/glm-5.3-flash`, reject this with a 400).
 - `response.model` echo-check warns on silent provider downgrade.
 - Free-text answer eval cascade: `call_kimi → call_openai` fallback.
 
@@ -154,7 +154,8 @@ Required in `.env`:
 ```
 SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY
 QDRANT_URL, QDRANT_API_KEY
-KIMI_API_KEY, OPENAI_API_KEY
+OPENAI_API_KEY
+OPENROUTER_API_KEY   # primary LLM; or KIMI_API_KEY (Moonshot direct) if OpenRouter is unset
 ```
 
 Optional:
