@@ -579,6 +579,8 @@ def _generate_and_insert_question(
     if not concept:
         return None
 
+    # Synchronous: the free checks always run; the solver call only when
+    # quiz_verify_first_question is on (it adds a model round trip here).
     q = generate_single_question(
         document_id=document_id,
         concept=concept,
@@ -586,6 +588,7 @@ def _generate_and_insert_question(
         question_types=question_types,
         session_id=session_id,
         user_id=user_id,
+        verify=False,
     )
     if not q:
         logger.error(
@@ -765,6 +768,7 @@ def generate_next_question_bg(session_id: str, user_id: str) -> None:
                 question_types=question_types,
                 session_id=session_id,
                 user_id=user_id,
+                verify=True,
             )
             if not q:
                 logger.warning(

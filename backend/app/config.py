@@ -73,6 +73,14 @@ class Settings(BaseSettings):
     # Long-poll cap on GET /next. Higher than typical p95 LLM, lower than
     # browser request timeouts.
     next_question_max_wait_ms: int = 10000
+    # Verified generation: a blind solver from a different model family than
+    # the generator must pick the key from the passages alone. $0.10 in /
+    # $0.50 out per million tokens on OpenRouter (2026-11-22).
+    quiz_verifier_model: str = "openai/gpt-6-luna"
+    # Q1 is generated inside the create-session request, so by default it
+    # gets only the free checks (structure + verbatim quote), not the solver
+    # call. Questions 2+ are generated in the background and always get both.
+    quiz_verify_first_question: bool = False
 
     # Langfuse / observability
     # All optional — when any of the three credentials below is missing, the

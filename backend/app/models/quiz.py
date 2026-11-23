@@ -54,6 +54,9 @@ class LLMQuestion(BaseModel):
     correct_answer: str = Field(min_length=1, max_length=2000)
     explanation: str | None = Field(default=None, max_length=2000)
     concept_id: str | None = None
+    # One sentence copied verbatim from the passages that settles the answer.
+    # Used to verify the question and to cite its page; never stored or shown.
+    source_quote: str | None = Field(default=None, max_length=2000)
 
     @field_validator("concept_id")
     @classmethod
