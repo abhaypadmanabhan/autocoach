@@ -402,19 +402,21 @@ def test_unknown_judge_rejected():
         describe_judge("gemini")
 
 
-def test_default_judge_is_still_kimi():
-    """Calibration must not silently swap the incumbent judge."""
+def test_default_judge_is_openai_and_kimi_stays_registered():
+    """The default moved off Kimi on 2026-11-22 (dead Moonshot key); Kimi must
+    stay selectable so old calibration runs can be reproduced."""
     from evals import judges
 
-    assert judges.DEFAULT_JUDGE == judges.JUDGE_KIMI
+    assert judges.DEFAULT_JUDGE == judges.JUDGE_OPENAI
     assert set(judges.available_judges()) == {"kimi", "openai"}
 
 
-def test_run_ragas_default_judge_untouched():
-    """run_ragas must keep building the Kimi judge, not the calibration registry."""
+def test_run_ragas_builds_its_judge_through_the_registry():
+    """run_ragas must follow the registry default (OpenAI since 2026-11-22),
+    not import the Kimi judge directly: that path ran on a dead Moonshot key."""
     source = (Path(calibrate.EVAL_DIR) / "run_ragas.py").read_text()
-    assert "from evals.kimi_judge import build_judge_embeddings, build_judge_llm" in source
-    assert "evals.judges" not in source
+    assert "from evals.judges import build_judge_embeddings, build_judge_llm" in source
+    assert "from evals.kimi_judge import" not in source
 
 
 def test_openai_judge_is_pinned_deterministic():
