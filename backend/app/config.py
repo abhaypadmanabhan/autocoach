@@ -24,7 +24,12 @@ class Settings(BaseSettings):
     qdrant_keepalive_interval_s: int = 300
 
     # AI APIs
-    kimi_api_key: str
+    # Primary LLM: when OPENROUTER_API_KEY is set it takes over from Kimi
+    # direct (see app/services/llm.py). Kimi stays as the fallback path for
+    # the evals harness and for deploys that have not switched yet.
+    kimi_api_key: str = ""
+    openrouter_api_key: str = ""
+    openrouter_model: str = "deepseek/deepseek-v4.1-flash"
     openai_api_key: str = ""
 
     # URLs

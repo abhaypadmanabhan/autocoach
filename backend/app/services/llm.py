@@ -1,4 +1,4 @@
-"""LLM service for calling Kimi and OpenAI APIs."""
+"""LLM service: primary model (OpenRouter, or Kimi direct) with OpenAI fallback."""
 
 import logging
 from typing import Optional
@@ -15,6 +15,10 @@ settings = get_settings()
 # Kimi API configuration
 KIMI_BASE_URL = "https://api.moonshot.ai/v1"
 KIMI_MODEL = "kimi-k2.6"
+
+# OpenRouter (OpenAI-compatible). Used as the primary LLM whenever
+# OPENROUTER_API_KEY is set; the model id comes from OPENROUTER_MODEL.
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 
 class LLMText(str):
@@ -84,11 +88,35 @@ def mark_current_observation_error(status_message: str) -> None:
         logger.warning(f"Langfuse error tagging failed: {e}")
 
 
+def _primary_llm() -> dict:
+    """Pick the primary LLM backend: OpenRouter when its key is set, else Kimi direct.
+
+    `extra_body` is provider-specific: Moonshot takes `thinking`, OpenRouter takes
+    a unified `reasoning` switch. Both suppress reasoning output for fast replies."""
+    if settings.openrouter_api_key:
+        return {
+            "label": "OpenRouter",
+            "api_key": settings.openrouter_api_key,
+            "base_url": OPENROUTER_BASE_URL,
+            "model": settings.openrouter_model,
+            "extra_body": {"reasoning": {"enabled": False}},
+        }
+    return {
+        "label": "Kimi",
+        "api_key": settings.kimi_api_key,
+        "base_url": KIMI_BASE_URL,
+        "model": KIMI_MODEL,
+        "extra_body": {"thinking": {"type": "disabled"}},
+    }
+
+
 def call_kimi(system_prompt: str, user_prompt: str) -> str:
     """
-    Call the Kimi API to generate a response using Instant Mode.
+    Call the primary LLM (OpenRouter if configured, else Kimi direct).
 
-    Instant Mode provides faster responses without reasoning traces.
+    The name is historical: every caller and test patches `call_kimi`, so it
+    keeps its name while the backend is chosen by `_primary_llm()`.
+    Reasoning is disabled for faster responses.
 
     Args:
         system_prompt: The system prompt defining the AI's behavior.
@@ -97,35 +125,34 @@ def call_kimi(system_prompt: str, user_prompt: str) -> str:
     Returns:
         The generated response text, or empty string on failure.
     """
+    label = "Kimi"
     try:
-        client = OpenAI(
-            api_key=settings.kimi_api_key,
-            base_url=KIMI_BASE_URL
-        )
+        cfg = _primary_llm()
+        label, model = cfg["label"], cfg["model"]
+        client = OpenAI(api_key=cfg["api_key"], base_url=cfg["base_url"])
 
-        # Use Instant Mode: disable thinking for faster responses (official API format)
         response = client.chat.completions.create(
-            model=KIMI_MODEL,
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
             max_tokens=4096,
-            extra_body={"thinking": {"type": "disabled"}}
+            extra_body=cfg["extra_body"],
         )
 
         content = response.choices[0].message.content
-        if response.model and not response.model.startswith(KIMI_MODEL):
-            logger.warning(f"Kimi response model={response.model}, expected {KIMI_MODEL}")
-        logger.info(f"Kimi API call successful, response length: {len(content) if content else 0}")
+        if response.model and not response.model.startswith(model):
+            logger.warning(f"{label} response model={response.model}, expected {model}")
+        logger.info(f"{label} API call successful, response length: {len(content) if content else 0}")
         return LLMText(
             content or "",
-            model=response.model or KIMI_MODEL,
+            model=response.model or model,
             usage_details=_usage_details(response.usage),
         )
     except Exception as e:
-        logger.error(f"Kimi API call failed: {e}")
-        mark_current_observation_error(f"Kimi API call failed: {e}")
+        logger.error(f"{label} API call failed: {e}")
+        mark_current_observation_error(f"{label} API call failed: {e}")
         return ""
 
 
