@@ -21,6 +21,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { getErrorMessage } from "@/lib/api";
 import { analytics } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import { resolveCorrectOptionIndex } from "@/lib/correctOption";
 import {
   LEARNING_TIP_ROTATION_MS,
   LEARNING_TIPS,
@@ -537,6 +538,7 @@ function QuestionView({
 }) {
   const isMcq = (question.options?.length ?? 0) > 0;
   const isFreeText = question.question_type === "text_free";
+  const correctIndex = resolveCorrectOptionIndex(question.options ?? [], correctAnswer);
 
   return (
     <div className="space-y-6">
@@ -558,7 +560,7 @@ function QuestionView({
           {question.options.map((opt, i) => {
             const letter = LETTERS[i] ?? String(i + 1);
             const selected = answer === opt;
-            const correct = showFeedback && correctAnswer === opt;
+            const correct = showFeedback && correctIndex === i;
             // Pending verdict (null) must not paint the selection as wrong.
             const wrong = showFeedback && selected && isCorrect === false;
             return (
