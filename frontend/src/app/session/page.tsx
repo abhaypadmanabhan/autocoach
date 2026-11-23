@@ -6,6 +6,7 @@ import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
+  CircleDashed,
   Loader2,
   XCircle,
 } from "lucide-react";
@@ -36,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ProgressHairline } from "@/components/primitives-acx/ProgressHairline";
 import { Kbd } from "@/components/primitives-acx/Kbd";
-import { WhyInset } from "@/components/primitives-acx/WhyInset";
+import { Explanation } from "@/components/primitives-acx/WhyInset";
 import { KeyboardHints } from "@/components/primitives-acx/KeyboardHints";
 
 const LETTERS = ["A", "B", "C", "D", "E", "F"] as const;
@@ -75,6 +76,8 @@ function SessionContent() {
   const [answer, setAnswer] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
+  // Free-text partial credit: graded "not correct" but some points landed.
+  const partlyRight = lastResult?.is_correct === false && lastResult.score === 1;
   const [isComplete, setIsComplete] = useState(false);
   const [inputMethod, setInputMethod] = useState<"click" | "typed" | "voice">(
     "typed",
@@ -416,12 +419,16 @@ function SessionContent() {
                           "p-4 border",
                           lastResult.is_correct
                             ? "border-[var(--accent)]"
-                            : "border-[var(--danger)]",
+                            : partlyRight
+                              ? "border-[var(--ink)]"
+                              : "border-[var(--danger)]",
                         )}
                       >
                         <div className="flex items-center gap-2">
                           {lastResult.is_correct ? (
                             <CheckCircle2 className="h-4 w-4 text-[var(--accent-text)]" />
+                          ) : partlyRight ? (
+                            <CircleDashed className="h-4 w-4 text-[var(--fg-primary)]" />
                           ) : (
                             <XCircle className="h-4 w-4 text-[var(--danger)]" />
                           )}
@@ -430,10 +437,16 @@ function SessionContent() {
                               "font-mono text-[11px] uppercase tracking-[0.08em]",
                               lastResult.is_correct
                                 ? "text-[var(--accent-text)]"
-                                : "text-[var(--danger)]",
+                                : partlyRight
+                                  ? "text-[var(--fg-primary)]"
+                                  : "text-[var(--danger)]",
                             )}
                           >
-                            {lastResult.is_correct ? "Correct" : "Incorrect"}
+                            {lastResult.is_correct
+                              ? "Correct"
+                              : partlyRight
+                                ? "Partly right"
+                                : "Incorrect"}
                           </span>
                           {lastResult.xp_awarded != null && lastResult.xp_awarded !== 0 && (
                             <span className="ml-auto font-mono text-[11px] tabular-nums text-[var(--fg-secondary)]">
@@ -465,8 +478,21 @@ function SessionContent() {
                         </div>
                       )}
 
+                      {partlyRight && lastResult.hint && (
+                        <div className="space-y-1.5 border border-[var(--line-default)] p-4">
+                          {lastResult.points_hit && lastResult.points_hit.length > 0 && (
+                            <p className="text-[14px] text-[var(--fg-secondary)]">
+                              You covered: {lastResult.points_hit.join("; ")}
+                            </p>
+                          )}
+                          <p className="text-[15px] font-medium text-[var(--fg-primary)]">
+                            {lastResult.hint}
+                          </p>
+                        </div>
+                      )}
+
                       {lastResult.explanation && (
-                        <WhyInset>{lastResult.explanation}</WhyInset>
+                        <Explanation text={lastResult.explanation} />
                       )}
                     </>
                   )}

@@ -35,7 +35,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ScoreGauge } from "@/components/primitives-acx/ScoreGauge";
 import { Confetti } from "@/components/primitives-acx/Confetti";
-import { WhyInset } from "@/components/primitives-acx/WhyInset";
+import { Explanation } from "@/components/primitives-acx/WhyInset";
 
 type Grade = {
   label: string;
@@ -352,7 +352,7 @@ function ReviewRow({ q }: { q: ReviewItem }) {
               {q.correct_answer}
             </p>
           </div>
-          {q.explanation && <WhyInset>{q.explanation}</WhyInset>}
+          {q.explanation && <Explanation text={q.explanation} />}
         </div>
       )}
     </div>
