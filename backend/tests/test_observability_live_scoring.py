@@ -131,11 +131,11 @@ def test_graded_answer_emits_a_live_score(verdict, expected_value):
     with patch.object(
         ae, "call_kimi", return_value='{"is_correct": %s, "feedback": "ok"}' % verdict
     ):
-        is_correct, _feedback, _explanation = ae.evaluate_free_text(
+        result = ae.evaluate_free_text(
             "user answer", "model answer", "question?", session_id="s1", user_id="u1"
         )
 
-    assert is_correct is (expected_value == 1.0)
+    assert result["is_correct"] is (expected_value == 1.0)
     fake.score_current_trace.assert_called_once()
     kwargs = fake.score_current_trace.call_args.kwargs
     assert kwargs["name"] == ae.LIVE_ANSWER_SCORE_NAME
@@ -149,10 +149,10 @@ def test_no_score_when_the_client_is_disabled():
     with patch.object(
         ae, "call_kimi", return_value='{"is_correct": true, "feedback": "ok"}'
     ):
-        is_correct, _feedback, _explanation = ae.evaluate_free_text(
+        result = ae.evaluate_free_text(
             "user answer", "model answer", "question?"
         )
-    assert is_correct is True
+    assert result["is_correct"] is True
 
 
 def test_ungraded_answer_marks_error_and_emits_no_score():
@@ -163,12 +163,12 @@ def test_ungraded_answer_marks_error_and_emits_no_score():
     with patch.object(ae, "call_kimi", return_value=""):
         with patch.object(ae, "call_openai", return_value=""):
             with patch.object(llm, "get_client", return_value=fake):
-                is_correct, feedback, _explanation = ae.evaluate_free_text(
+                result = ae.evaluate_free_text(
                     "user answer", "model answer", "question?"
                 )
 
-    assert is_correct is False
-    assert "retry" in feedback.lower()
+    assert result["is_correct"] is False
+    assert "retry" in result["feedback"].lower()
     fake.score_current_trace.assert_not_called()
     assert fake.update_current_span.call_args.kwargs["level"] == "ERROR"
 
@@ -179,11 +179,11 @@ def test_unparseable_json_marks_error_and_emits_no_score():
 
     with patch.object(ae, "call_kimi", return_value="not json at all"):
         with patch.object(llm, "get_client", return_value=fake):
-            is_correct, _feedback, _explanation = ae.evaluate_free_text(
+            result = ae.evaluate_free_text(
                 "user answer", "model answer", "question?"
             )
 
-    assert is_correct is False
+    assert result["is_correct"] is False
     fake.score_current_trace.assert_not_called()
     assert fake.update_current_span.call_args.kwargs["level"] == "ERROR"
 
