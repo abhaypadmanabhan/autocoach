@@ -242,3 +242,17 @@ def test_loads_every_page_past_the_supabase_row_limit(monkeypatch):
     result = retrieval.retrieve_for_concept(DOC_ID, {"concept_name": "Raft"}, top_k=1)
 
     assert 2400 in [c["chunk_index"] for c in result]
+
+
+def test_lexical_index_failure_falls_back_to_dense_alone(monkeypatch):
+    """Postgres down for the BM25 index must not stop a healthy vector search."""
+    _install(monkeypatch, [_chunk(0, "unused")], dense=[1])
+    monkeypatch.setattr(retrieval, "_document_index", lambda _id: (_ for _ in ()).throw(RuntimeError("db down")))
+    dense_hit = {"id": "p1", "content": "Raft elects one leader.", "chunk_index": 1,
+                 "score": 0.9, "metadata": {"page": 4}}
+    monkeypatch.setattr(retrieval, "get_embeddings", lambda _texts: [[0.1]])
+    monkeypatch.setattr(retrieval, "search_vectors", lambda **_kw: [dense_hit])
+
+    result = retrieval.retrieve_for_concept(DOC_ID, {"concept_name": "Raft"}, top_k=3)
+
+    assert result == [dense_hit]

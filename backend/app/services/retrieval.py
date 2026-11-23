@@ -197,13 +197,20 @@ def retrieve_for_concept(document_id: str, concept: dict, top_k: int = 6) -> lis
     Returns `[{id, content, chunk_index, metadata, score}]`, where `id` is the
     Postgres chunk id, `metadata` the chunk row's metadata (`{}` when absent)
     and `score` the fused score (0.0 for a neighbour that was not a hit).
-    Degrades to BM25 alone when dense search fails; `[]` when nothing matches.
+    Degrades to BM25 alone when dense search fails and to dense alone when
+    the chunk rows cannot be read; `[]` when nothing matches.
     """
     name = concept.get("concept_name") or concept.get("name") or ""
     description = concept.get("concept_description") or concept.get("description") or ""
     query = f"{name}: {description}" if description else name
 
-    index = _document_index(document_id)
+    try:
+        index = _document_index(document_id)
+    except Exception as e:
+        # No chunk rows to rank lexically; the vector search holds its own
+        # copy of each passage, so serve those rather than no question.
+        logger.warning("Lexical index failed for document %s, using dense search only: %s", document_id, e)
+        return retrieve_relevant_chunks(query=query, document_id=document_id, top_k=top_k)
     if not index.chunks:
         return []
     by_chunk_index = {c["chunk_index"]: c for c in index.chunks}
