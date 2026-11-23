@@ -450,8 +450,16 @@ def test_a_quote_with_a_different_number_is_not_verbatim():
     assert quote_in_context("The system handles 10.0 requests per second", passage) is True
 
 
-def test_a_quote_cannot_match_across_a_word_boundary():
-    assert quote_in_context("the rapist was seen in town", ["Her therapist was seen in town."]) is False
+def test_a_quote_matches_text_whose_words_a_pdf_split_in_two():
+    # Stored chunks of real PDFs lose the line-wrap hyphen and keep a space
+    # inside the word ("consis tency"). The model quotes the real word. Seen
+    # live 2026-11-23: 12 of 14 quotes on one document were rejected for this
+    # alone, so spaces are not compared. Letters, digits and number
+    # separators still are.
+    passage = ["A transaction needn't necessarily have ACID (atomicity, consis tency, isola-\ntion) properties."]
+    quote = "A transaction needn't necessarily have ACID (atomicity, consistency, isolation) properties."
+    assert quote_in_context(quote, passage) is True
+    assert quote_in_context(quote.replace("atomicity", "atomic"), passage) is False
 
 
 def test_passage_text_cannot_close_the_solver_passage_block(models):

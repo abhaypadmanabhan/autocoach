@@ -102,28 +102,27 @@ def structural_problems(question: dict) -> list[str]:
     return problems
 
 
-def _words(text: str) -> str:
-    """``text`` as space-separated lower-case words, padded with a space at
-    each end. Keeps every word, its order and its boundaries, and the point
-    or comma inside a number (10.0, 10,000 and 100 all differ), but drops what a PDF or a
-    model changes when text is copied: line-wrap hyphens, spacing and other
-    punctuation."""
+def _skeleton(text: str) -> str:
+    """The letters and digits of ``text`` in order, case-folded, plus the
+    point or comma inside a number (10.0, 10,000 and 100 all differ).
+    Spaces and other punctuation are dropped: PDF extraction splits words
+    at lost line-wrap hyphens ("consis tency") and models normalise
+    punctuation when they copy, and neither changes what was said."""
     text = normalize(text)
-    text = re.sub(r"(?<=\w)-\s+(?=\w)", "", text)  # "volt-\nage" -> "voltage"
     text = re.sub(r"(?<=\d)\.(?=\d)", "\x00", text)
     text = re.sub(r"(?<=\d),(?=\d)", "\x01", text)
-    text = re.sub(r"[^\w\x00\x01]+", " ", text).replace("\x00", ".").replace("\x01", ",")
-    return f" {text.strip()} "
+    text = "".join(ch for ch in text if ch.isalnum() or ch in "\x00\x01")
+    return text.replace("\x00", ".").replace("\x01", ",")
 
 
 def quote_in_context(quote: Optional[str], context: Iterable[str]) -> bool:
     """True when ``quote`` appears word for word inside one of the context
-    passages: the same whole words and numbers in the same order, at least
-    MIN_QUOTE_CHARS long. Punctuation, spacing and line wraps may differ."""
-    needle = _words(quote or "")
-    if len(needle.strip()) < MIN_QUOTE_CHARS:
+    passages: the same letters and numbers in the same order, at least
+    MIN_QUOTE_CHARS of them. Spacing, punctuation and line wraps may differ."""
+    needle = _skeleton(quote or "")
+    if len(needle) < MIN_QUOTE_CHARS:
         return False
-    return any(needle in _words(passage) for passage in context)
+    return any(needle in _skeleton(passage) for passage in context)
 
 
 _PASSAGE_TAG = re.compile(r"</?\s*passages\s*>", re.I)
