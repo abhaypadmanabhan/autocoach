@@ -1,5 +1,6 @@
 """Document ingestion pipeline service."""
 
+import json
 import logging
 from uuid import UUID
 
@@ -7,8 +8,8 @@ from app.config import get_settings
 from app.core.supabase import supabase_admin
 from app.core.qdrant import store_vectors
 from app.observability.langfuse import observe
-from app.services.text_extraction import extract_text_from_pdf, extract_text_from_pptx
-from app.services.chunking import chunk_text
+from app.services.text_extraction import extract_pdf_pages, extract_pptx_slides
+from app.services.chunking import chunk_units
 from app.services.embeddings import get_embeddings
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 _settings = get_settings()
 MAX_DOCUMENT_BYTES = _settings.max_document_mb * 1024 * 1024
 MAX_EXTRACTED_CHARS = 2_000_000
-MAX_CHUNKS = 500
+MAX_CHUNKS = 2500
 
 
 @observe(
@@ -28,12 +29,26 @@ MAX_CHUNKS = 500
     capture_input=False,
     capture_output=False,
 )
-def _extract_document_text(file_type: str, file_bytes: bytes) -> tuple[str, int]:
+def _extract_document_text(file_type: str, file_bytes: bytes) -> tuple[list[dict], int]:
+    """Per-page (PDF) or per-slide (PPTX) text units, plus the page/slide count."""
     if file_type == "pdf":
-        return extract_text_from_pdf(file_bytes)
+        return extract_pdf_pages(file_bytes)
     if file_type == "pptx":
-        return extract_text_from_pptx(file_bytes)
+        return extract_pptx_slides(file_bytes)
     raise ValueError(f"Unsupported file type: {file_type}")
+
+
+def _cap_units(units: list[dict], max_chars: int) -> list[dict]:
+    """Keep units in order until max_chars total; cut the unit that crosses it."""
+    kept = []
+    remaining = max_chars
+    for unit in units:
+        if remaining <= 0:
+            break
+        text = unit["text"][:remaining]
+        kept.append({**unit, "text": text})
+        remaining -= len(text)
+    return kept
 
 
 @observe(
@@ -42,8 +57,8 @@ def _extract_document_text(file_type: str, file_bytes: bytes) -> tuple[str, int]
     capture_input=False,
     capture_output=False,
 )
-def _chunk_document_text(full_text: str) -> list[dict]:
-    return chunk_text(full_text)
+def _chunk_document_text(units: list[dict]) -> list[dict]:
+    return chunk_units(units)
 
 
 @observe(
@@ -136,42 +151,43 @@ def process_document(document_id: str) -> None:
                 logger.error(f"Unsupported file type: {file_type}")
                 _mark_document_failed(document_id, f"Unsupported file type: {file_type}")
                 return
-            full_text, page_count = _extract_document_text(file_type, file_bytes)
+            units, page_count = _extract_document_text(file_type, file_bytes)
         except Exception as e:
             logger.error(f"Failed to extract text from document {document_id}: {e}")
             _mark_document_failed(document_id, f"Text extraction failed: {str(e)}")
             return
 
         # Check if extraction was successful
-        if not full_text or not full_text.strip():
+        if not units:
             logger.error(f"No text extracted from document {document_id}")
             _mark_document_failed(document_id, "No text could be extracted from the document")
             return
 
-        logger.info(f"Extracted {len(full_text)} characters, {page_count} pages/slides")
+        extracted_chars = sum(len(unit["text"]) for unit in units)
+        logger.info(f"Extracted {extracted_chars} characters, {page_count} pages/slides")
 
-        # Cap extracted text — guards against PDF/PPTX bombs whose decompressed
-        # text expands to GBs from a small input.
-        if len(full_text) > MAX_EXTRACTED_CHARS:
-            logger.warning(
-                f"Document {document_id} extracted text truncated: "
-                f"{len(full_text)} > {MAX_EXTRACTED_CHARS}"
-            )
-            full_text = full_text[:MAX_EXTRACTED_CHARS]
+        # Cap extracted text across units — guards against PDF/PPTX bombs whose
+        # decompressed text expands to GBs from a small input.
+        if extracted_chars > MAX_EXTRACTED_CHARS:
+            units = _cap_units(units, MAX_EXTRACTED_CHARS)
 
         # Chunk the text
         try:
-            chunks = _chunk_document_text(full_text)
+            chunks = _chunk_document_text(units)
             if not chunks:
                 logger.error(f"No chunks created from document {document_id}")
                 _mark_document_failed(document_id, "Failed to create text chunks")
                 return
-            if len(chunks) > MAX_CHUNKS:
-                logger.warning(
-                    f"Document {document_id} chunk count capped: "
-                    f"{len(chunks)} > {MAX_CHUNKS}"
-                )
+            chunk_total = len(chunks)
+            if chunk_total > MAX_CHUNKS:
                 chunks = chunks[:MAX_CHUNKS]
+            if extracted_chars > MAX_EXTRACTED_CHARS or chunk_total > MAX_CHUNKS:
+                _log_truncation(
+                    document_id,
+                    extracted_chars=extracted_chars,
+                    chunk_total=chunk_total,
+                    last_unit=chunks[-1]["metadata"],
+                )
             logger.info(f"Created {len(chunks)} chunks")
         except Exception as e:
             logger.error(f"Failed to chunk text for document {document_id}: {e}")
@@ -219,7 +235,6 @@ def process_document(document_id: str) -> None:
                 batch = chunk_records[i:i + batch_size]
                 supabase_admin.table("chunks").insert(batch).execute()
             
-            logger.info(f"Saved {len(chunk_records)} chunks to database")
             logger.info(f"Saved {len(chunk_records)} chunks to database")
         except Exception as e:
             logger.error(f"Failed to save chunks for document {document_id}: {e}")
@@ -280,6 +295,35 @@ def process_document(document_id: str) -> None:
     except Exception as e:
         logger.error(f"Unexpected error processing document {document_id}: {e}")
         _mark_document_failed(document_id, f"Unexpected error: {str(e)}")
+
+
+def _log_truncation(
+    document_id: str,
+    *,
+    extracted_chars: int,
+    chunk_total: int,
+    last_unit: dict,
+) -> None:
+    """
+    Record that a ready document was only partly ingested.
+
+    A structured warning rather than documents.error_message: both web screens
+    render error_message only for failed documents and iOS never reads it, so
+    a ready document's note there would be seen by nobody and would read as an
+    error to any future consumer.
+    """
+    logger.warning(
+        "ingestion.truncated %s",
+        json.dumps({
+            "document_id": document_id,
+            "extracted_chars": extracted_chars,
+            "max_extracted_chars": MAX_EXTRACTED_CHARS,
+            "chunks_total": chunk_total,
+            "chunks_kept": min(chunk_total, MAX_CHUNKS),
+            "max_chunks": MAX_CHUNKS,
+            "last_kept_unit": last_unit,
+        }),
+    )
 
 
 def _mark_document_failed(document_id: str, error_message: str) -> None:

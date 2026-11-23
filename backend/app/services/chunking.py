@@ -50,3 +50,26 @@ def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> l
     except Exception as e:
         logger.error(f"Failed to chunk text: {e}")
         return []
+
+
+def chunk_units(units: list[dict], chunk_size: int = 1000, chunk_overlap: int = 200) -> list[dict]:
+    """
+    Chunk each page or slide on its own, never across units.
+
+    Args:
+        units: [{"text": str, "metadata": {"page": n} or {"slide": n}}] in document order.
+
+    Returns:
+        [{"content": str, "chunk_index": int, "metadata": dict}] where chunk_index is a
+        document-wide 0-based sequence and metadata is a copy of the unit's metadata.
+    """
+    chunks = []
+    for unit in units:
+        for piece in chunk_text(unit["text"], chunk_size=chunk_size, chunk_overlap=chunk_overlap):
+            chunks.append({
+                "content": piece["content"],
+                "chunk_index": len(chunks),
+                "metadata": dict(unit["metadata"]),
+            })
+    logger.info(f"Split {len(units)} units into {len(chunks)} chunks")
+    return chunks

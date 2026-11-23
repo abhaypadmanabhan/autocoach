@@ -32,11 +32,13 @@ def test_search_vectors_includes_stable_point_id():
             "content": "TEST FIXTURE chunk one",
             "chunk_index": 0,
             "score": 0.9,
+            "metadata": {},
         },
         {
             "id": "22222222-2222-2222-2222-222222222222",
             "content": "TEST FIXTURE chunk two",
             "chunk_index": 1,
             "score": 0.8,
+            "metadata": {},
         },
     ]

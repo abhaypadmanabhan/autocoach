@@ -19,6 +19,9 @@ qdrant_client = QdrantClient(
     api_key=settings.qdrant_api_key,
 )
 
+# Chunk location keys copied from chunk metadata into the point payload.
+LOCATION_KEYS = ("page", "slide")
+
 # Default collection settings
 DEFAULT_COLLECTION_NAME = "documents"
 VECTOR_SIZE = 1536  # OpenAI text-embedding-3-small dimensions
@@ -118,6 +121,7 @@ def store_vectors(
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
             point_id = str(uuid4())
             point_ids.append(point_id)
+            metadata = chunk.get("metadata", {})
             
             point = PointStruct(
                 id=point_id,
@@ -126,7 +130,8 @@ def store_vectors(
                     "document_id": document_id,
                     "content": chunk["content"],
                     "chunk_index": chunk["chunk_index"],
-                    "metadata": chunk.get("metadata", {})
+                    "metadata": metadata,
+                    **{key: metadata[key] for key in LOCATION_KEYS if key in metadata},
                 }
             )
             points.append(point)
@@ -189,9 +194,11 @@ def search_vectors(
 
     Returns:
         List of dictionaries containing chunk information:
-        [{"id": str, "content": str, "chunk_index": int, "score": float}]
+        [{"id": str, "content": str, "chunk_index": int, "score": float,
+          "metadata": dict}]
         where "id" is the stable Qdrant point ID (same UUID stored as
-        chunks.embedding_id at ingestion).
+        chunks.embedding_id at ingestion) and "metadata" is {"page": n} or
+        {"slide": n}, or {} for points stored before page-aware ingestion.
     """
     try:
         # Search in Qdrant using query_points (new API)
@@ -215,7 +222,10 @@ def search_vectors(
                 "id": str(point.id),
                 "content": point.payload.get("content", ""),
                 "chunk_index": point.payload.get("chunk_index", 0),
-                "score": point.score
+                "score": point.score,
+                "metadata": {
+                    key: point.payload[key] for key in LOCATION_KEYS if key in point.payload
+                },
             }
             for point in results_wrapper.points
         ]
