@@ -6,7 +6,7 @@ from typing import List
 from uuid import UUID
 
 from fastapi import HTTPException
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, field_validator
 
 from app.core.supabase import supabase_admin
 from app.observability.langfuse import observe
@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 DOCUMENT_CONTENT_OPEN_TAG = "<document_content>"
 DOCUMENT_CONTENT_CLOSE_TAG = "</document_content>"
 
+# Concept extraction reads the whole document when it fits this budget
+# (tokens estimated as chars / 4); larger documents are sampled in evenly
+# spaced windows that together stay inside it.
+CONCEPT_PROMPT_BUDGET_TOKENS = 300_000
+CHARS_PER_TOKEN = 4
+CONCEPT_SAMPLE_WINDOWS = 10
+# Room for 30 concepts, each with a description, reasons and evidence indices.
+CONCEPT_MAX_TOKENS = 12_000
+
 
 class ExtractedConcept(BaseModel):
     """Schema for a concept extracted by the LLM."""
@@ -27,6 +36,21 @@ class ExtractedConcept(BaseModel):
     importance_score: int  # 1–5 integer scale
     prerequisites: List[str]
     why_important: str = ""
+    evidence_chunks: List[int] = []
+
+    @field_validator("evidence_chunks", mode="before")
+    @classmethod
+    def _keep_integer_indices(cls, value):
+        """Drop evidence entries that are not chunk indices instead of failing the response."""
+        if not isinstance(value, list):
+            return []
+        kept = []
+        for item in value:
+            try:
+                kept.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return kept
 
 
 class ExtractionResponse(BaseModel):
@@ -42,14 +66,40 @@ def _sanitize_document_content(content: str) -> str:
     )
 
 
+def _chunk_entry(chunk: dict, position: int) -> str:
+    index = chunk.get("chunk_index", position)
+    return f"[chunk {index}] {_sanitize_document_content(str(chunk.get('content', '')))}"
+
+
+def _select_concept_chunks(chunks: List[dict], budget_chars: int) -> List[dict]:
+    """
+    Every chunk when the document fits budget_chars; otherwise evenly spaced
+    contiguous windows, the first starting at the first chunk and the last
+    ending at the last chunk, each holding at most budget_chars / windows.
+    """
+    sizes = [len(_chunk_entry(c, i)) + 2 for i, c in enumerate(chunks)]
+    if sum(sizes) <= budget_chars:
+        return chunks
+
+    last = len(chunks) - 1
+    windows = min(CONCEPT_SAMPLE_WINDOWS, len(chunks))
+    window_chars = budget_chars // windows
+    picked: set[int] = set()
+    for k in range(windows):
+        anchor = round(k * last / (windows - 1)) if windows > 1 else 0
+        step = -1 if k == windows - 1 and windows > 1 else 1
+        used = 0
+        i = anchor
+        while 0 <= i <= last and used + sizes[i] <= window_chars:
+            picked.add(i)
+            used += sizes[i]
+            i += step
+    return [chunks[i] for i in sorted(picked)]
+
+
 def _build_document_content(chunks: List[dict]) -> str:
     """Build a single trusted prompt envelope around sanitized chunk content."""
-    context_text = "\n\n".join(
-        [
-            f"Chunk {i+1}: {_sanitize_document_content(str(c.get('content', '')))}"
-            for i, c in enumerate(chunks)
-        ]
-    )
+    context_text = "\n\n".join(_chunk_entry(c, i) for i, c in enumerate(chunks))
     return (
         f"{DOCUMENT_CONTENT_OPEN_TAG}\n"
         f"{context_text}\n"
@@ -71,6 +121,7 @@ def _postprocess_concepts(concepts: List[ExtractedConcept]) -> List[dict]:
             "importance_score": score,
             "prerequisites": c.prerequisites,
             "prereq_count": len(c.prerequisites),
+            "evidence_chunks": c.evidence_chunks,
         })
 
     total = len(items)
@@ -116,6 +167,25 @@ def _postprocess_concepts(concepts: List[ExtractedConcept]) -> List[dict]:
     return items
 
 
+def _chunk_ids_by_index(document_id: str, indices: set[int]) -> dict[int, str]:
+    """Postgres chunks.id for each chunk_index of this document; unknown indices are absent."""
+    wanted = sorted(i for i in indices if i >= 0)
+    if not wanted:
+        return {}
+    try:
+        res = (
+            supabase_admin.table("chunks")
+            .select("id, chunk_index")
+            .eq("document_id", document_id)
+            .in_("chunk_index", wanted)
+            .execute()
+        )
+    except Exception as e:
+        logger.error(f"[concepts] evidence lookup failed for document {document_id}: {e}")
+        return {}
+    return {row["chunk_index"]: row["id"] for row in (res.data or [])}
+
+
 @observe(
     name="ingestion.extract_concepts",
     as_type="generation",
@@ -132,7 +202,14 @@ def extract_concepts(document_id: str, chunks: List[dict]) -> None:
             logger.info(f"Concepts already exist for document {document_id}, skipping extraction.")
             return
 
-        sample_chunks = chunks[:20]
+        sample_chunks = _select_concept_chunks(
+            chunks, CONCEPT_PROMPT_BUDGET_TOKENS * CHARS_PER_TOKEN
+        )
+        if len(sample_chunks) < len(chunks):
+            logger.warning(
+                f"[concepts] document {document_id} over budget: "
+                f"sampled {len(sample_chunks)}/{len(chunks)} chunks"
+            )
         document_content = _build_document_content(sample_chunks)
 
         system_prompt = (
@@ -159,7 +236,8 @@ def extract_concepts(document_id: str, chunks: List[dict]) -> None:
             f"- concept_description: 1 sentence\n"
             f"- importance_score: integer 1–5 (use the FULL range, see scoring guide)\n"
             f"- prerequisites: list of concept_name strings from this list\n"
-            f"- why_important: 1 sentence explaining why this score\n\n"
+            f"- why_important: 1 sentence explaining why this score\n"
+            f"- evidence_chunks: the [chunk N] numbers of the passages that explain it\n\n"
             f"Text:\n{document_content}\n\n"
             f"Response format (JSON):\n"
             f'{{\n'
@@ -169,14 +247,15 @@ def extract_concepts(document_id: str, chunks: List[dict]) -> None:
             f'      "concept_description": "Brief description...",\n'
             f'      "importance_score": 3,\n'
             f'      "prerequisites": ["Other Concept Name"],\n'
-            f'      "why_important": "Reason for this score..."\n'
+            f'      "why_important": "Reason for this score...",\n'
+            f'      "evidence_chunks": [12, 13]\n'
             f'    }}\n'
             f'  ]\n'
             f'}}'
         )
 
         logger.info("Calling Kimi for concept extraction...")
-        response_text = call_kimi(system_prompt, user_prompt)
+        response_text = call_kimi(system_prompt, user_prompt, max_tokens=CONCEPT_MAX_TOKENS)
 
         if not response_text:
             logger.error("Empty response from LLM for concept extraction.")
@@ -207,6 +286,9 @@ def extract_concepts(document_id: str, chunks: List[dict]) -> None:
         logger.info(f"Saving {len(concepts)} concepts to database...")
 
         name_to_id = {}
+        index_to_chunk_id = _chunk_ids_by_index(
+            document_id, {i for c in concepts for i in c["evidence_chunks"]}
+        )
 
         for concept in concepts:
             insert_data = {
@@ -216,6 +298,11 @@ def extract_concepts(document_id: str, chunks: List[dict]) -> None:
                 "importance": concept["importance"],
                 "importance_score": concept["importance_score"],
             }
+            evidence_ids = list(dict.fromkeys(
+                index_to_chunk_id[i] for i in concept["evidence_chunks"] if i in index_to_chunk_id
+            ))
+            if evidence_ids:
+                insert_data["chunk_ids"] = evidence_ids
 
             try:
                 res = supabase_admin.table("concepts").insert(insert_data).execute()

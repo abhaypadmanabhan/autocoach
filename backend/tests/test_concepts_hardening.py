@@ -38,7 +38,7 @@ class _Supabase:
 def test_extract_concepts_wraps_untrusted_chunks_in_single_document_envelope(monkeypatch):
     captured = {}
 
-    def fake_call_kimi(system_prompt, user_prompt):
+    def fake_call_kimi(system_prompt, user_prompt, **_kwargs):
         captured["system_prompt"] = system_prompt
         captured["user_prompt"] = user_prompt
         return json.dumps(
