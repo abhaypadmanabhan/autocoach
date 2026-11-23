@@ -371,6 +371,22 @@ def _live_solver(model: str) -> SolveFn:
     return solve
 
 
+def rejudge(rows: list[dict], *, solve: SolveFn, stop: Callable[[], bool] = lambda: False) -> list[dict]:
+    """The same recorded questions with fresh solver replies. Used to score a
+    run with a judge that is NOT the model the generator verified against,
+    so the generator is not marking its own homework."""
+    out = []
+    for row in rows:
+        row = {k: v for k, v in row.items() if k not in {"open_book", "closed_book"}}
+        question = row.get("question")
+        if question and not stop():
+            row["open_book"] = parse_solver_reply(solve(open_book_prompt(question)))
+            if question.get("question_type") in {"text_mcq", "text_tf"}:
+                row["closed_book"] = parse_solver_reply(solve(closed_book_prompt(question)))
+        out.append(row)
+    return out
+
+
 # --------------------------------------------------------------------------
 # io + cli
 # --------------------------------------------------------------------------
@@ -443,6 +459,8 @@ def main(argv: Optional[list[str]] = None, *, golden_dir: Path = GOLDEN_DIR) -> 
     )
     parser.add_argument("--label", default="run", help="Tag for the output file names.")
     parser.add_argument("--replay", type=Path, help="Re-score a recorded .jsonl; no network.")
+    parser.add_argument("--rejudge", type=Path,
+                        help="Re-run only the solver on a recorded .jsonl (live; use with --solver-model).")
     parser.add_argument("--solver-model", default=SOLVER_MODEL,
                         help="OpenRouter model id for the open- and closed-book solver.")
     parser.add_argument("--gate", action="store_true", help="Exit 1 when a threshold is missed.")
@@ -464,7 +482,7 @@ def main(argv: Optional[list[str]] = None, *, golden_dir: Path = GOLDEN_DIR) -> 
         cap = settings.llm_spend_cap_usd
         over_cap = lambda: cap > 0 and llm.spend_total() >= cap  # noqa: E731
         solve = _live_solver(args.solver_model)
-        rows = collect(
+        rows = rejudge(read_recording(args.rejudge), solve=solve, stop=over_cap) if args.rejudge else collect(
             _resolve_docs(args.doc, args.document_id, golden_dir),
             per_doc=args.per_doc,
             modes=[m.strip() for m in args.modes.split(",") if m.strip()],

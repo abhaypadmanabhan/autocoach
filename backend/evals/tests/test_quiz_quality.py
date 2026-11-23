@@ -288,6 +288,24 @@ def test_live_run_refuses_to_start_without_a_spend_ledger(monkeypatch, capsys):
     assert "LLM_SPEND_LEDGER_PATH" in capsys.readouterr().err
 
 
+def test_rejudge_replaces_solver_replies_and_keeps_the_question(fixtures_dir):
+    rows = qq.read_recording(fixtures_dir / GOOD)
+    prompts = []
+
+    def solve(prompt):
+        prompts.append(prompt)
+        return '{"answer": "unknown", "quote": ""}'
+
+    judged = qq.rejudge(rows, solve=solve)
+
+    assert [r["question"] for r in judged] == [r["question"] for r in rows]
+    assert all(r["open_book"] == {"answer": "unknown", "quote": ""} for r in judged)
+    assert "closed_book" not in judged[3]  # free text has no closed-book pass
+    assert len(prompts) == 8 + 6
+    assert qq.summarize([qq.score_row(r) for r in judged])["validity_rate"] == 0.0
+    assert rows[0]["open_book"]["answer"] == "B"  # the input recording is untouched
+
+
 def test_free_text_open_book_prompt_judges_the_reference_answer():
     question = {"question_type": "text_free", "question_text": "What do ribosomes do?",
                 "correct_answer": "They assemble proteins.", "context_chunks": CONTEXT}
