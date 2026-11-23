@@ -44,18 +44,24 @@ pytest                         # Run tests (65 passed as of 2026-05-14; history 
 Client upload → Supabase Storage → Backend register → Text extract (PDF/PPTX) → Chunk → OpenAI embeddings → Qdrant upsert
 ```
 Document status: `pending` → `processing` → `ready` (or `failed`).
-On ingestion, also: AI-generated title + concept extraction (top 20 chunks via Kimi).
+Extraction is per page (PDF) or per slide (PPTX: title, body, table rows as `header: value`, speaker notes); chunks never cross a page or slide and carry `metadata.page` / `metadata.slide` (1-based) in Postgres and the Qdrant payload. Documents ingested before 2026-11-23 have empty metadata and get no citation. Up to 2,500 chunks; truncation is logged as `ingestion.truncated {json}`. Vectors are upserted in batches of 64.
+On ingestion, also: AI-generated title + concept extraction over the whole document in one call when it fits ~300K tokens (else 10 evenly spaced windows); each concept's evidence chunks are stored in `concepts.chunk_ids`.
 
 ### Adaptive Quiz Flow (latency-split)
 1. `POST /quiz/sessions/` — creates session + first question (synchronous LLM call).
 2. `POST /quiz/sessions/{id}/answer` — fast write (~250ms p50). MCQ/T-F evaluated inline; `text_free` evaluated via LLM (still inline, see Followup #2).
 3. `GET /quiz/sessions/{id}/next` — long-polls for the *next* question, generated in background (FSM: `pending → generating → ready → answered`, 30s stale-TTL self-heals).
-4. Question selection: mastery-weighted concept selector with `RECENT_ASK_WINDOW=3` dedup (PR #10) — excludes any concept asked in the last 3 answered Qs. Two-level fallback for tiny core pools.
+4. Each question is written from passages chosen by `retrieval.retrieve_for_concept` (Qdrant dense + in-process BM25, RRF, neighbours) and checked before delivery (`quiz_generator._verified_question`): structural checks, a `source_quote` that must appear word for word in the passages, and a blind solver (`QUIZ_VERIFIER_MODEL`, default `openai/gpt-6-luna`) that must reach the key. Failure → regenerate once → true/false fallback → no question. Q1 skips the solver call unless `QUIZ_VERIFY_FIRST_QUESTION=true`. The explanation ends with `\n\nSource: Page n` / `Source: Slide n` when known; the web app splits that suffix off (`frontend/src/lib/explanation.ts`). `source_quote` and `context_chunks` are never stored or returned.
+5. Free-text grading (`answer_evaluator.evaluate_free_text`) retrieves source passages, scores 0-2 against a rubric and returns one hint at score 1. `is_correct` = score 2; `score`, `hint`, `points_hit` are optional fields on `AnswerResult` and live in `questions.eval_result`.
+6. Question selection: mastery-weighted concept selector with `RECENT_ASK_WINDOW=3` dedup (PR #10) — excludes any concept asked in the last 3 answered Qs. Two-level fallback for tiny core pools.
 
 ### LLM Layer (`backend/app/services/llm.py`)
 - `call_kimi` (historical name) picks its backend in `_primary_llm()`: OpenRouter if `OPENROUTER_API_KEY` is set (model from `OPENROUTER_MODEL`), else Kimi direct via the `KIMI_MODEL` constant. Unset the OpenRouter key to revert.
 - Reasoning is suppressed per backend: Kimi direct sends `extra_body={"thinking": {"type": "disabled"}}`, OpenRouter sends `{"reasoning": {"enabled": false}}` (models that force reasoning, e.g. `z-ai/glm-5.3-flash`, reject this with a 400).
 - `response.model` echo-check warns on silent provider downgrade.
+- Every OpenRouter request carries a provider price ceiling (`OPENROUTER_MAX_PRICE_PROMPT` / `_COMPLETION`, USD per million tokens, default 0.15 / 0.60): OpenRouter will not route above it.
+- `call_kimi` takes optional `model`, `temperature`, `response_format`, `max_tokens`.
+- Spend guard for evals and local runs: with `LLM_SPEND_LEDGER_PATH` set, every call is appended to that JSONL and refused once `LLM_SPEND_CAP_USD` is reached. Unset in production.
 - Free-text answer eval cascade: `call_kimi → call_openai` fallback.
 
 ### Auth Pattern
@@ -163,6 +169,11 @@ Optional:
 LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_HOST, LANGFUSE_ENVIRONMENT   # fully configured on Railway (production) and locally (development).
 QDRANT_KEEPALIVE_INTERVAL_S=300         # 0 disables
 GENERATION_STALE_TTL_SECONDS=30         # FSM self-heal threshold
+QUIZ_VERIFIER_MODEL=openai/gpt-6-luna   # blind solver for question verification
+QUIZ_VERIFY_FIRST_QUESTION=false        # true adds the solver call to the synchronous Q1
+OPENROUTER_MAX_PRICE_PROMPT=0.15        # provider price ceiling, USD per million tokens
+OPENROUTER_MAX_PRICE_COMPLETION=0.60
+LLM_SPEND_LEDGER_PATH=, LLM_SPEND_CAP_USD=   # eval/local spend guard; leave unset in prod
 NEXT_QUESTION_MAX_WAIT_MS=10000         # long-poll cap
 FRONTEND_ORIGINS=...                    # comma-separated CORS allowlist
 ENVIRONMENT=development|production
@@ -181,6 +192,13 @@ Frontend needs `NEXT_PUBLIC_BACKEND_URL` and Supabase publishable keys.
 - **Service-role client bypasses RLS** — every backend query MUST `.eq("user_id", str(user_id))`. Audit any new route.
 - **In-memory rate limiter (`core/rate_limit.py`) is per-worker** — multi-replica deploys multiply the effective limit. Daily quotas (Postgres-backed) are the real gate.
 - **Frontend design system is "Quiet Brutalism" (Padzy OS), light-only** — warm cream `#F9F1E6` ground, ink `#171717`, single emerald accent `#109462`, error `#C2402A`. Fonts: Space Grotesk (display) / Inter (body) / Space Mono (all data) via `next/font/google`. ALL radii are 0 (zeroed in `globals.css` `@theme`). Hard offset shadow (`.shadow-hard`, 4px ink, zero blur) is reserved for primary CTA buttons + the active quiz card ONLY. No blurred shadows, gradients, `backdrop-blur`, pills, or dark mode (next-themes removed). Any future `shadcn add` pulls rounded/shadowed defaults — audit and brutalize before committing. Status = `StatusMark` (form carries state, colour only on failure). **Numbered mono kickers (`01 / DASHBOARD`) are BANNED** — overruled 2026-07-27 as AI slop; use a real title in the display face, or nothing. **Mono is for data only** (counts, percentages, timers, IDs) — labels, buttons and body copy are Inter, sentence case, never forced uppercase. Progress bars are 8pt, not hairlines. The house UI-UX vault (`~/Documents/Obsidian Vault/UI-UX`, `AI Design Tells.md`) outranks this design system wherever they conflict.
+
+## Evals
+
+- `backend/evals/quiz_quality.py` — question-quality eval (validity, evidence-hit, closed-book guess rate, completion, latency, cost per quiz) with `--replay`, `--gate` and `--rejudge`; see `backend/evals/README.md`.
+- `backend/evals/grading_cases.py` — 20 labelled free-text grading cases, `--baseline` for the old grader.
+- `backend/evals/concept_coverage.py` — share of a document's deciles that hold concept evidence.
+- Frontend unit tests: `cd frontend && npm test` (Node's built-in runner, no dependency).
 
 ## Specs
 
