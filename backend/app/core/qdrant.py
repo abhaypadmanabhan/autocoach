@@ -22,6 +22,10 @@ qdrant_client = QdrantClient(
 # Chunk location keys copied from chunk metadata into the point payload.
 LOCATION_KEYS = ("page", "slide")
 
+# Points per upsert request. 64 points of 1536 floats is about 2 MB of JSON:
+# a 6 MB batch of 200 timed out on a slow uplink.
+UPSERT_BATCH_SIZE = 64
+
 # Default collection settings
 DEFAULT_COLLECTION_NAME = "documents"
 VECTOR_SIZE = 1536  # OpenAI text-embedding-3-small dimensions
@@ -136,16 +140,21 @@ def store_vectors(
             )
             points.append(point)
         
-        # Upload points to Qdrant
-        qdrant_client.upsert(
-            collection_name=collection_name,
-            points=points
-        )
-        
+        # Upload in batches: one request for a whole large document exceeds
+        # Qdrant's 32 MB body limit.
+        for start in range(0, len(points), UPSERT_BATCH_SIZE):
+            qdrant_client.upsert(
+                collection_name=collection_name,
+                points=points[start:start + UPSERT_BATCH_SIZE],
+            )
+
         logger.info(f"Stored {len(points)} vectors in collection '{collection_name}'")
         return point_ids
     except Exception as e:
         logger.error(f"Failed to store vectors: {e}")
+        # A document whose upload stops part-way is marked failed; do not
+        # leave its earlier batches behind as orphan points.
+        delete_document_vectors(document_id, collection_name)
         raise
 
 
