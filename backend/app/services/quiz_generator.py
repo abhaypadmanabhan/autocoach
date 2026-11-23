@@ -9,7 +9,7 @@ from langfuse import propagate_attributes
 from app.core.supabase import supabase_admin
 from app.models.quiz import LLMQuestion
 from app.observability.langfuse import observe
-from app.services.retrieval import retrieve_relevant_chunks
+from app.services.retrieval import retrieve_for_concept, retrieve_relevant_chunks
 from app.services.llm import call_kimi, call_openai, tag_current_generation
 
 logger = logging.getLogger(__name__)
@@ -66,98 +66,6 @@ def _tokenize_keywords(text: str) -> list[str]:
     """Extract meaningful keywords from text, filtering stop words."""
     words = text.lower().split()
     return [w.strip(".,;:!?()[]{}\"'") for w in words if w.strip(".,;:!?()[]{}\"'") not in STOP_WORDS and len(w) > 1]
-
-
-def get_targeted_chunks(document_id: str, focus_concept_ids: list[str], limit_chars: int = 12000) -> list[dict]:
-    """
-    Retrieve chunks relevant to specific concepts using keyword matching.
-
-    Args:
-        document_id: The document to get chunks from.
-        focus_concept_ids: Concept UUIDs to target.
-        limit_chars: Max total characters of chunk content to return.
-
-    Returns:
-        List of chunk dicts with 'content' and 'chunk_index' keys.
-    """
-    try:
-        # Fetch concept details
-        concepts_res = (
-            supabase_admin.table("concepts")
-            .select("id, concept_name, concept_description")
-            .in_("id", focus_concept_ids)
-            .execute()
-        )
-        concepts = concepts_res.data or []
-
-        if not concepts:
-            logger.warning(f"No concepts found for IDs: {focus_concept_ids}")
-            return []
-
-        # Build keyword lists from concept names and descriptions
-        name_keywords = []
-        desc_keywords = []
-        for c in concepts:
-            name_keywords.extend(_tokenize_keywords(c.get("concept_name", "")))
-            desc_keywords.extend(_tokenize_keywords(c.get("concept_description", "")))
-
-        # Fetch all chunks for the document
-        chunks_res = (
-            supabase_admin.table("chunks")
-            .select("content, chunk_index")
-            .eq("document_id", document_id)
-            .order("chunk_index")
-            .execute()
-        )
-        all_chunks = chunks_res.data or []
-
-        if not all_chunks:
-            logger.warning(f"No chunks found for document {document_id}")
-            return []
-
-        # Score each chunk by keyword matching
-        scored_chunks = []
-        for chunk in all_chunks:
-            content_lower = chunk["content"].lower()
-            score = 0
-            for kw in name_keywords:
-                score += content_lower.count(kw) * 2
-            for kw in desc_keywords:
-                score += content_lower.count(kw)
-            scored_chunks.append((score, chunk))
-
-        # Sort by score descending
-        scored_chunks.sort(key=lambda x: x[0], reverse=True)
-
-        # Accumulate chunks until limit_chars
-        selected = []
-        total_chars = 0
-        for score, chunk in scored_chunks:
-            if score == 0:
-                break
-            chunk_len = len(chunk["content"])
-            if total_chars + chunk_len > limit_chars and selected:
-                break
-            selected.append(chunk)
-            total_chars += chunk_len
-
-        # Fallback: if no chunks scored > 0, return first N chunks by index
-        if not selected:
-            logger.info("No keyword-matched chunks, falling back to first chunks by index")
-            total_chars = 0
-            for chunk in all_chunks:
-                chunk_len = len(chunk["content"])
-                if total_chars + chunk_len > limit_chars and selected:
-                    break
-                selected.append(chunk)
-                total_chars += chunk_len
-
-        logger.info(f"get_targeted_chunks: selected {len(selected)} chunks ({total_chars} chars) for {len(concepts)} concepts")
-        return selected
-
-    except Exception as e:
-        logger.error(f"Failed to get targeted chunks: {e}")
-        return []
 
 
 def validate_question_alignment(question: dict, concept_names: list[str]) -> bool:
@@ -264,14 +172,15 @@ def _run_quiz_generation(
     try:
         # Determine chunk retrieval strategy
         if focus_concept_ids and target_concepts:
-            # Targeted mode: keyword-based chunk retrieval
-            chunks = get_targeted_chunks(document_id, focus_concept_ids)
-            if not chunks:
-                logger.warning("Targeted chunks empty, falling back to RAG retrieval")
-                chunks = retrieve_relevant_chunks(
-                    query="Generate quiz questions covering key concepts",
-                    document_id=document_id,
-                    top_k=num_questions * 3,
+            # Targeted mode: the passages that explain each target concept
+            # (dense + BM25). No generic fallback: passages about something
+            # else would produce an off-concept question.
+            chunks = []
+            for target in target_concepts:
+                seen = {c["chunk_index"] for c in chunks}
+                chunks.extend(
+                    c for c in retrieve_for_concept(document_id, target)
+                    if c["chunk_index"] not in seen
                 )
         else:
             # Default RAG-based retrieval
@@ -407,7 +316,11 @@ Return ONLY a valid JSON array with no markdown formatting."""
             # Callers that persist a question pick named fields, so this
             # extra key never reaches the database.
             context_chunks = [
-                {"chunk_index": c.get("chunk_index"), "content": c.get("content", "")}
+                {
+                    "chunk_index": c.get("chunk_index"),
+                    "content": c.get("content", ""),
+                    "metadata": c.get("metadata") or {},
+                }
                 for c in chunks
             ]
             for q in valid_questions:
