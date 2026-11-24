@@ -26,7 +26,7 @@ def _generate_with_responses(monkeypatch, responses, focus_concept_ids=None):
         lambda **_kwargs: [{"content": "Replication improves availability."}],
     )
 
-    def fake_call_kimi(_system_prompt, _user_prompt):
+    def fake_call_kimi(_system_prompt, _user_prompt, **_kwargs):
         calls.append("kimi")
         return next(response_iter)
 

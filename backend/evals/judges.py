@@ -5,12 +5,13 @@ a product choice: nothing here touches ``app/services/llm.py`` or any request
 path the app serves. Two backends are registered:
 
 ``kimi``
-    Moonshot Kimi K2.6 — the incumbent, and still the default. Moonshot rejects
+    Moonshot Kimi K2.6 — the former default, kept for explicit runs. Moonshot rejects
     any temperature other than 0.6 on this model, so the judge cannot be pinned
     to a deterministic setting. See :mod:`evals.kimi_judge`.
 
 ``openai``
-    OpenAI ``gpt-4o-mini`` at ``temperature=0`` with a fixed ``seed``. Uses the
+    OpenAI ``gpt-4o-mini`` at ``temperature=0`` with a fixed ``seed`` — the
+    default. Uses the
     ``OPENAI_API_KEY`` already required by the project (embeddings at ingestion,
     LLM fallback), so it adds no new credential.
 
@@ -34,9 +35,10 @@ from evals.kimi_judge import KIMI_JUDGE_TEMPERATURE
 JUDGE_KIMI = "kimi"
 JUDGE_OPENAI = "openai"
 
-#: Incumbent judge. Deliberately unchanged — calibration measures the default,
-#: it does not silently replace it.
-DEFAULT_JUDGE = JUDGE_KIMI
+#: Default judge. Was Kimi until 2026-11-22: the app's primary LLM moved to
+#: OpenRouter and the Moonshot key is no longer kept alive, so a Kimi default
+#: failed every run. Kimi stays registered for explicit `--judge kimi` runs.
+DEFAULT_JUDGE = JUDGE_OPENAI
 
 OPENAI_JUDGE_MODEL = "gpt-4o-mini"
 OPENAI_JUDGE_TEMPERATURE = 0.0

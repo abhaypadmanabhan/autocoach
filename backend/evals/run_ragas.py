@@ -191,10 +191,10 @@ def live_answer(question: str, contexts: list[str]) -> str:
 def default_evaluator(
     dataset: Any, metrics: list[Any], *, llm: Any = None, embeddings: Any = None
 ) -> EvalResult:
-    """Live Ragas evaluator. Builds the Kimi judge + OpenAI embeddings lazily.
+    """Live Ragas evaluator. Builds the default judge + OpenAI embeddings lazily.
 
     ``metrics`` may be strings (from ``METRIC_COLUMNS``) or ragas metric objs.
-    Pass ``llm``/``embeddings`` to skip building the Kimi judge (used by tests).
+    Pass ``llm``/``embeddings`` to skip building the judge (used by tests).
     """
     from ragas import evaluate  # lazy
     from ragas.metrics import (  # lazy
@@ -213,7 +213,7 @@ def default_evaluator(
     resolved = [metric_objs[m] if isinstance(m, str) else m for m in metrics]
 
     if llm is None or embeddings is None:
-        from evals.kimi_judge import build_judge_embeddings, build_judge_llm  # lazy
+        from evals.judges import build_judge_embeddings, build_judge_llm  # lazy
         llm = llm or build_judge_llm()
         embeddings = embeddings or build_judge_embeddings()
 

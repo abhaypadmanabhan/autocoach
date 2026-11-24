@@ -54,6 +54,9 @@ class LLMQuestion(BaseModel):
     correct_answer: str = Field(min_length=1, max_length=2000)
     explanation: str | None = Field(default=None, max_length=2000)
     concept_id: str | None = None
+    # One sentence copied verbatim from the passages that settles the answer.
+    # Used to verify the question and to cite its page; never stored or shown.
+    source_quote: str | None = Field(default=None, max_length=2000)
 
     @field_validator("concept_id")
     @classmethod
@@ -135,6 +138,12 @@ class AnswerResult(BaseModel):
     `correct_answer` / `explanation` are nullable because pending payloads
     deliberately omit them — the model answer must never be visible before
     the user's answer is graded (answer-leak fix).
+
+    `score` / `hint` / `points_hit` are the free-text grade details: `score`
+    is 0 (no key point), 1 (some) or 2 (all; `is_correct` is true only
+    then), `hint` a Socratic nudge given only at score 1, `points_hit` the
+    rubric points the answer covered. None for MCQ / T-F, pending answers
+    and answers graded without a usable score.
     """
 
     is_correct: bool | None = None
@@ -145,6 +154,9 @@ class AnswerResult(BaseModel):
     feedback: str | None = None
     xp_awarded: int = 0
     mastery_delta: float = 0.0
+    score: int | None = None
+    hint: str | None = None
+    points_hit: list[str] | None = None
 
 
 class AnswerResponse(BaseModel):

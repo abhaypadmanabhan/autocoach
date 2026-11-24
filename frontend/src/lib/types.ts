@@ -112,6 +112,13 @@ export interface AnswerResult {
   feedback?: string | null;
   xp_awarded?: number;
   mastery_delta?: number;
+  // Free-text answers only (null for MCQ and true/false): 0 wrong, 1 partly
+  // right, 2 right. `is_correct` is true only at 2.
+  score?: number | null;
+  // One guiding question, sent only at score 1.
+  hint?: string | null;
+  // The rubric points the answer covered.
+  points_hit?: string[] | null;
 }
 
 export type AnswerEvalStatus = "complete" | "pending";

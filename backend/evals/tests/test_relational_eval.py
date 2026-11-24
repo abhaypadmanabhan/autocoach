@@ -247,11 +247,11 @@ def test_evaluate_requires_explicit_judge():
         evaluate_relational(Q, A, C, transport=_transport(_payload()))  # type: ignore[call-arg]
 
 
-def test_default_ragas_judge_is_not_changed():
-    # The new evaluator must not touch the incumbent default judge.
+def test_relational_eval_does_not_set_the_ragas_default_judge():
+    # The default is owned by evals.judges (OpenAI since 2026-11-22), not here.
     from evals.judges import DEFAULT_JUDGE
 
-    assert DEFAULT_JUDGE == "kimi"
+    assert DEFAULT_JUDGE == "openai"
 
 
 # --------------------------------------------------------------------------

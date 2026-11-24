@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.core.supabase import supabase_admin
 from app.observability.langfuse import observe
 from app.services.quiz_generator import generate_single_question
-from app.services.answer_evaluator import evaluate_answer
+from app.services.answer_evaluator import FREE_TEXT_GRADE_EXTRAS, evaluate_answer
 from app.services.embeddings import get_embeddings
 from app.models.quiz import QuestionType
 from app.services.concepts import get_document_concepts, get_due_concepts
@@ -90,10 +90,14 @@ def _answer_payload(
     feedback: str | None = None,
     xp_awarded: int = 0,
     mastery_delta: float = 0.0,
+    score: int | None = None,
+    hint: str | None = None,
+    points_hit: list[str] | None = None,
 ) -> dict:
     """Single builder for the answer-result payload. Pending payloads MUST
     leave `correct_answer`/`explanation` at None — the model answer is never
-    exposed before the user's answer is graded."""
+    exposed before the user's answer is graded. `score`/`hint`/`points_hit`
+    are the free-text grade details; MCQ / T-F leave them None."""
     return {
         "is_correct": is_correct,
         "correct_answer": correct_answer,
@@ -103,6 +107,9 @@ def _answer_payload(
         "feedback": feedback,
         "xp_awarded": xp_awarded,
         "mastery_delta": mastery_delta,
+        "score": score,
+        "hint": hint,
+        "points_hit": points_hit,
     }
 
 
@@ -579,6 +586,8 @@ def _generate_and_insert_question(
     if not concept:
         return None
 
+    # Synchronous: the free checks always run; the solver call only when
+    # quiz_verify_first_question is on (it adds a model round trip here).
     q = generate_single_question(
         document_id=document_id,
         concept=concept,
@@ -586,6 +595,7 @@ def _generate_and_insert_question(
         question_types=question_types,
         session_id=session_id,
         user_id=user_id,
+        verify=False,
     )
     if not q:
         logger.error(
@@ -765,6 +775,7 @@ def generate_next_question_bg(session_id: str, user_id: str) -> None:
                 question_types=question_types,
                 session_id=session_id,
                 user_id=user_id,
+                verify=True,
             )
             if not q:
                 logger.warning(
@@ -1342,9 +1353,19 @@ def evaluate_answer_bg(session_id: str, user_id: str, question_id: str) -> None:
             question_text=question["question_text"],
             session_id=session_id,
             user_id=user_id,
+            # The session row was read under this user's id, so its document
+            # is theirs: the grader retrieves source passages from it.
+            document_id=session.get("document_id"),
         )
         is_correct = bool(verdict["is_correct"])
         feedback = verdict.get("feedback", "")
+        # Feedback and the grade details (score, points hit, rubric, hint).
+        # They go in with the verdict: the verdict long-poll returns the
+        # moment `is_correct` is set, so anything written later is missed.
+        grade = {
+            "feedback": feedback,
+            **{k: verdict[k] for k in FREE_TEXT_GRADE_EXTRAS if k in verdict},
+        }
 
         # Atomic verdict write — the exactly-once finalize gate. Conditional
         # on `is_correct IS NULL`: if a racing worker (duplicate bg task or a
@@ -1352,7 +1373,7 @@ def evaluate_answer_bg(session_id: str, user_id: str, question_id: str) -> None:
         # we MUST NOT finalize (mastery would double-count one answer).
         write = (
             supabase_admin.table("questions")
-            .update({"is_correct": is_correct})
+            .update({"is_correct": is_correct, "eval_result": grade})
             .eq("id", question_id)
             .is_("is_correct", "null")
             .execute()
@@ -1366,13 +1387,13 @@ def evaluate_answer_bg(session_id: str, user_id: str, question_id: str) -> None:
 
         finalized = _finalize_answer(session, user_id, question, is_correct, feedback)
 
-        # Best-effort: persist feedback + real mastery_delta/xp so the verdict
-        # long-poll can return them instead of hardcoded zeros.
+        # Best-effort: add the real mastery_delta/xp, known only after
+        # finalize, so a later verdict read returns them instead of zeros.
         try:
             supabase_admin.table("questions").update(
                 {
                     "eval_result": {
-                        "feedback": feedback,
+                        **grade,
                         "mastery_delta": finalized["result"].get("mastery_delta", 0.0),
                         "xp_awarded": finalized["result"].get("xp_awarded", 0),
                     }
@@ -1545,6 +1566,9 @@ def _build_verdict_response(
             feedback=stored.get("feedback"),
             xp_awarded=int(xp_awarded),
             mastery_delta=float(stored.get("mastery_delta") or 0.0),
+            score=stored.get("score"),
+            hint=stored.get("hint"),
+            points_hit=stored.get("points_hit"),
         ),
         "session_complete": session_complete,
         "session_ended_reason": ended_reason,
